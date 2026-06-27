@@ -5,13 +5,13 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/models/local_data_models.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class IncomingOrderSheet extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -42,13 +42,21 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   _AcceptStatus _status = _AcceptStatus.idle;
   String? _errorMessage;
 
+  // Fallback: locally-computed distance/time when backend values are missing
+  int? _distanceMeters;
+  int? _timeMinutes;
+  bool _fallbackLoading = false;
+
   @override
   Widget build(BuildContext context) {
     final orderId = widget.order['orderId'] as String;
-    final distance = widget.order['distanceToPassengerInMeters'] as int;
-    final timeHours = widget.order['averageTravelTimeInHours'] as int;
-    final timeMinutes = widget.order['averageTravelTimeInMinutes'] as int;
-    final totalDest = widget.order['distanceToDestinationInMeters'] as int;
+    final distance = (widget.order['distanceToPassengerInMeters'] as int?) ?? 0;
+    final timeHours = (widget.order['averageTravelTimeInHours'] as int?) ?? 0;
+    final timeMinutes = (widget.order['averageTravelTimeInMinutes'] as int?) ?? 0;
+    final totalDest = (widget.order['distanceToDestinationInMeters'] as int?) ?? 0;
+
+    // Fallback — if backend didn't send distance/time, calculate locally via Google Maps
+    final shouldFallback = distance == 0 && totalDest == 0 && _driverLocation != null;
     final passLat = (widget.order['passengerLatitude'] as num).toDouble();
     final passLng = (widget.order['passengerLongitude'] as num).toDouble();
 
@@ -64,14 +72,41 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          // Header com título + botões de ação
+          Row(
             children: [
-              Icon(Icons.directions_car, color: Color(0xFF4685C0)),
-              SizedBox(width: 8),
-              Text(
-                'Nova Viagem',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4E4E4E)),
+              const Icon(Icons.directions_car, color: Color(0xFF4685C0)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Nova Viagem',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4E4E4E)),
+                ),
               ),
+              if (isLoading)
+                const Padding(
+                  padding: EdgeInsets.only(right: 8),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              else ...[
+                _IconActionButton(
+                  icon: Icons.close,
+                  color: Colors.red,
+                  tooltip: 'Recusar',
+                  onPressed: () => _deny(context, orderId),
+                ),
+                const SizedBox(width: 12),
+                _IconActionButton(
+                  icon: _status == _AcceptStatus.success ? Icons.check : Icons.check_circle_outline,
+                  color: _status == _AcceptStatus.success ? Colors.green : const Color(0xFF4685C0),
+                  tooltip: 'Aceitar',
+                  onPressed: () => _accept(context, orderId),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -128,7 +163,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
             children: [
               const Icon(Icons.location_on, color: Color(0xFF4685C0), size: 20),
               const SizedBox(width: 8),
-              Text('$distance m ate o passageiro', style: const TextStyle(color: Color(0xFF4E4E4E))),
+              Text(
+                _resolveDistanceText(distance, shouldFallback),
+                style: const TextStyle(color: Color(0xFF4E4E4E)),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -136,7 +174,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
             children: [
               const Icon(Icons.route, color: Color(0xFF4685C0), size: 20),
               const SizedBox(width: 8),
-              Text('$totalDest m ate o destino', style: const TextStyle(color: Color(0xFF4E4E4E))),
+              Text(
+                _resolveTotalDestText(totalDest, shouldFallback),
+                style: const TextStyle(color: Color(0xFF4E4E4E)),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -144,14 +185,16 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
             children: [
               const Icon(Icons.timer, color: Color(0xFF4685C0), size: 20),
               const SizedBox(width: 8),
-              Text('${timeHours}h ${timeMinutes}min', style: const TextStyle(color: Color(0xFF4E4E4E))),
+              Text(
+                _resolveTimeText(timeHours, timeMinutes, shouldFallback),
+                style: const TextStyle(color: Color(0xFF4E4E4E)),
+              ),
             ],
           ),
-          const SizedBox(height: 24),
           // Error message container
           if (_status == _AcceptStatus.error && _errorMessage != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(top: 12),
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -173,62 +216,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
                 ),
               ),
             ),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: isLoading ? null : () => _deny(context, orderId),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: BorderSide(
-                      color: _status == _AcceptStatus.denying ? Colors.red.shade300 : Colors.red,
-                    ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: _status == _AcceptStatus.denying
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.red,
-                          ),
-                        )
-                      : const Text('Recusar', style: TextStyle(color: Colors.red, fontSize: 16)),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: isLoading ? null : () => _accept(context, orderId),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _status == _AcceptStatus.success ? Colors.green : const Color(0xFF4685C0),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: _status == _AcceptStatus.accepting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : _status == _AcceptStatus.success
-                      ? const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.check, color: Colors.white, size: 20),
-                            SizedBox(width: 4),
-                            Text('Viagem aceita!', style: TextStyle(color: Colors.white, fontSize: 16)),
-                          ],
-                        )
-                      : const Text('Aceitar', style: TextStyle(color: Colors.white, fontSize: 16)),
-                ),
-              ),
-            ],
-          ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom),
         ],
       ),
     );
@@ -272,7 +260,8 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // Open Google Maps navigation to destination
       final destLat = widget.order['destinationLatitude'] as num;
       final destLng = widget.order['destinationLongitude'] as num;
-      final googleMapsUrl = 'https://www.google.com/maps/dir/?api=1'
+      final googleMapsUrl =
+          'https://www.google.com/maps/dir/?api=1'
           '&destination=$destLat,$destLng'
           '&travelmode=driving';
 
@@ -333,6 +322,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     final destLat = (widget.order['destinationLatitude'] as num).toDouble();
     final destLng = (widget.order['destinationLongitude'] as num).toDouble();
 
+    final distance = (widget.order['distanceToPassengerInMeters'] as int?) ?? 0;
+    final totalDest = (widget.order['distanceToDestinationInMeters'] as int?) ?? 0;
+
     setState(() {
       if (result.isGranted) {
         _driverLocation = LatLng(result.position!.latitude, result.position!.longitude);
@@ -384,5 +376,106 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
 
       _mapLoaded = true;
     });
+
+    // Fallback: calculate distance/time locally if backend values are zero/missing
+    if (distance == 0 && totalDest == 0 && _driverLocation != null) {
+      _calculateFallbackDistance(passLat, passLng, destLat, destLng);
+    }
+  }
+
+  /// Calculates distance/time using Google Maps Directions API as fallback
+  Future<void> _calculateFallbackDistance(
+    double passLat,
+    double passLng,
+    double destLat,
+    double destLng,
+  ) async {
+    setState(() => _fallbackLoading = true);
+
+    try {
+      final directionsService = Modular.get<DirectionsService>();
+      final result = await directionsService.getDirections(
+        _driverLocation!.latitude,
+        _driverLocation!.longitude,
+        destLat,
+        destLng,
+      );
+
+      if (result != null && mounted) {
+        setState(() {
+          _distanceMeters = result.distanceMeters;
+          _timeMinutes = result.timeMinutes;
+          _fallbackLoading = false;
+        });
+      } else {
+        if (mounted) setState(() => _fallbackLoading = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _fallbackLoading = false);
+    }
+  }
+
+  String _resolveDistanceText(int distance, bool shouldFallback) {
+    if (shouldFallback) {
+      if (_fallbackLoading) return 'Calculando distância...';
+      if (_distanceMeters != null) return '$_distanceMeters m até o passageiro (estimado)';
+      return 'Distância não disponível';
+    }
+    return '$distance m até o passageiro';
+  }
+
+  String _resolveTotalDestText(int totalDest, bool shouldFallback) {
+    if (shouldFallback) {
+      if (_fallbackLoading) return 'Calculando...';
+      return '— até o destino';
+    }
+    return '$totalDest m até o destino';
+  }
+
+  String _resolveTimeText(int timeHours, int timeMinutes, bool shouldFallback) {
+    if (shouldFallback) {
+      if (_fallbackLoading) return 'Calculando...';
+      if (_timeMinutes != null) {
+        final h = _timeMinutes! ~/ 60;
+        final m = _timeMinutes! % 60;
+        return '${h}h ${m}min (estimado)';
+      }
+      return 'Tempo não disponível';
+    }
+    return '${timeHours}h ${timeMinutes}min';
+  }
+}
+
+class _IconActionButton extends StatelessWidget {
+  const _IconActionButton({
+    required this.icon,
+    required this.color,
+    this.tooltip,
+    this.onPressed,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String? tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip ?? '',
+      child: Material(
+        color: color.withAlpha(25),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: const CircleBorder(),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Icon(icon, color: color, size: 22),
+          ),
+        ),
+      ),
+    );
   }
 }

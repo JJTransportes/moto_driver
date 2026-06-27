@@ -1,0 +1,47 @@
+# AI-Assisted Spec-Driven Development
+
+AI tool agnostic Spec Driven Development implementation
+
+## Project Context
+
+### Paths
+- Steering: `.sdd/steering/`
+- Specs: `.sdd/specs/`
+
+### Steering vs Specification
+
+**Steering** (`.sdd/steering/`) - Guide AI with project-wide rules and context
+**Specs** (`.sdd/specs/`) - Formalize development process for individual features
+
+### Active Specifications
+- Check `.sdd/specs/` for active specifications
+- Use `/sdd:spec-status [feature-name]` to check progress
+
+## Development Guidelines
+- Think in English, generate responses in Portuguese. All Markdown content written to project files (e.g., requirements.md, design.md, tasks.md, research.md, validation reports) MUST be written in the target language configured for this specification (see spec.json.language).
+
+## Minimal Workflow
+- Phase 0 (optional): `/sdd:steering`, `/sdd:steering-custom`
+- Phase 1 (Specification):
+  - `/sdd:spec-init "description"`
+  - `/sdd:spec-requirements {feature}`
+  - `/sdd:validate-gap {feature}` (optional: for existing codebase)
+  - `/sdd:spec-design {feature} [-y]`
+  - `/sdd:validate-design {feature}` (optional: design review)
+  - `/sdd:spec-tasks {feature} [-y]`
+- Phase 2 (Implementation): `/sdd:spec-impl {feature} [tasks]`
+  - `/sdd:validate-impl {feature}` (optional: after implementation)
+- Progress check: `/sdd:spec-status {feature}` (use anytime)
+
+## Development Rules
+- **MANDATORY: Every delegated task MUST start with the SDD workflow. Never implement anything without going through the full specification process first: `/sdd:spec-init` → requirements → design → tasks → approval by the user. Once approved, then implement.**
+- **No exceptions. No shortcuts. No code without specs.** Even small changes, bug fixes, or seemingly trivial additions require a spec and user approval before any code is written.
+- 3-phase approval workflow: Requirements → Design → Tasks → Implementation
+- Human review required each phase; use `-y` only for intentional fast-track
+- Keep steering current and verify alignment with `/sdd:spec-status`
+- Follow the user's instructions precisely, and within that scope act autonomously: gather the necessary context and complete the requested work end-to-end in this run, asking questions only when essential information is missing or the instructions are critically ambiguous.
+
+## Steering Configuration
+- Load entire `.sdd/steering/` as project memory
+- Default files: `product.md`, `tech.md`, `structure.md`
+- Custom files are supported (managed via `/sdd:steering-custom`)

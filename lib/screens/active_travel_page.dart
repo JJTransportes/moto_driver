@@ -209,8 +209,22 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
     try {
       if (_hubConnected) {
+        // Get current location to send with finish event
+        double? lat;
+        double? lng;
+        try {
+          final locationService = Modular.get<LocationService>();
+          final pos = await locationService.getCurrentPosition();
+          if (pos.isGranted) {
+            lat = pos.position!.latitude;
+            lng = pos.position!.longitude;
+          }
+        } catch (_) {
+          // Location is optional — proceed without it
+        }
+
         final signalR = Modular.get<SignalRService>();
-        await signalR.finishTravel(widget.travelId);
+        await signalR.finishTravel(widget.travelId, latitude: lat, longitude: lng);
         await Future.delayed(const Duration(milliseconds: 500));
       } else {
         final dio = Modular.get<Dio>();
@@ -441,7 +455,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                 BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, -2)),
               ],
             ),
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,

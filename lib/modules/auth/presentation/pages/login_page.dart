@@ -78,6 +78,8 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+     
     return BlocConsumer<LoginBloc, LoginState>(
       listener: (context, state) {
         if (state is LoginSuccess) {
@@ -97,6 +99,7 @@ class _LoginPageState extends State<LoginPage> {
                 vertical: 36,
               ),
               child: Column(
+                spacing: size.height * 0.1,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   GradientText(
@@ -108,38 +111,31 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 24),
                   _buildBrandImage(),
-                  const SizedBox(height: 32),
-                  AppTextField(
-                    label: 'E-mail',
-                    hint: 'Informe seu e-mail',
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    errorText: _emailError,
-                  ),
-                  const SizedBox(height: 16),
-                  AppTextField(
-                    label: 'Senha',
-                    hint: 'Informe sua senha',
-                    controller: _passwordController,
-                    obscureText: true,
-                    errorText: _passwordError,
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pushNamed('/recovery'),
-                      child: Text(
-                        'Esqueci minha senha',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppColors.primary,
+                  Column(
+                    spacing: 16,
+                    children: [
+                      AppTextField(
+                        label: 'E-mail',
+                        hint: 'Informe seu e-mail',
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        errorText: _emailError,
+                      ),
+                      AppTextField(
+                        label: 'Senha',
+                        hint: 'Informe sua senha',
+                        controller: _passwordController,
+                        obscureText: true,
+                        errorText: _passwordError,
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pushNamed('/recovery'),
+                          child: Text('Esqueci minha senha', style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary)),
                         ),
                       ),
-                    ),
-                  ),
-                  if (errorMessage != null) ...[
-                    const SizedBox(height: 8),
+                      if (errorMessage != null) ...[
                     Text(
                       errorMessage,
                       style: const TextStyle(
@@ -148,12 +144,13 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                  ],
-                  const SizedBox(height: 24),
+                      ],
                   AppButton(
                     label: 'Entrar',
                     loading: isLoading,
                     onPressed: _submit,
+                  ),
+                    ],
                   ),
                 ],
               ),

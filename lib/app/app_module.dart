@@ -43,7 +43,7 @@ class AppModule extends Module {
     i.add<IAuthDatasource>(AuthDatasource.new);
     i.add<IAuthRepository>(AuthRepository.new);
     i.add<ILoginUsecase>(LoginUsecase.new);
-    i.add<LoginBloc>(LoginBloc.new);
+    i.addSingleton<LoginBloc>(LoginBloc.new);
   }
 
   @override

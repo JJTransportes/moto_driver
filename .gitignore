@@ -47,3 +47,5 @@ app.*.map.json
 .env
 .sdd/
 .claude/
+.pi/
+.vscode/launch.json
