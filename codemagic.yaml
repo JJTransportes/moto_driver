@@ -32,6 +32,9 @@ workflows:
         cat > .env << EOF
         API_BASE_URL=$API_BASE_URL
         EOF
+    - name: Build App Bundle
+      script: flutter build appbundle --release
+
     artifacts:
     - build/**/outputs/**/*.aab
     - build/**/outputs/**/mapping.txt
