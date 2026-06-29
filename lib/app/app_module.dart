@@ -1,27 +1,13 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart';
-import 'package:moto_driver/core/auth/auth_storage.dart';
-import 'package:moto_driver/core/auth/sign_out_service.dart';
-import 'package:moto_driver/core/brand/brand_cache_service.dart';
-import 'package:moto_driver/core/brand/i_brand_cache_service.dart';
-import 'package:moto_driver/core/http/dio_client.dart';
-import 'package:moto_driver/core/local_db/repositories/auth_local_repository.dart';
-import 'package:moto_driver/core/local_db/repositories/profile_local_repository.dart';
-import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
-import 'package:moto_driver/core/location/location_service.dart';
-import 'package:moto_driver/core/maps/directions_service.dart';
-import 'package:moto_driver/core/network/signalr_service.dart';
-import 'package:moto_driver/modules/auth/data/datasources/auth_datasource.dart';
-import 'package:moto_driver/modules/auth/data/datasources/i_auth_datasource.dart';
-import 'package:moto_driver/modules/auth/data/repositories/auth_repository.dart';
-import 'package:moto_driver/modules/auth/domain/repositories/i_auth_repository.dart';
+import 'package:moto_driver/core/common_module.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/i_login_usecase.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/login_usecase.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/login_page.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/password_recovery_page.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/password_reset_page.dart';
+import 'package:moto_driver/modules/driver_registration/driver_registration_module.dart';
 import 'package:moto_driver/screens/active_travel_page.dart';
 import 'package:moto_driver/screens/home_screen.dart';
 import 'package:moto_driver/screens/splash_screen.dart';
@@ -29,19 +15,9 @@ import 'package:moto_driver/screens/travel_history_page.dart';
 
 class AppModule extends Module {
   @override
+  List<Module> get imports => [CommonModule()];
+  @override
   void binds(i) {
-    i.addSingleton<Dio>(DioClient.create);
-    i.addSingleton<AuthStorage>(AuthStorage.new);
-    i.addSingleton<AuthLocalRepository>(AuthLocalRepository.new);
-    i.addSingleton<ProfileLocalRepository>(ProfileLocalRepository.new);
-    i.addSingleton<TravelLocalRepository>(TravelLocalRepository.new);
-    i.addSingleton<SignOutService>(SignOutService.new);
-    i.addSingleton<SignalRService>(SignalRService.new);
-    i.addSingleton<LocationService>(LocationService.new);
-    i.addSingleton<DirectionsService>(DirectionsService.new);
-    i.addSingleton<IBrandCacheService>(BrandCacheService.new);
-    i.add<IAuthDatasource>(AuthDatasource.new);
-    i.add<IAuthRepository>(AuthRepository.new);
     i.add<ILoginUsecase>(LoginUsecase.new);
     i.addSingleton<LoginBloc>(LoginBloc.new);
   }
@@ -64,5 +40,6 @@ class AppModule extends Module {
       return ActiveTravelPage(travelId: args['travelId'] as String);
     });
     r.child('/travel-history', child: (_) => const DriverTravelHistoryPage());
+    r.module('/driver-register', module: DriverRegistrationModule());
   }
 }

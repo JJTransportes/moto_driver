@@ -150,6 +150,13 @@ class _LoginPageState extends State<LoginPage> {
                     loading: isLoading,
                     onPressed: _submit,
                   ),
+                  TextButton(
+                          onPressed: () => Navigator.of(context).pushNamed('/driver-register/'),
+                    child: Text(
+                      'Criar conta',
+                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
+                    ),
+                  ),
                     ],
                   ),
                 ],

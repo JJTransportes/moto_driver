@@ -19,6 +19,14 @@ class ValidationException implements Exception {
   String toString() => message;
 }
 
+class DuplicateException implements Exception {
+  final String message;
+  final String? field;
+  const DuplicateException(this.message, {this.field});
+  @override
+  String toString() => message;
+}
+
 class RateLimitedException implements Exception {
   final String message;
   const RateLimitedException([this.message = 'Muitas tentativas. Tente novamente mais tarde.']);
