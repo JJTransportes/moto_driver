@@ -1,14 +1,16 @@
 workflows:
-  android_staging:
-    name: Moto Staging
+  ios_staging:
+    name: Moto IOs Staging
     instance_type: mac_mini_m1
     max_build_duration: 30
+    integrations:
+      app_store_connect: Moto Platform
 
     triggering:
       events:
       - push
       branch_patterns:
-      - pattern: "staging"
+      - pattern: "ios_staging"
       - include: true
       - source: true
       cancel_previous_builds: true
@@ -17,31 +19,39 @@ workflows:
       flutter: 3.32.2
       groups:
       - moto_staging
-      android_signing:
-      - moto_keystore
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: $BUNDLE_ID
 
     scripts:
-    - name: Set up local.properties
-      script: echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
-
-    - name: Get Flutter packages
-      script: flutter pub get
-
-    - name: Config definitions
+    - name: Set up code signing settings on Xcode project
       script: |
-        cat > .env << EOF
-        API_BASE_URL=$API_BASE_URL
-        EOF
-    - name: Build App Bundle
-      script: flutter build appbundle --release
-
+        xcode-project use-profiles
+    - name: Get Flutter packages
+      script: |
+        flutter pub get
+    - name: Install pods
+      script: |
+        find . -name "Podfile" -execdir pod install \;
+    - name: Flutter analyze
+      script: |
+        flutter analyze
+    - name: Flutter unit tests
+      script: |
+        flutter test
+      ignore_failure: false
+    - name: Flutter build ipa
+      script: |
+        flutter build ipa --release \
+          --build-name=1.0.0 \
+          --build-number=$(($(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID") + 1)) \
+          --export-options-plist=/Users/builder/export_options.plist
     artifacts:
-    - build/**/outputs/**/*.aab
-    - build/**/outputs/**/mapping.txt
+    - build/ios/ipa/*.ipa
+    - /tmp/xcodebuild_logs/*.log
     - flutter_drive.log
 
     publishing:
-
       email:
         recipients:
         - comercialpepiviagens@gmail.com
@@ -49,7 +59,11 @@ workflows:
           success: false
           failure: true
 
-      google_play:
-        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
-        track: alpha
-        submit_as_draft: false
+      app_store_connect:
+        auth: integration
+        beta_groups:
+        - Moto Platform
+        expire_build_submitted_for_review: true
+        submit_to_testflight: true
+        submit_to_app_store: false
+        release_type: MANUAL
