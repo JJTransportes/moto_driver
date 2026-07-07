@@ -33,6 +33,11 @@ workflows:
     - name: Install pods
       script: |
         find . -name "Podfile" -execdir pod install \;
+    - name: Config definitions
+      script: |
+        cat > .env << EOF
+        API_BASE_URL=$API_BASE_URL
+        EOF
     - name: Flutter build ipa
       script: |
         flutter build ipa --release \
