@@ -22,6 +22,10 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: $BUNDLE_ID
+        certificates:
+        - certificate: moto_driver_staging
+        provisioning_profiles:
+        - profile: moto_driver_staging
 
     scripts:
     - name: Set up code signing settings on Xcode project
