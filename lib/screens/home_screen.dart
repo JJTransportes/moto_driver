@@ -31,6 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _currentPassengerName;
   Timer? _locationTimer;
 
+  final Set<String> _deniedOrderIds = {};
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,11 +65,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 24),
               // Active travel card
-              if (_currentTravelId != null && _currentTravelStatus != 'Cancelled' && _currentTravelStatus != 'Completed')
-                _buildActiveTravelCard(),
+              if (_currentTravelId != null && _currentTravelStatus != 'Cancelled' && _currentTravelStatus != 'Completed') _buildActiveTravelCard(),
               if (_currentTravelId == null || _currentTravelStatus == 'Cancelled' || _currentTravelStatus == 'Completed')
                 const Expanded(
-                  child: Center(child: Text('Aguardando novas viagens...', style: TextStyle(color: Color(0xFF4E4E4E), fontSize: 16))),
+                  child: Center(
+                    child: Text('Aguardando novas viagens...', style: TextStyle(color: Color(0xFF4E4E4E), fontSize: 16)),
+                  ),
                 ),
               const SizedBox(height: 12),
               SizedBox(
@@ -232,7 +235,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _newOrderSub = signalR.onNewOrder.listen((data) {
       if (_currentTravelId != null) return; // Already in a travel
-      IncomingOrderSheet.show(context, data);
+
+      final orderId = data['orderId'] as String?;
+      if (orderId == null) return;
+
+      // If this order was already denied, ignore the re-send
+      if (_deniedOrderIds.contains(orderId)) return;
+
+      // A new (non-denied) order signals a fresh dispatch round — clear old denials
+      if (_deniedOrderIds.isNotEmpty) {
+        _deniedOrderIds.clear();
+      }
+
+      IncomingOrderSheet.show(
+        context,
+        data,
+        onDenied: () {
+          _deniedOrderIds.add(orderId);
+        },
+      );
     });
 
     _orderAcceptedSub = signalR.onOrderAccepted.listen((data) {
@@ -309,8 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
       (_) async {
         try {
           final hasPermission = await Geolocator.checkPermission();
-          if (hasPermission == LocationPermission.denied ||
-              hasPermission == LocationPermission.deniedForever) {
+          if (hasPermission == LocationPermission.denied || hasPermission == LocationPermission.deniedForever) {
             return;
           }
           final position = await Geolocator.getCurrentPosition(
