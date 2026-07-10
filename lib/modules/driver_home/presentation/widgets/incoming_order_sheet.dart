@@ -10,23 +10,23 @@ import 'package:moto_driver/core/local_db/models/local_data_models.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
-import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class IncomingOrderSheet extends StatefulWidget {
   final Map<String, dynamic> order;
+  final VoidCallback? onDenied;
 
-  const IncomingOrderSheet({super.key, required this.order});
+  const IncomingOrderSheet({super.key, required this.order, this.onDenied});
 
   @override
   State<IncomingOrderSheet> createState() => _IncomingOrderSheetState();
 
-  static void show(BuildContext context, Map<String, dynamic> order) {
+  static void show(BuildContext context, Map<String, dynamic> order, {VoidCallback? onDenied}) {
     showModalBottomSheet(
       context: context,
       isDismissible: false,
       enableDrag: false,
-      builder: (_) => IncomingOrderSheet(order: order),
+      builder: (_) => IncomingOrderSheet(order: order, onDenied: onDenied),
     );
   }
 }
@@ -240,12 +240,14 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       final orderId = widget.order['orderId'] as String;
       final response = await dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/accept');
 
-      // Success feedback — show confirmation for 1.5s then navigate to active travel
-      setState(() => _status = _AcceptStatus.success);
-      await Future.delayed(const Duration(milliseconds: 1500));
-
       // Get travelId from response
       final travelId = response.data['travelId'] as String;
+
+      // Close the sheet immediately
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
+
+      // Persist travel locally
       final travelRepo = Modular.get<TravelLocalRepository>();
       await travelRepo.saveActiveTravel(
         TravelLocalData(
@@ -257,7 +259,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
         ),
       );
 
-      // Open Google Maps navigation to destination
+      // Open Google Maps navigation to destination (best-effort)
       final destLat = widget.order['destinationLatitude'] as num;
       final destLng = widget.order['destinationLongitude'] as num;
       final googleMapsUrl =
@@ -271,7 +273,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
         // Google Maps not available — continue to active travel page
       }
 
-      Navigator.of(context).pop();
+      // Navigate to active travel
       Modular.to.pushNamed('/active-travel', arguments: {'travelId': travelId});
     } on DioException catch (e) {
       String message;
@@ -297,19 +299,19 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   }
 
   Future<void> _deny(BuildContext context, String orderId) async {
-    setState(() {
-      _status = _AcceptStatus.denying;
-      _errorMessage = null;
-    });
+    // Notify parent that this order was denied (for duplicate tracking)
+    widget.onDenied?.call();
+
+    // Close the sheet immediately — denial is fire-and-forget
+    Navigator.of(context).pop();
 
     try {
-      await Modular.get<SignalRService>().denyOrder(orderId);
-      Navigator.of(context).pop();
-    } catch (_) {
-      setState(() {
-        _status = _AcceptStatus.error;
-        _errorMessage = 'Erro ao recusar viagem. Tente novamente.';
-      });
+      final dio = Modular.get<Dio>();
+      await dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
+    } on DioException catch (e) {
+      // Log the error but don't block the UI — backend already recorded the denial
+      log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}',
+          name: 'travel-deny');
     }
   }
 

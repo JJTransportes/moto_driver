@@ -48,9 +48,13 @@ class SignalRService {
   }
 
   /// Envia um comando 'DenyOrder' para o hub de travel-orders.
+  /// Lança exceção se a conexão não estiver estabelecida.
   Future<void> denyOrder(String travelId) async {
     final conn = _connections['travel-orders'];
-    await conn?.invoke('DenyOrder', args: [travelId]);
+    if (conn == null) {
+      throw Exception('Conexão SignalR não estabelecida para travel-orders');
+    }
+    await conn.invoke('DenyOrder', args: [travelId]);
   }
 
   /// Desconecta apenas o hub especificado.
