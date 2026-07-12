@@ -31,6 +31,10 @@ class RegistrationDatasource implements IRegistrationDatasource {
         body['department'] = params.department!.trim();
       }
 
+      if (params.phone != null && params.phone!.trim().isNotEmpty) {
+        body['phone'] = params.phone!.trim();
+      }
+
       await _dio.post(
         '/api/registrations',
         data: body,

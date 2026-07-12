@@ -30,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _currentTravelId;
   String? _currentPassengerName;
   Timer? _locationTimer;
+  String? _userId;
+  String? _userPhotoUrl;
+  final String _userName = 'Motorista';
 
   final Set<String> _deniedOrderIds = {};
 
@@ -60,7 +63,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ProfileHeader(
-                fullName: 'Motorista',
+                fullName: _userName,
+                photoUrl: _userPhotoUrl,
+                userId: _userId ?? '',
                 onSignOut: _handleSignOut,
               ),
               const SizedBox(height: 24),
@@ -192,8 +197,17 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _loadUserId();
     _loadActiveTravel();
     _connectSignalR();
+  }
+
+  Future<void> _loadUserId() async {
+    final authStorage = Modular.get<AuthStorage>();
+    final userId = await authStorage.getUserId();
+    if (mounted) {
+      setState(() => _userId = userId);
+    }
   }
 
   Future<void> _loadActiveTravel() async {

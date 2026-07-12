@@ -24,6 +24,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _departmentController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _cnhController = TextEditingController();
 
   DateTime? _birthdate;
@@ -34,6 +35,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   String? _birthdateError;
   String? _emailError;
   String? _passwordError;
+  String? _phoneError;
   String? _cnhError;
 
   bool _obscurePassword = true;
@@ -47,6 +49,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     _emailController.dispose();
     _passwordController.dispose();
     _departmentController.dispose();
+    _phoneController.dispose();
     _cnhController.dispose();
     super.dispose();
   }
@@ -60,6 +63,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       _birthdateError = null;
       _emailError = null;
       _passwordError = null;
+      _phoneError = null;
       _cnhError = null;
 
       if (_fullNameController.text.trim().isEmpty) {
@@ -89,6 +93,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
         _passwordError = 'Campo obrigatório';
         valid = false;
       }
+      final phoneDigits = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
+      if (phoneDigits.isNotEmpty && phoneDigits.length < 10) {
+        _phoneError = 'Telefone inválido';
+        valid = false;
+      }
       if (_cnhController.text.trim().isEmpty) {
         _cnhError = 'Campo obrigatório';
         valid = false;
@@ -113,6 +122,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
       department: _departmentController.text.trim().isEmpty
           ? null
           : _departmentController.text.trim(),
+      phone: _phoneController.text.trim().isEmpty
+          ? null
+          : _phoneController.text.trim(),
       cnh: _cnhController.text.trim(),
     );
 
@@ -199,6 +211,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     label: 'Matrícula',
                     hint: 'Opcional',
                     controller: _registrationController,
+                  ),
+                  AppTextField(
+                    label: 'Telefone',
+                    hint: '(12) 91234-5678',
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    errorText: _phoneError,
                   ),
                   _buildDateField(),
                   AppTextField(
