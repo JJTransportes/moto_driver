@@ -8,6 +8,7 @@ import 'package:moto_driver/modules/auth/presentation/pages/login_page.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/password_recovery_page.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/password_reset_page.dart';
 import 'package:moto_driver/modules/driver_registration/driver_registration_module.dart';
+import 'package:moto_driver/modules/profile_configuration/profile_configuration_module.dart';
 import 'package:moto_driver/screens/active_travel_page.dart';
 import 'package:moto_driver/screens/home_screen.dart';
 import 'package:moto_driver/screens/splash_screen.dart';
@@ -41,5 +42,6 @@ class AppModule extends Module {
     });
     r.child('/travel-history', child: (_) => const DriverTravelHistoryPage());
     r.module('/driver-register', module: DriverRegistrationModule());
+    r.module('/profile-configuration', module: ProfileConfigurationModule());
   }
 }

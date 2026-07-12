@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:flutter_modular/flutter_modular.dart';
+import 'package:moto_driver/modules/profile_configuration/presentation/widgets/profile_image_display.dart';
 
 class ProfileHeader extends StatelessWidget {
   final String fullName;
+  final String? photoUrl;
+  final String userId;
   final VoidCallback? onSignOut;
 
   const ProfileHeader({
     super.key,
     required this.fullName,
+    this.photoUrl,
+    required this.userId,
     this.onSignOut,
   });
 
@@ -15,17 +20,10 @@ class ProfileHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        CircleAvatar(
-          backgroundColor: AppColors.primary,
+        ProfileImageDisplay(
+          photoUrl: photoUrl,
+          name: fullName,
           radius: 17,
-          child: Text(
-            fullName.isNotEmpty ? fullName[0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
         ),
         const SizedBox(width: 12),
         Text(
@@ -39,6 +37,9 @@ class ProfileHeader extends StatelessWidget {
         const Spacer(),
         PopupMenuButton<String>(
           onSelected: (value) {
+            if (value == 'settings') {
+              Modular.to.pushNamed('/profile-configuration', arguments: {'userId': userId});
+            }
             if (value == 'signout') onSignOut?.call();
           },
           itemBuilder: (_) => const [
