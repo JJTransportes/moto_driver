@@ -1,57 +1,42 @@
 workflows:
-  ios_staging:
-    name: Moto IOs Staging
+  android_staging:
+    name: Moto Android Staging
     instance_type: mac_mini_m1
     max_build_duration: 30
-    integrations:
-      app_store_connect: Moto Driver
 
     triggering:
       events:
       - push
       branch_patterns:
-      - pattern: "ios_staging"
-      - include: true
-      - source: true
-      cancel_previous_builds: true
+      - pattern: "android_staging"
+      - include: false
+      - source: false
 
     environment:
       flutter: 3.32.2
       groups:
       - moto_staging
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: $BUNDLE_ID
+      android_signing:
+      - moto_keystore
 
     scripts:
-    - name: Set up code signing settings on Xcode project
-      script: |
-        xcode-project use-profiles
+    - name: Set up local.properties
+      script: echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
 
     - name: Get Flutter packages
-      script: |
-        flutter pub get
-
-    - name: Install pods
-      script: |
-        find . -name "Podfile" -execdir pod install \;
+      script: flutter pub get
 
     - name: Config definitions
       script: |
         cat > .env << EOF
         API_BASE_URL=$API_BASE_URL
         EOF
+    - name: Build App Bundle
+      script: flutter build appbundle --release
 
-    - name: Flutter build ipa
-      script: |+
-        flutter build ipa --release \
-          --build-name=1.0.0 \
-          --build-number=4 \
-          --export-options-plist=/Users/builder/export_options.plist
-          
     artifacts:
-    - build/ios/ipa/*.ipa
-    - /tmp/xcodebuild_logs/*.log
+    - build/**/outputs/**/*.aab
+    - build/**/outputs/**/mapping.txt
     - flutter_drive.log
 
     publishing:
@@ -62,10 +47,7 @@ workflows:
           success: false
           failure: true
 
-      app_store_connect:
-        auth: integration
-        beta_groups:
-        - Moto Driver Staging
-        submit_to_testflight: true
-        submit_to_app_store: false
-        issuer_id: $ISSUER_ID
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: alpha
+        submit_as_draft: false
