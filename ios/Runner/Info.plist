@@ -53,5 +53,7 @@
   <string>Este aplicativo utiliza sua localização para oferecer funcionalidades relacionadas ao mapa e melhorar sua experiência.</string>
   <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
   <string>Este aplicativo utiliza sua localização para oferecer funcionalidades relacionadas ao mapa, mesmo quando necessário em segundo plano.</string>
+  <key>IosMapsApiKey</key>
+	<string>$(IOS_MAPS_API_KEY)</string>
 </dict>
 </plist>

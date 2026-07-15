@@ -49,3 +49,4 @@ app.*.map.json
 .claude/
 .pi/
 .vscode/launch.json
+ios/Flutter/Secrets.xcconfig
