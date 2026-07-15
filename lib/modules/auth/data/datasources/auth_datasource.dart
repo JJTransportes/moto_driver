@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:moto_driver/core/errors/exceptions.dart';
 import 'package:moto_driver/modules/auth/data/datasources/i_auth_datasource.dart';
+import 'package:moto_driver/modules/auth/data/models/refresh_token_response_model.dart';
 import 'package:moto_driver/modules/auth/data/models/sign_in_response_model.dart';
 
 class AuthDatasource implements IAuthDatasource {
@@ -16,6 +17,21 @@ class AuthDatasource implements IAuthDatasource {
         data: {'email': email, 'password': password},
       );
       return SignInResponseModel.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    }
+  }
+
+  @override
+  Future<RefreshTokenResponseModel> refreshToken(String refreshToken) async {
+    try {
+      final response = await _dio.post(
+        '/api/auth/refresh',
+        data: {'refreshToken': refreshToken},
+      );
+      return RefreshTokenResponseModel.fromJson(
         response.data as Map<String, dynamic>,
       );
     } on DioException catch (e) {

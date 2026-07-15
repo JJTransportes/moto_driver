@@ -6,6 +6,7 @@ class AuthStorage {
   final FlutterSecureStorage _storage;
 
   static const _tokenKey = 'moto_driver_token';
+  static const _refreshTokenKey = 'moto_driver_refresh_token';
   static const _userIdKey = 'moto_driver_user_id';
 
   AuthStorage() : _storage = const FlutterSecureStorage();
@@ -21,9 +22,15 @@ class AuthStorage {
 
   Future<String?> getUserId() => _safeRead(_userIdKey);
 
+  Future<void> saveRefreshToken(String token) =>
+      _storage.write(key: _refreshTokenKey, value: token);
+
+  Future<String?> getRefreshToken() => _safeRead(_refreshTokenKey);
+
   Future<void> clear() async {
     await Future.wait([
       _storage.delete(key: _tokenKey),
+      _storage.delete(key: _refreshTokenKey),
       _storage.delete(key: _userIdKey),
     ]);
   }

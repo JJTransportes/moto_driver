@@ -27,6 +27,9 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
     if (result.isSuccess()) {
       final user = result.getOrNull()!;
       await _authStorage.saveToken(user.token, user.id);
+      if (user.refreshToken != null) {
+        await _authStorage.saveRefreshToken(user.refreshToken!);
+      }
       await _authLocal.saveAuth(
         userId: user.id,
         accessToken: user.token,

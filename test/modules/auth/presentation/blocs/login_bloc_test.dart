@@ -25,6 +25,13 @@ void main() {
     roles: ['Driver'],
   );
 
+  const userWithRefresh = UserEntity(
+    id: 'user_1',
+    token: 'tok_123',
+    refreshToken: 'refresh_456',
+    roles: ['Driver'],
+  );
+
   group('LoginBloc', () {
     blocTest<LoginBloc, LoginState>(
       'emits [LoginLoading, LoginSuccess] when login succeeds and persists token',
@@ -32,6 +39,8 @@ void main() {
         when(() => mockUsecase.call(any(), any()))
             .thenAnswer((_) async => Success(user));
         when(() => mockAuthStorage.saveToken(any(), any()))
+            .thenAnswer((_) async {});
+        when(() => mockAuthStorage.saveRefreshToken(any()))
             .thenAnswer((_) async {});
         when(() => mockAuthLocal.saveAuth(
               userId: any(named: 'userId'),
@@ -49,6 +58,44 @@ void main() {
       ],
       verify: (_) {
         verify(() => mockAuthStorage.saveToken('tok_123', 'user_1'))
+            .called(1);
+        verify(() => mockAuthStorage.saveRefreshToken(any()))
+            .called(1);
+        verify(() => mockAuthLocal.saveAuth(
+              userId: 'user_1',
+              accessToken: 'tok_123',
+              roles: ['Driver'],
+            )).called(1);
+      },
+    );
+
+    blocTest<LoginBloc, LoginState>(
+      'emits [LoginLoading, LoginSuccess] and persists refreshToken when present',
+      build: () {
+        when(() => mockUsecase.call(any(), any()))
+            .thenAnswer((_) async => Success(userWithRefresh));
+        when(() => mockAuthStorage.saveToken(any(), any()))
+            .thenAnswer((_) async {});
+        when(() => mockAuthStorage.saveRefreshToken(any()))
+            .thenAnswer((_) async {});
+        when(() => mockAuthLocal.saveAuth(
+              userId: any(named: 'userId'),
+              accessToken: any(named: 'accessToken'),
+              roles: any(named: 'roles'),
+            )).thenAnswer((_) async {});
+        return LoginBloc(mockUsecase, mockAuthStorage, mockAuthLocal);
+      },
+      act: (bloc) => bloc.add(
+        const LoginSubmitted(email: 'joao@moto.com', password: '123456'),
+      ),
+      expect: () => [
+        const LoginLoading(),
+        LoginSuccess(userWithRefresh),
+      ],
+      verify: (_) {
+        verify(() => mockAuthStorage.saveToken('tok_123', 'user_1'))
+            .called(1);
+        verify(() => mockAuthStorage.saveRefreshToken('refresh_456'))
             .called(1);
         verify(() => mockAuthLocal.saveAuth(
               userId: 'user_1',
