@@ -32,6 +32,12 @@ workflows:
       script: |
         flutter pub get
 
+    - name: Set application secrets
+      script: |
+        cat <<EOF > ios/Flutter/Secrets.xcconfig
+        IOS_MAPS_API_KEY=$IOS_MAPS_API_KEY
+        EOF
+
     - name: Install pods
       script: |
         find . -name "Podfile" -execdir pod install \;
