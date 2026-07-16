@@ -88,9 +88,7 @@ class ProfileDatasource implements IProfileDatasource {
           'Erro interno do servidor. Tente novamente mais tarde.',
         );
       default:
-        if (e.type == DioExceptionType.connectionTimeout ||
-            e.type == DioExceptionType.receiveTimeout ||
-            e.type == DioExceptionType.connectionError) {
+        if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout || e.type == DioExceptionType.connectionError) {
           return const NetworkException(
             'Erro de conexão. Verifique sua internet e tente novamente.',
           );
