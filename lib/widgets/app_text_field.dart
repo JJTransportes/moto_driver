@@ -52,7 +52,7 @@ class AppTextField extends StatelessWidget {
             hintStyle: GoogleFonts.robotoFlex(
               fontSize: 10,
               fontWeight: FontWeight.w300,
-              color: AppColors.primary.withOpacity(0.5),
+              color: AppColors.primary,
               letterSpacing: 0.2,
             ),
             contentPadding: const EdgeInsets.all(12),

@@ -1,4 +1,6 @@
+import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/modules/profile_configuration/domain/entities/profile_entity.dart';
 import 'package:moto_driver/modules/profile_configuration/domain/usecases/i_get_profile_usecase.dart';
 import 'package:moto_driver/modules/profile_configuration/domain/usecases/i_update_profile_usecase.dart';
@@ -74,7 +76,9 @@ class ProfileConfigurationBloc extends Bloc<ProfileConfigurationEvent, ProfileCo
 
     emit(ProfileImageUploadLoading(profile: profile, progress: 0.0));
 
-    final result = await _uploadImage(profile.id, event.filePath);
+    final authStorage = Modular.get<AuthStorage>();
+    final authUserId = await authStorage.getUserId();
+    final result = await _uploadImage(authUserId ?? profile.id, event.filePath);
     result.fold(
       (photoUrl) {
         final updatedProfile = profile.copyWith(photoUrl: photoUrl);
