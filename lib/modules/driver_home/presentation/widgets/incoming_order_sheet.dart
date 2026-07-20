@@ -117,7 +117,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 200,
+            height: MediaQuery.sizeOf(context).height * 0.16,
             child: _mapLoaded
                 ? GoogleMap(
                     initialCameraPosition: CameraPosition(
