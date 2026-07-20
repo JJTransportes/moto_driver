@@ -23,6 +23,7 @@ class IncomingOrderSheet extends StatefulWidget {
 
   static void show(BuildContext context, Map<String, dynamic> order, {VoidCallback? onDenied}) {
     showModalBottomSheet(
+      useSafeArea: true,
       context: context,
       isDismissible: false,
       enableDrag: false,
@@ -69,6 +70,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -310,8 +312,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       await dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
     } on DioException catch (e) {
       // Log the error but don't block the UI — backend already recorded the denial
-      log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}',
-          name: 'travel-deny');
+      log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
     }
   }
 

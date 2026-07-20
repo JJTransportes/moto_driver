@@ -204,9 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadUserId() async {
     final authStorage = Modular.get<AuthStorage>();
     final userId = await authStorage.getUserId();
-    if (mounted) {
-      setState(() => _userId = userId);
-    }
+    setState(() => _userId = userId);
   }
 
   Future<void> _checkActiveTravelHttp() async {
@@ -230,13 +228,11 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
       // Sem viagem ativa via REST — limpa estado
-      if (mounted) {
-        setState(() {
-          _currentTravelId = null;
-          _currentTravelStatus = null;
-          _currentPassengerName = null;
-        });
-      }
+      setState(() {
+        _currentTravelId = null;
+        _currentTravelStatus = null;
+        _currentPassengerName = null;
+      });
     } catch (_) {
       // Fallback silencioso para cache local
       await _loadActiveTravelFromLocal();
