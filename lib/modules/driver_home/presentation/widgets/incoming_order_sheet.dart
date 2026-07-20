@@ -222,7 +222,6 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
                 ),
               ),
             ),
-          SizedBox(height: MediaQuery.of(context).padding.bottom),
         ],
       ),
     );
