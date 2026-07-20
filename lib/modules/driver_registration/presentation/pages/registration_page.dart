@@ -23,7 +23,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _registrationController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _departmentController = TextEditingController();
   final _phoneController = TextEditingController();
   final _cnhController = TextEditingController();
 
@@ -48,7 +47,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
     _registrationController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _departmentController.dispose();
     _phoneController.dispose();
     _cnhController.dispose();
     super.dispose();
@@ -113,18 +111,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
       fullName: _fullNameController.text.trim(),
       cpf: _cpfController.text.trim(),
       rg: _rgController.text.trim(),
-      registration: _registrationController.text.trim().isEmpty
-          ? null
-          : _registrationController.text.trim(),
+      registration: _registrationController.text.trim().isEmpty ? null : _registrationController.text.trim(),
       birthdate: _birthdate!,
       email: _emailController.text.trim(),
       initialPassword: _passwordController.text,
-      department: _departmentController.text.trim().isEmpty
-          ? null
-          : _departmentController.text.trim(),
-      phone: _phoneController.text.trim().isEmpty
-          ? null
-          : _phoneController.text.trim(),
+      phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
       cnh: _cnhController.text.trim(),
     );
 
@@ -209,8 +200,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   ),
                   AppTextField(
                     label: 'Matrícula',
-                    hint: 'Opcional',
+                    hint: 'N° de matrícula',
                     controller: _registrationController,
+                    keyboardType: TextInputType.number,
                   ),
                   AppTextField(
                     label: 'Telefone',
@@ -229,15 +221,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   ),
                   _buildPasswordField(),
                   AppTextField(
-                    label: 'Departamento',
-                    hint: 'Opcional',
-                    controller: _departmentController,
-                  ),
-                  AppTextField(
                     label: 'CNH',
                     hint: 'Número da CNH',
                     controller: _cnhController,
                     errorText: _cnhError,
+                    keyboardType: TextInputType.number,
                   ),
                   if (errorMessage != null)
                     Text(
@@ -299,15 +287,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
               ),
             ),
             child: Text(
-              _birthdate != null
-                  ? DateFormat('dd/MM/yyyy').format(_birthdate!)
-                  : 'Selecione a data',
+              _birthdate != null ? DateFormat('dd/MM/yyyy').format(_birthdate!) : 'Selecione a data',
               style: GoogleFonts.robotoFlex(
                 fontSize: 10,
                 fontWeight: FontWeight.w300,
-                color: _birthdate != null
-                    ? AppColors.primary
-                    : AppColors.primary.withValues(alpha: 0.5),
+                color: _birthdate != null ? AppColors.primary : AppColors.primary.withValues(alpha: 0.5),
                 letterSpacing: 0.2,
               ),
             ),

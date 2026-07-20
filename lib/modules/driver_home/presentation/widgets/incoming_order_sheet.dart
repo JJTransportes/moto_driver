@@ -1,4 +1,4 @@
-import 'dart:convert' show jsonEncode;
+import 'dart:convert' show jsonDecode, jsonEncode;
 import 'dart:developer' show log;
 
 import 'package:dio/dio.dart';
@@ -23,6 +23,11 @@ class IncomingOrderSheet extends StatefulWidget {
 
   static void show(BuildContext context, Map<String, dynamic> order, {VoidCallback? onDenied}) {
     showModalBottomSheet(
+      useSafeArea: true,
+      constraints: BoxConstraints.expand(
+        width: MediaQuery.sizeOf(context).width,
+        height: MediaQuery.sizeOf(context).height * 0.8,
+      ),
       context: context,
       isDismissible: false,
       enableDrag: false,
@@ -69,6 +74,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -111,7 +117,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 200,
+            height: MediaQuery.sizeOf(context).height * 0.16,
             child: _mapLoaded
                 ? GoogleMap(
                     initialCameraPosition: CameraPosition(
@@ -216,7 +222,6 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
                 ),
               ),
             ),
-          SizedBox(height: MediaQuery.of(context).padding.bottom),
         ],
       ),
     );
@@ -310,8 +315,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       await dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
     } on DioException catch (e) {
       // Log the error but don't block the UI — backend already recorded the denial
-      log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}',
-          name: 'travel-deny');
+      log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
     }
   }
 
@@ -354,26 +358,60 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           ),
       };
 
-      final encodedPolyline = widget.order['encodedPolyline'] as String?;
-      if (encodedPolyline != null && encodedPolyline.isNotEmpty) {
-        final result = DirectionsResult(
-          distanceMeters: 0,
-          timeMinutes: 0,
-          encodedPolyline: encodedPolyline,
-          startLat: passLat,
-          startLng: passLng,
-          endLat: destLat,
-          endLng: destLng,
-        );
-        final points = result.decodePolyline();
-        _polylines = {
-          Polyline(
-            polylineId: const PolylineId('route'),
-            points: points,
-            color: const Color(0xFF4685C0),
-            width: 4,
-          ),
-        };
+      // Tentar usar routeJson do payload (travel-v2+) — rota pré-calculada
+      final routeJson = widget.order['routeJson'];
+      if (routeJson != null) {
+        try {
+          final routeData = routeJson is String ? jsonDecode(routeJson) : routeJson;
+          final encodedPolyline = routeData['encodedPolyline'] as String?;
+          if (encodedPolyline != null && encodedPolyline.isNotEmpty) {
+            final result = DirectionsResult(
+              distanceMeters: 0,
+              timeMinutes: 0,
+              encodedPolyline: encodedPolyline,
+              startLat: passLat,
+              startLng: passLng,
+              endLat: destLat,
+              endLng: destLng,
+            );
+            final points = result.decodePolyline();
+            _polylines = {
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: points,
+                color: const Color(0xFF4685C0),
+                width: 4,
+              ),
+            };
+          }
+        } catch (_) {
+          // Fallback: tentar encodedPolyline direto do payload
+        }
+      }
+
+      // Fallback: encodedPolyline direto (backends antigos ou se routeJson falhou)
+      if (_polylines.isEmpty) {
+        final encodedPolyline = widget.order['encodedPolyline'] as String?;
+        if (encodedPolyline != null && encodedPolyline.isNotEmpty) {
+          final result = DirectionsResult(
+            distanceMeters: 0,
+            timeMinutes: 0,
+            encodedPolyline: encodedPolyline,
+            startLat: passLat,
+            startLng: passLng,
+            endLat: destLat,
+            endLng: destLng,
+          );
+          final points = result.decodePolyline();
+          _polylines = {
+            Polyline(
+              polylineId: const PolylineId('route'),
+              points: points,
+              color: const Color(0xFF4685C0),
+              width: 4,
+            ),
+          };
+        }
       }
 
       _mapLoaded = true;
