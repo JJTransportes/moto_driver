@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
+import 'package:flutter_modular/flutter_modular.dart';
+import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/modules/profile_configuration/domain/entities/profile_entity.dart';
 import 'package:moto_driver/modules/profile_configuration/presentation/blocs/profile_configuration_bloc.dart';
 import 'package:moto_driver/modules/profile_configuration/presentation/blocs/profile_configuration_event.dart';
@@ -23,6 +25,7 @@ class ProfileConfigurationPage extends StatefulWidget {
 class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
   final ProfileImagePicker _imagePicker = ProfileImagePicker();
   final GlobalKey<ProfileFormState> _formKey = GlobalKey<ProfileFormState>();
+  bool _hasActiveTravel = false;
 
   @override
   void initState() {
@@ -30,6 +33,13 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
     context.read<ProfileConfigurationBloc>().add(
       ProfileLoadEvent(userId: widget.userId),
     );
+    _checkActiveTravel();
+  }
+
+  Future<void> _checkActiveTravel() async {
+    final travelRepo = Modular.get<TravelLocalRepository>();
+    final active = await travelRepo.getActiveTravel();
+    setState(() => _hasActiveTravel = active != null);
   }
 
   @override
@@ -118,6 +128,49 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                     initialPhone: profile.phone ?? '',
                     isLoading: isSaving,
                     onSave: _onSave,
+                  ),
+                  const SizedBox(height: 32),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  // Danger Zone section
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Zona de Perigo',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Ao excluir sua conta, todos os seus dados serão perdidos '
+                    'e você não poderá mais acessar o aplicativo.',
+                    style: TextStyle(fontSize: 14, color: Color(0xFF4E4E4E)),
+                  ),
+                  const SizedBox(height: 12),
+                  Tooltip(
+                    message: _hasActiveTravel ? 'Não é possível excluir a conta enquanto houver viagens em andamento.' : '',
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _hasActiveTravel ? null : () => Modular.to.pushNamed('/delete-account/'),
+                        icon: const Icon(Icons.delete_forever, color: Colors.red),
+                        label: const Text(
+                          'Excluir conta',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
