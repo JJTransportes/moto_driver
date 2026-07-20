@@ -1,4 +1,4 @@
-import 'dart:convert' show jsonEncode;
+import 'dart:convert' show jsonDecode, jsonEncode;
 import 'dart:developer' show log;
 
 import 'package:dio/dio.dart';
@@ -354,26 +354,60 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           ),
       };
 
-      final encodedPolyline = widget.order['encodedPolyline'] as String?;
-      if (encodedPolyline != null && encodedPolyline.isNotEmpty) {
-        final result = DirectionsResult(
-          distanceMeters: 0,
-          timeMinutes: 0,
-          encodedPolyline: encodedPolyline,
-          startLat: passLat,
-          startLng: passLng,
-          endLat: destLat,
-          endLng: destLng,
-        );
-        final points = result.decodePolyline();
-        _polylines = {
-          Polyline(
-            polylineId: const PolylineId('route'),
-            points: points,
-            color: const Color(0xFF4685C0),
-            width: 4,
-          ),
-        };
+      // Tentar usar routeJson do payload (travel-v2+) — rota pré-calculada
+      final routeJson = widget.order['routeJson'];
+      if (routeJson != null) {
+        try {
+          final routeData = routeJson is String ? jsonDecode(routeJson) : routeJson;
+          final encodedPolyline = routeData['encodedPolyline'] as String?;
+          if (encodedPolyline != null && encodedPolyline.isNotEmpty) {
+            final result = DirectionsResult(
+              distanceMeters: 0,
+              timeMinutes: 0,
+              encodedPolyline: encodedPolyline,
+              startLat: passLat,
+              startLng: passLng,
+              endLat: destLat,
+              endLng: destLng,
+            );
+            final points = result.decodePolyline();
+            _polylines = {
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: points,
+                color: const Color(0xFF4685C0),
+                width: 4,
+              ),
+            };
+          }
+        } catch (_) {
+          // Fallback: tentar encodedPolyline direto do payload
+        }
+      }
+
+      // Fallback: encodedPolyline direto (backends antigos ou se routeJson falhou)
+      if (_polylines.isEmpty) {
+        final encodedPolyline = widget.order['encodedPolyline'] as String?;
+        if (encodedPolyline != null && encodedPolyline.isNotEmpty) {
+          final result = DirectionsResult(
+            distanceMeters: 0,
+            timeMinutes: 0,
+            encodedPolyline: encodedPolyline,
+            startLat: passLat,
+            startLng: passLng,
+            endLat: destLat,
+            endLng: destLng,
+          );
+          final points = result.decodePolyline();
+          _polylines = {
+            Polyline(
+              polylineId: const PolylineId('route'),
+              points: points,
+              color: const Color(0xFF4685C0),
+              width: 4,
+            ),
+          };
+        }
       }
 
       _mapLoaded = true;

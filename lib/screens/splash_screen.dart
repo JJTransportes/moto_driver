@@ -77,9 +77,33 @@ class _SplashScreenState extends State<SplashScreen> {
     await Modular.get<IBrandCacheService>().getBrandImagePath();
   }
 
-  /// Checks if there's an active travel in local storage and navigates to it.
+  /// Checks if there's an active travel and navigates to it.
+  /// Tries GET /api/travels/active first (travel-v2+), falls back to local cache.
   /// Returns true if restored, false if no active travel found.
   Future<bool> _checkActiveTravel() async {
+    // Tenta REST primeiro (travel-v2+)
+    try {
+      final dio = Modular.get<Dio>();
+      final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/active');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data as Map<String, dynamic>?;
+        if (data != null && data['travelId'] != null) {
+          final status = data['status'] as String?;
+          if (status == 'Accepted' || status == 'InProgress') {
+            Modular.to.pushNamed('/active-travel', arguments: {
+              'travelId': data['travelId'] as String,
+            });
+            return true;
+          }
+        }
+      }
+      // Sem viagem ativa via REST — limpa cache local
+      await Modular.get<TravelLocalRepository>().clearTravels();
+      return false;
+    } catch (_) {
+      // Fallback: cache local
+    }
+
     final travelRepo = Modular.get<TravelLocalRepository>();
     final active = await travelRepo.getActiveTravel();
 

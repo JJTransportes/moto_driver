@@ -6,7 +6,6 @@ class SignalRService {
   final _connections = <String, HubConnection>{};
 
   final _newOrderController = StreamController<Map<String, dynamic>>.broadcast();
-  final _orderAcceptedController = StreamController<Map<String, dynamic>>.broadcast();
   final _travelStartedController = StreamController<Map<String, dynamic>>.broadcast();
   final _travelCompletedController = StreamController<Map<String, dynamic>>.broadcast();
   final _travelCancelledController = StreamController<Map<String, dynamic>>.broadcast();
@@ -16,7 +15,6 @@ class SignalRService {
 
   Stream<void> get onClosed => _closedController.stream;
   Stream<Map<String, dynamic>> get onNewOrder => _newOrderController.stream;
-  Stream<Map<String, dynamic>> get onOrderAccepted => _orderAcceptedController.stream;
   Stream<void> get onReconnected => _reconnectedController.stream;
   Stream<void> get onReconnecting => _reconnectingController.stream;
   Stream<Map<String, dynamic>> get onTravelCancelled => _travelCancelledController.stream;
@@ -74,7 +72,6 @@ class SignalRService {
   void dispose() {
     disconnectAll();
     _newOrderController.close();
-    _orderAcceptedController.close();
     _travelStartedController.close();
     _travelCompletedController.close();
     _travelCancelledController.close();
@@ -114,11 +111,6 @@ class SignalRService {
         connection.on('NewOrder', (args) {
           if (args != null && args.isNotEmpty) {
             _newOrderController.add(args.first as Map<String, dynamic>);
-          }
-        });
-        connection.on('OrderAccepted', (args) {
-          if (args != null && args.isNotEmpty) {
-            _orderAcceptedController.add(args.first as Map<String, dynamic>);
           }
         });
         break;

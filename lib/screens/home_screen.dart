@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:geolocator/geolocator.dart';
@@ -23,7 +24,6 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription? _newOrderSub;
   StreamSubscription? _reconnectingSub;
   StreamSubscription? _reconnectedSub;
-  StreamSubscription? _orderAcceptedSub;
   StreamSubscription? _travelCancelledSub;
   bool _isReconnecting = false;
   String? _currentTravelStatus;
@@ -187,7 +187,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _locationTimer?.cancel();
     _newOrderSub?.cancel();
-    _orderAcceptedSub?.cancel();
     _travelCancelledSub?.cancel();
     _reconnectingSub?.cancel();
     _reconnectedSub?.cancel();
@@ -198,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadUserId();
-    _loadActiveTravel();
+    _checkActiveTravelHttp();
     _connectSignalR();
   }
 
@@ -210,7 +209,41 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadActiveTravel() async {
+  Future<void> _checkActiveTravelHttp() async {
+    try {
+      final dio = Modular.get<Dio>();
+      final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/active');
+      if (!mounted) return;
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data as Map<String, dynamic>?;
+        if (data != null && data['travelId'] != null) {
+          final status = data['status'] as String?;
+          if (status == 'Accepted' || status == 'InProgress') {
+            setState(() {
+              _currentTravelId = data['travelId'] as String;
+              _currentTravelStatus = status;
+              _currentPassengerName = data['passengerName'] as String?;
+            });
+            return;
+          }
+        }
+      }
+      // Sem viagem ativa via REST — limpa estado
+      if (mounted) {
+        setState(() {
+          _currentTravelId = null;
+          _currentTravelStatus = null;
+          _currentPassengerName = null;
+        });
+      }
+    } catch (_) {
+      // Fallback silencioso para cache local
+      await _loadActiveTravelFromLocal();
+    }
+  }
+
+  Future<void> _loadActiveTravelFromLocal() async {
     final travelRepo = Modular.get<TravelLocalRepository>();
     final active = await travelRepo.getActiveTravel();
     if (active != null && mounted) {
@@ -268,17 +301,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _deniedOrderIds.add(orderId);
         },
       );
-    });
-
-    _orderAcceptedSub = signalR.onOrderAccepted.listen((data) {
-      if (!mounted) return;
-      final travelId = data['travelId'] as String?;
-      if (travelId != null) {
-        setState(() {
-          _currentTravelId = travelId;
-          _currentTravelStatus = 'Accepted';
-        });
-      }
     });
 
     // Listen for travel cancellations
