@@ -93,10 +93,13 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
       _updateMapMarkers();
 
-      // Connect to travel-management hub and start location tracking
+      // Connect to travel-management hub
+      // Only start location tracking when travel is InProgress
       if (_status == 'Accepted' || _status == 'InProgress') {
         await _connectManagementHub();
-        _startLocationTracking();
+        if (_status == 'InProgress') {
+          _startLocationTracking();
+        }
       }
     } catch (e) {
       if (!mounted) return;
