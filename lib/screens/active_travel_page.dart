@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert' show jsonDecode;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
+import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 
@@ -32,6 +34,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   int? _distanceToDestination;
   int? _timeHours;
   int? _timeMinutes;
+  String? _encodedPolyline;
   double? _passengerLat;
   double? _passengerLng;
   double? _destLat;
@@ -88,6 +91,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         _passengerLng = routes.isNotEmpty ? (routes[0]['initialLongitude'] as num?)?.toDouble() : null;
         _destLat = routes.isNotEmpty ? (routes[0]['destinationLatitude'] as num?)?.toDouble() : null;
         _destLng = routes.isNotEmpty ? (routes[0]['destinationLongitude'] as num?)?.toDouble() : null;
+        _encodedPolyline = routes.isNotEmpty ? routes[0]['encodedPolyline'] as String? : null;
         _isLoading = false;
       });
 
@@ -176,6 +180,32 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
       }
 
       _polylines.clear();
+
+      // Draw route polyline from encoded polyline
+      if (_encodedPolyline != null && _encodedPolyline!.isNotEmpty) {
+        try {
+          final result = DirectionsResult(
+            distanceMeters: _distanceToDestination ?? 0,
+            timeMinutes: (_timeHours ?? 0) * 60 + (_timeMinutes ?? 0),
+            encodedPolyline: _encodedPolyline!,
+            startLat: _passengerLat!,
+            startLng: _passengerLng!,
+            endLat: _destLat ?? _passengerLat!,
+            endLng: _destLng ?? _passengerLng!,
+          );
+          final points = result.decodePolyline();
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('route'),
+              points: points,
+              color: const Color(0xFF4685C0),
+              width: 4,
+            ),
+          );
+        } catch (_) {
+          // Polyline decoding failed — skip drawing route
+        }
+      }
     });
   }
 
