@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert' show jsonDecode, jsonEncode;
 import 'dart:developer' show log;
 
@@ -51,6 +52,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   int? _distanceMeters;
   int? _timeMinutes;
   bool _fallbackLoading = false;
+
+  static const int _rejectTimeoutSeconds = 60;
+  int _remainingSeconds = _rejectTimeoutSeconds;
+  Timer? _rejectTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -197,6 +202,30 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               ),
             ],
           ),
+          // Timer regressivo discreto
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: _remainingSeconds / _rejectTimeoutSeconds,
+                    minHeight: 3,
+                    color: const Color(0xFFB0B0B0).withValues(alpha: 0.5),
+                    backgroundColor: const Color(0xFFE0E0E0).withValues(alpha: 0.3),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${_remainingSeconds}s',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFB0B0B0),
+                  ),
+                ),
+              ],
+            ),
+          ),
           // Error message container
           if (_status == _AcceptStatus.error && _errorMessage != null)
             Padding(
@@ -232,9 +261,17 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     super.initState();
     log(jsonEncode(widget.order), name: 'travel-order');
     _loadDriverLocation();
+    _startRejectTimer();
+  }
+
+  @override
+  void dispose() {
+    _rejectTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _accept(BuildContext context, String id) async {
+    _rejectTimer?.cancel();
     setState(() {
       _status = _AcceptStatus.accepting;
       _errorMessage = null;
@@ -304,6 +341,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   }
 
   Future<void> _deny(BuildContext context, String orderId) async {
+    _rejectTimer?.cancel();
     // Notify parent that this order was denied (for duplicate tracking)
     widget.onDenied?.call();
 
@@ -316,6 +354,36 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     } on DioException catch (e) {
       // Log the error but don't block the UI — backend already recorded the denial
       log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
+    }
+  }
+
+  void _startRejectTimer() {
+    _rejectTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_remainingSeconds <= 1) {
+        _rejectTimer?.cancel();
+        _autoReject();
+        return;
+      }
+      setState(() => _remainingSeconds--);
+    });
+  }
+
+  void _autoReject() {
+    if (!mounted) return;
+    final orderId = widget.order['orderId'] as String;
+
+    // Notify parent for duplicate tracking
+    widget.onDenied?.call();
+
+    // Close the sheet
+    Navigator.of(context).pop();
+
+    // Fire-and-forget deny request
+    try {
+      final dio = Modular.get<Dio>();
+      dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
+    } on DioException catch (e) {
+      log('Auto-deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
     }
   }
 

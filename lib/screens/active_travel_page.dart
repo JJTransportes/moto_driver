@@ -30,7 +30,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   String? _passengerName;
   String? _departureAddress;
   String? _destinationAddress;
-  
+
   int? _distanceToDestination;
   int? _timeHours;
   int? _timeMinutes;
@@ -364,7 +364,11 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
               const SizedBox(height: 16),
               const Text('Erro ao carregar viagem', style: TextStyle(fontSize: 16)),
               const SizedBox(height: 8),
-              Text(_error!, style: const TextStyle(color: Color(0xFF4E4E4E)), textAlign: TextAlign.center),
+              Text(
+                _error!,
+                style: const TextStyle(color: Color(0xFF4E4E4E)),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _loadTravel,
