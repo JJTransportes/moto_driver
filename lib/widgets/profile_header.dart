@@ -27,7 +27,7 @@ class ProfileHeader extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Text(
-          'Olá, $fullName',
+          'Olá, ${fullName.split(' ').first}',
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
