@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert' show jsonDecode;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +11,7 @@ import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ActiveTravelPage extends StatefulWidget {
   final String travelId;
@@ -31,10 +31,6 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   String? _departureAddress;
   String? _destinationAddress;
 
-  int? _distanceToDestination;
-  int? _timeHours;
-  int? _timeMinutes;
-  String? _encodedPolyline;
   double? _passengerLat;
   double? _passengerLng;
   double? _destLat;
@@ -47,10 +43,34 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
 
+  Map<String, dynamic>? _pickupRoute;
+  Map<String, dynamic>? _tripRoute;
+
+  Map<String, dynamic>? get _currentRoute {
+    if (_status == 'Accepted') return _pickupRoute;
+    if (_status == 'InProgress') return _tripRoute;
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
+    // Extract route arguments only after the widget is in the tree
+    WidgetsBinding.instance.addPostFrameCallback((_) => _extractRouteArgs());
     _loadTravel();
+  }
+
+  void _extractRouteArgs() {
+    if (!mounted) return;
+    final routeArgs = ModalRoute.of(context)?.settings.arguments;
+    if (routeArgs is Map<String, dynamic>) {
+      _pickupRoute = routeArgs['pickupRoute'] as Map<String, dynamic>?;
+      _tripRoute = routeArgs['tripRoute'] as Map<String, dynamic>?;
+      // Re-render map if routes were extracted after loadTravel completed
+      if (_pickupRoute != null || _tripRoute != null) {
+        _updateMapMarkers();
+      }
+    }
   }
 
   @override
@@ -82,16 +102,25 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
       setState(() {
         _status = data['status'] as String?;
         _passengerName = data['passengerName'] as String?;
-        _departureAddress = routes.isNotEmpty ? routes[0]['departureAddress'] as String? : null;
-        _destinationAddress = routes.isNotEmpty ? routes[0]['destinationAddress'] as String? : null;
-        _distanceToDestination = routes.isNotEmpty ? (routes[0]['routeDestinationInMeters'] as int?) ?? 0 : 0;
-        _timeHours = routes.isNotEmpty ? (routes[0]['averageTravelTimeInHours'] as int?) ?? 0 : 0;
-        _timeMinutes = routes.isNotEmpty ? (routes[0]['averageTravelTimeInMinutes'] as int?) ?? 0 : 0;
-        _passengerLat = routes.isNotEmpty ? (routes[0]['initialLatitude'] as num?)?.toDouble() : null;
-        _passengerLng = routes.isNotEmpty ? (routes[0]['initialLongitude'] as num?)?.toDouble() : null;
-        _destLat = routes.isNotEmpty ? (routes[0]['destinationLatitude'] as num?)?.toDouble() : null;
-        _destLng = routes.isNotEmpty ? (routes[0]['destinationLongitude'] as num?)?.toDouble() : null;
-        _encodedPolyline = routes.isNotEmpty ? routes[0]['encodedPolyline'] as String? : null;
+
+        // Parse routes from API response (fallback if not passed via args)
+        if (_pickupRoute == null && routes.isNotEmpty) {
+          _pickupRoute = routes[0] as Map<String, dynamic>;
+        }
+        if (_tripRoute == null && routes.length > 1) {
+          _tripRoute = routes[1] as Map<String, dynamic>;
+        }
+
+        // Extract coordinates from routes
+        _passengerLat = (_pickupRoute?['destinationLatitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['initialLatitude'] as num?)?.toDouble() : null);
+        _passengerLng = (_pickupRoute?['destinationLongitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['initialLongitude'] as num?)?.toDouble() : null);
+        _destLat = (_tripRoute?['destinationLatitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['destinationLatitude'] as num?)?.toDouble() : null);
+        _destLng = (_tripRoute?['destinationLongitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['destinationLongitude'] as num?)?.toDouble() : null);
+
+        // Endereços das rotas
+        _departureAddress = _pickupRoute?['destinationAddress'] as String?;
+        _destinationAddress = _tripRoute?['destinationAddress'] as String?;
+
         _isLoading = false;
       });
 
@@ -159,6 +188,9 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
     setState(() {
       _markers.clear();
+      _polylines.clear();
+
+      // Marcadores
       _markers.add(
         Marker(
           markerId: const MarkerId('passenger'),
@@ -167,7 +199,6 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
           infoWindow: const InfoWindow(title: 'Passageiro'),
         ),
       );
-
       if (_destLat != null && _destLng != null) {
         _markers.add(
           Marker(
@@ -179,31 +210,24 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         );
       }
 
-      _polylines.clear();
-
-      // Draw route polyline from encoded polyline
-      if (_encodedPolyline != null && _encodedPolyline!.isNotEmpty) {
-        try {
-          final result = DirectionsResult(
-            distanceMeters: _distanceToDestination ?? 0,
-            timeMinutes: (_timeHours ?? 0) * 60 + (_timeMinutes ?? 0),
-            encodedPolyline: _encodedPolyline!,
-            startLat: _passengerLat!,
-            startLng: _passengerLng!,
-            endLat: _destLat ?? _passengerLat!,
-            endLng: _destLng ?? _passengerLng!,
-          );
-          final points = result.decodePolyline();
-          _polylines.add(
-            Polyline(
-              polylineId: const PolylineId('route'),
-              points: points,
-              color: const Color(0xFF4685C0),
-              width: 4,
-            ),
-          );
-        } catch (_) {
-          // Polyline decoding failed — skip drawing route
+      // Polyline da rota atual (Accepted → pickup, InProgress → trip)
+      final route = _currentRoute;
+      if (route != null) {
+        final encoded = route['encodedPolyline'] as String?;
+        if (encoded != null && encoded.isNotEmpty) {
+          try {
+            final points = DirectionsResult.decode(encoded);
+            _polylines.add(
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: points,
+                color: const Color(0xFF4685C0),
+                width: 4,
+              ),
+            );
+          } catch (_) {
+            // Polyline inválida — apenas não renderiza
+          }
         }
       }
     });
@@ -331,6 +355,36 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
       ),
       body: _buildBody(),
     );
+  }
+
+  /// Abre Google Maps com destino baseado na rota atual
+  Future<void> _navigateToDestination() async {
+    final route = _currentRoute;
+    if (route == null) return;
+
+    final activeRoute = _status == 'Accepted' ? _pickupRoute : _tripRoute;
+    final destLat = activeRoute?['destinationLatitude'] as num?;
+    final destLng = activeRoute?['destinationLongitude'] as num?;
+
+    if (destLat == null || destLng == null) return;
+
+    final url =
+        'https://www.google.com/maps/dir/?api=1'
+        '&destination=$destLat,$destLng'
+        '&travelmode=driving';
+
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('App de mapas não disponível'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   String _statusLabel() {
@@ -497,7 +551,21 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (_departureAddress != null)
+                // Dados da rota atual
+                if (isAccepted && _departureAddress != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person_pin, color: Color(0xFF4685C0), size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text('Embarque: ${_departureAddress!}', style: const TextStyle(color: Color(0xFF4E4E4E), fontSize: 14)),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (!isAccepted && _departureAddress != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
@@ -523,16 +591,29 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                       ],
                     ),
                   ),
-                Row(
-                  children: [
-                    const Icon(Icons.route, color: Color(0xFF4685C0), size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${_distanceToDestination ?? 0} m — ${_timeHours ?? 0}h ${_timeMinutes ?? 0}min',
-                      style: const TextStyle(color: Color(0xFF4E4E4E), fontSize: 14),
-                    ),
-                  ],
-                ),
+                // Distância e tempo da rota atual
+                ...() {
+                  final route = _currentRoute;
+                  final dist = route?['distanceMeters'] as int?;
+                  final timeMin = route?['timeMinutes'] as int?;
+                  if (dist != null && timeMin != null) {
+                    final h = timeMin ~/ 60;
+                    final m = timeMin % 60;
+                    return [
+                      Row(
+                        children: [
+                          const Icon(Icons.route, color: Color(0xFF4685C0), size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$dist m — ${h}h ${m}min',
+                            style: const TextStyle(color: Color(0xFF4E4E4E), fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ];
+                  }
+                  return [const SizedBox.shrink()];
+                }(),
                 if (_hubConnected)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -544,6 +625,24 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                       ],
                     ),
                   ),
+                const SizedBox(height: 12),
+                // Botão de navegação
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _navigateToDestination,
+                    icon: const Icon(Icons.directions, color: Colors.white, size: 20),
+                    label: Text(
+                      isAccepted ? 'Navegar até o passageiro' : 'Navegar até o destino',
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isAccepted ? Colors.orange : Colors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Row(
                   children: [

@@ -60,38 +60,39 @@ class DirectionsResult {
     required this.endLng,
   });
 
-  List<LatLng> decodePolyline() {
+  /// Decodifica uma string encoded polyline do Google Maps sem precisar
+  /// instanciar um DirectionsResult com valores artificiais.
+  static List<LatLng> decode(String encoded) {
     final points = <LatLng>[];
     int index = 0;
-    final len = encodedPolyline.length;
     int lat = 0;
     int lng = 0;
 
-    while (index < len) {
+    while (index < encoded.length) {
       int b;
       int shift = 0;
       int result = 0;
       do {
-        b = encodedPolyline.codeUnitAt(index++) - 63;
+        b = encoded.codeUnitAt(index++) - 63;
         result |= (b & 0x1f) << shift;
         shift += 5;
       } while (b >= 0x20);
-      final dlat = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      lat += dlat;
+      lat += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
 
       shift = 0;
       result = 0;
       do {
-        b = encodedPolyline.codeUnitAt(index++) - 63;
+        b = encoded.codeUnitAt(index++) - 63;
         result |= (b & 0x1f) << shift;
         shift += 5;
       } while (b >= 0x20);
-      final dlng = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      lng += dlng;
+      lng += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
 
       points.add(LatLng(lat / 1E5, lng / 1E5));
     }
 
     return points;
   }
+
+  List<LatLng> decodePolyline() => decode(encodedPolyline);
 }
