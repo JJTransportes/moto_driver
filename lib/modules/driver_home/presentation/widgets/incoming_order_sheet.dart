@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert' show jsonDecode, jsonEncode;
 import 'dart:developer' show log;
 
@@ -10,8 +11,6 @@ import 'package:moto_driver/core/local_db/models/local_data_models.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 class IncomingOrderSheet extends StatefulWidget {
   final Map<String, dynamic> order;
   final VoidCallback? onDenied;
@@ -47,10 +46,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   _AcceptStatus _status = _AcceptStatus.idle;
   String? _errorMessage;
 
-  // Fallback: locally-computed distance/time when backend values are missing
-  int? _distanceMeters;
-  int? _timeMinutes;
-  bool _fallbackLoading = false;
+  static const int _rejectTimeoutSeconds = 60;
+  int _remainingSeconds = _rejectTimeoutSeconds;
+  Timer? _rejectTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -60,8 +58,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     final timeMinutes = (widget.order['averageTravelTimeInMinutes'] as int?) ?? 0;
     final totalDest = (widget.order['distanceToDestinationInMeters'] as int?) ?? 0;
 
-    // Fallback — if backend didn't send distance/time, calculate locally via Google Maps
-    final shouldFallback = distance == 0 && totalDest == 0 && _driverLocation != null;
+
     final passLat = (widget.order['passengerLatitude'] as num).toDouble();
     final passLng = (widget.order['passengerLongitude'] as num).toDouble();
 
@@ -170,7 +167,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               const Icon(Icons.location_on, color: Color(0xFF4685C0), size: 20),
               const SizedBox(width: 8),
               Text(
-                _resolveDistanceText(distance, shouldFallback),
+                _resolveDistanceText(distance),
                 style: const TextStyle(color: Color(0xFF4E4E4E)),
               ),
             ],
@@ -181,7 +178,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               const Icon(Icons.route, color: Color(0xFF4685C0), size: 20),
               const SizedBox(width: 8),
               Text(
-                _resolveTotalDestText(totalDest, shouldFallback),
+                _resolveTotalDestText(totalDest),
                 style: const TextStyle(color: Color(0xFF4E4E4E)),
               ),
             ],
@@ -192,10 +189,34 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               const Icon(Icons.timer, color: Color(0xFF4685C0), size: 20),
               const SizedBox(width: 8),
               Text(
-                _resolveTimeText(timeHours, timeMinutes, shouldFallback),
+                _resolveTimeText(timeHours, timeMinutes),
                 style: const TextStyle(color: Color(0xFF4E4E4E)),
               ),
             ],
+          ),
+          // Timer regressivo discreto
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: _remainingSeconds / _rejectTimeoutSeconds,
+                    minHeight: 3,
+                    color: const Color(0xFFB0B0B0).withValues(alpha: 0.5),
+                    backgroundColor: const Color(0xFFE0E0E0).withValues(alpha: 0.3),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${_remainingSeconds}s',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFB0B0B0),
+                  ),
+                ),
+              ],
+            ),
           ),
           // Error message container
           if (_status == _AcceptStatus.error && _errorMessage != null)
@@ -232,21 +253,47 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     super.initState();
     log(jsonEncode(widget.order), name: 'travel-order');
     _loadDriverLocation();
+    _startRejectTimer();
+  }
+
+  @override
+  void dispose() {
+    _rejectTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _accept(BuildContext context, String id) async {
+    _rejectTimer?.cancel();
     setState(() {
       _status = _AcceptStatus.accepting;
       _errorMessage = null;
     });
 
     try {
+      // Obtain current GPS position to send to backend
+      final locationService = Modular.get<LocationService>();
+      final locResult = await locationService.getCurrentPosition();
+
       final dio = Modular.get<Dio>();
       final orderId = widget.order['orderId'] as String;
-      final response = await dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/accept');
 
-      // Get travelId from response
+      // Build request body with optional GPS data
+      final body = <String, dynamic>{};
+      if (locResult.isGranted && locResult.position != null) {
+        body['currentLatitude'] = locResult.position!.latitude;
+        body['currentLongitude'] = locResult.position!.longitude;
+      }
+
+      final response = await dio.post(
+        '${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/accept',
+        data: body.isNotEmpty ? body : null,
+      );
+
+      // Get travelId and routes from response
       final travelId = response.data['travelId'] as String;
+      final routesList = response.data['routes'] as List? ?? [];
+      final pickupRoute = routesList.isNotEmpty ? routesList[0] as Map<String, dynamic> : null;
+      final tripRoute = routesList.length > 1 ? routesList[1] as Map<String, dynamic> : null;
 
       // Close the sheet immediately
       if (!context.mounted) return;
@@ -258,28 +305,18 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
         TravelLocalData(
           travelId: travelId,
           status: 'Accepted',
-          departureAddress: widget.order['departureAddress'] as String?,
-          destinationAddress: widget.order['destinationAddress'] as String?,
+          departureAddress: pickupRoute?['destinationAddress'] as String? ?? widget.order['departureAddress'] as String?,
+          destinationAddress: tripRoute?['destinationAddress'] as String? ?? widget.order['destinationAddress'] as String?,
           createdAt: DateTime.now(),
         ),
       );
 
-      // Open Google Maps navigation to destination (best-effort)
-      final destLat = widget.order['destinationLatitude'] as num;
-      final destLng = widget.order['destinationLongitude'] as num;
-      final googleMapsUrl =
-          'https://www.google.com/maps/dir/?api=1'
-          '&destination=$destLat,$destLng'
-          '&travelmode=driving';
-
-      try {
-        await launchUrl(Uri.parse(googleMapsUrl), mode: LaunchMode.externalApplication);
-      } catch (_) {
-        // Google Maps not available — continue to active travel page
-      }
-
-      // Navigate to active travel
-      Modular.to.pushNamed('/active-travel', arguments: {'travelId': travelId});
+      // Navigate to active travel with route data
+      Modular.to.pushNamed('/active-travel', arguments: {
+        'travelId': travelId,
+        'pickupRoute': pickupRoute,
+        'tripRoute': tripRoute,
+      });
     } on DioException catch (e) {
       String message;
       switch (e.response?.statusCode) {
@@ -304,6 +341,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   }
 
   Future<void> _deny(BuildContext context, String orderId) async {
+    _rejectTimer?.cancel();
     // Notify parent that this order was denied (for duplicate tracking)
     widget.onDenied?.call();
 
@@ -319,6 +357,36 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     }
   }
 
+  void _startRejectTimer() {
+    _rejectTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_remainingSeconds <= 1) {
+        _rejectTimer?.cancel();
+        _autoReject();
+        return;
+      }
+      setState(() => _remainingSeconds--);
+    });
+  }
+
+  void _autoReject() {
+    if (!mounted) return;
+    final orderId = widget.order['orderId'] as String;
+
+    // Notify parent for duplicate tracking
+    widget.onDenied?.call();
+
+    // Close the sheet
+    Navigator.of(context).pop();
+
+    // Fire-and-forget deny request
+    try {
+      final dio = Modular.get<Dio>();
+      dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
+    } on DioException catch (e) {
+      log('Auto-deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
+    }
+  }
+
   Future<void> _loadDriverLocation() async {
     final locationService = Modular.get<LocationService>();
     final result = await locationService.getCurrentPosition();
@@ -327,9 +395,6 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     final passLng = (widget.order['passengerLongitude'] as num).toDouble();
     final destLat = (widget.order['destinationLatitude'] as num).toDouble();
     final destLng = (widget.order['destinationLongitude'] as num).toDouble();
-
-    final distance = (widget.order['distanceToPassengerInMeters'] as int?) ?? 0;
-    final totalDest = (widget.order['distanceToDestinationInMeters'] as int?) ?? 0;
 
     setState(() {
       if (result.isGranted) {
@@ -416,72 +481,17 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
 
       _mapLoaded = true;
     });
-
-    // Fallback: calculate distance/time locally if backend values are zero/missing
-    if (distance == 0 && totalDest == 0 && _driverLocation != null) {
-      _calculateFallbackDistance(passLat, passLng, destLat, destLng);
-    }
   }
 
-  /// Calculates distance/time using Google Maps Directions API as fallback
-  Future<void> _calculateFallbackDistance(
-    double passLat,
-    double passLng,
-    double destLat,
-    double destLng,
-  ) async {
-    setState(() => _fallbackLoading = true);
-
-    try {
-      final directionsService = Modular.get<DirectionsService>();
-      final result = await directionsService.getDirections(
-        _driverLocation!.latitude,
-        _driverLocation!.longitude,
-        destLat,
-        destLng,
-      );
-
-      if (result != null && mounted) {
-        setState(() {
-          _distanceMeters = result.distanceMeters;
-          _timeMinutes = result.timeMinutes;
-          _fallbackLoading = false;
-        });
-      } else {
-        if (mounted) setState(() => _fallbackLoading = false);
-      }
-    } catch (_) {
-      if (mounted) setState(() => _fallbackLoading = false);
-    }
-  }
-
-  String _resolveDistanceText(int distance, bool shouldFallback) {
-    if (shouldFallback) {
-      if (_fallbackLoading) return 'Calculando distância...';
-      if (_distanceMeters != null) return '$_distanceMeters m até o passageiro (estimado)';
-      return 'Distância não disponível';
-    }
+  String _resolveDistanceText(int distance) {
     return '$distance m até o passageiro';
   }
 
-  String _resolveTotalDestText(int totalDest, bool shouldFallback) {
-    if (shouldFallback) {
-      if (_fallbackLoading) return 'Calculando...';
-      return '— até o destino';
-    }
+  String _resolveTotalDestText(int totalDest) {
     return '$totalDest m até o destino';
   }
 
-  String _resolveTimeText(int timeHours, int timeMinutes, bool shouldFallback) {
-    if (shouldFallback) {
-      if (_fallbackLoading) return 'Calculando...';
-      if (_timeMinutes != null) {
-        final h = _timeMinutes! ~/ 60;
-        final m = _timeMinutes! % 60;
-        return '${h}h ${m}min (estimado)';
-      }
-      return 'Tempo não disponível';
-    }
+  String _resolveTimeText(int timeHours, int timeMinutes) {
     return '${timeHours}h ${timeMinutes}min';
   }
 }

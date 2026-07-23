@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _locationTimer;
   String? _userId;
   String? _userPhotoUrl;
-  final String _userName = 'Motorista';
+  String? _userName;
 
   final Set<String> _deniedOrderIds = {};
 
@@ -63,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ProfileHeader(
-                fullName: _userName,
+                fullName: _userName ?? 'Motorista',
                 photoUrl: _userPhotoUrl,
                 userId: _userId ?? '',
                 onSignOut: _handleSignOut,
@@ -205,6 +205,25 @@ class _HomeScreenState extends State<HomeScreen> {
     final authStorage = Modular.get<AuthStorage>();
     final userId = await authStorage.getUserId();
     setState(() => _userId = userId);
+    if (userId != null) {
+      await _loadUserName(userId);
+    }
+  }
+
+  Future<void> _loadUserName(String userId) async {
+    try {
+      final dio = Modular.get<Dio>();
+      final response = await dio.get('${AppConfig.getBaseUrl()}/api/drivers/$userId');
+      if (!mounted) return;
+      if (response.statusCode == 200 && response.data != null) {
+        final name = response.data['name'] as String?;
+        if (name != null && name.isNotEmpty) {
+          setState(() => _userName = name);
+        }
+      }
+    } catch (_) {
+      // Silently fallback — name stays null, ProfileHeader handles gracefully
+    }
   }
 
   Future<void> _checkActiveTravelHttp() async {
