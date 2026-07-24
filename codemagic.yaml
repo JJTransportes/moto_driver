@@ -49,5 +49,5 @@ workflows:
 
       google_play:
         credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
-        track: pre release
+        track: "Pre Release"
         submit_as_draft: false
