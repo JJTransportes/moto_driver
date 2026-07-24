@@ -10,7 +10,7 @@ workflows:
       events:
       - push
       branch_patterns:
-      - pattern: "ios_staging"
+      - pattern: "ios_pre_release"
       - include: true
       - source: true
       cancel_previous_builds: true
@@ -18,7 +18,7 @@ workflows:
     environment:
       flutter: 3.32.2
       groups:
-      - moto_staging
+      - pre_release
       ios_signing:
         distribution_type: app_store
         bundle_identifier: $BUNDLE_ID
@@ -52,7 +52,7 @@ workflows:
       script: |+
         flutter build ipa --release \
           --build-name=1.0.0 \
-          --build-number=10 \
+          --build-number=11 \
           --export-options-plist=/Users/builder/export_options.plist
           
     artifacts:
@@ -63,7 +63,7 @@ workflows:
     publishing:
       email:
         recipients:
-        - comercialpepiviagens@gmail.com
+        - dev.jr.s.engineer@gmail.com
         notify:
           success: false
           failure: true
@@ -71,7 +71,7 @@ workflows:
       app_store_connect:
         auth: integration
         beta_groups:
-        - Moto Driver Staging
+        - Moto Driver Pre Release
         submit_to_testflight: true
         submit_to_app_store: false
         issuer_id: $ISSUER_ID
