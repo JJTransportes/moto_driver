@@ -7,6 +7,7 @@ class ProfileHeader extends StatelessWidget {
   final String? photoUrl;
   final String userId;
   final VoidCallback? onSignOut;
+  final VoidCallback? onSettingsTap;
 
   const ProfileHeader({
     super.key,
@@ -14,6 +15,7 @@ class ProfileHeader extends StatelessWidget {
     this.photoUrl,
     required this.userId,
     this.onSignOut,
+    this.onSettingsTap,
   });
 
   @override
@@ -38,7 +40,11 @@ class ProfileHeader extends StatelessWidget {
         PopupMenuButton<String>(
           onSelected: (value) {
             if (value == 'settings') {
-              Modular.to.pushNamed('/profile-configuration', arguments: {'userId': userId});
+              if (onSettingsTap != null) {
+                onSettingsTap!();
+              } else {
+                Modular.to.pushNamed('/profile-configuration', arguments: {'userId': userId});
+              }
             }
             if (value == 'signout') onSignOut?.call();
           },
