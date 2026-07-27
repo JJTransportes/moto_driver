@@ -2,8 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
-import 'package:moto_driver/core/brand/brand_cache_service.dart';
-import 'package:moto_driver/core/brand/i_brand_cache_service.dart';
 import 'package:moto_driver/core/http/dio_client.dart';
 import 'package:moto_driver/core/local_db/repositories/auth_local_repository.dart';
 import 'package:moto_driver/core/local_db/repositories/profile_local_repository.dart';
@@ -28,7 +26,6 @@ class CommonModule extends Module {
     i.addSingleton<SignalRService>(SignalRService.new);
     i.addSingleton<LocationService>(LocationService.new);
     i.addSingleton<DirectionsService>(DirectionsService.new);
-    i.addSingleton<IBrandCacheService>(BrandCacheService.new);
     i.add<IAuthDatasource>(AuthDatasource.new);
     i.add<IAuthRepository>(AuthRepository.new);
   }
