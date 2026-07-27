@@ -67,6 +67,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 photoUrl: _userPhotoUrl,
                 userId: _userId ?? '',
                 onSignOut: _handleSignOut,
+                onSettingsTap: () async {
+                  await Modular.to.pushNamed('/profile-configuration', arguments: {'userId': _userId});
+                  _loadUserId();
+                },
               ),
               const SizedBox(height: 24),
               // Active travel card
@@ -217,9 +221,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       if (response.statusCode == 200 && response.data != null) {
         final name = response.data['name'] as String?;
-        if (name != null && name.isNotEmpty) {
-          setState(() => _userName = name);
+        var photoUrl = response.data['photoUrl'] as String?;
+        if (photoUrl != null && photoUrl.isNotEmpty
+            && !photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+          photoUrl = '${AppConfig.getBaseUrl()}$photoUrl';
         }
+        setState(() {
+          if (name != null && name.isNotEmpty) _userName = name;
+          _userPhotoUrl = photoUrl;
+        });
       }
     } catch (_) {
       // Silently fallback — name stays null, ProfileHeader handles gracefully

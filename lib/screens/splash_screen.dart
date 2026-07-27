@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
-import 'package:moto_driver/core/brand/i_brand_cache_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
@@ -22,10 +21,6 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() async {
-      await _downloadBrandImage();
-    });
-
     _checkAuth();
   }
 
@@ -70,11 +65,6 @@ class _SplashScreenState extends State<SplashScreen> {
     } else {
       Modular.to.navigate('/login');
     }
-  }
-
-  /// Initiates brand image download (non-blocking).
-  Future<void> _downloadBrandImage() async {
-    await Modular.get<IBrandCacheService>().getBrandImagePath();
   }
 
   /// Checks if there's an active travel and navigates to it.
@@ -132,7 +122,7 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: AppColors.white,
       body: Center(
         child: Image.asset(
-          'assets/images/logo.jpeg',
+          'assets/images/moto_driver_logo.png',
           width: 257,
           height: 103,
           fit: BoxFit.contain,
