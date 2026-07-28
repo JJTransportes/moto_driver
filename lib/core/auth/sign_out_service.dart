@@ -3,6 +3,7 @@ import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/local_db/repositories/auth_local_repository.dart';
 import 'package:moto_driver/core/local_db/repositories/profile_local_repository.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
+import 'package:moto_driver/core/notifications/notification_service.dart';
 
 class SignOutService {
   final AuthStorage _authStorage;
@@ -18,6 +19,7 @@ class SignOutService {
   );
 
   Future<void> signOut() async {
+    await NotificationService.logout();
     await Future.wait([
       _authStorage.clear(),
       _authLocal.clearAuth(),

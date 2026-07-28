@@ -6,6 +6,7 @@ import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/brand/i_brand_cache_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
+import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/modules/auth/domain/repositories/i_auth_repository.dart';
 
@@ -48,6 +49,7 @@ class _SplashScreenState extends State<SplashScreen> {
           // Refresh succeeded — save new tokens (rotation)
           await authStorage.saveToken(success.accessToken, success.userId);
           await authStorage.saveRefreshToken(success.refreshToken);
+          await NotificationService.login(success.userId);
 
           // Check for active travel and navigate
           final restored = await _checkActiveTravel();
@@ -65,6 +67,10 @@ class _SplashScreenState extends State<SplashScreen> {
     // for users upgrading from an older version without refresh tokens)
     final token = await authStorage.getToken();
     if (token != null) {
+      final userId = await authStorage.getUserId();
+      if (userId != null) {
+        await NotificationService.login(userId);
+      }
       final restored = await _checkActiveTravel();
       if (!restored) Modular.to.navigate('/home');
     } else {

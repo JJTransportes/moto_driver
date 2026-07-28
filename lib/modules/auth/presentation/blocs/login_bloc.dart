@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/local_db/repositories/auth_local_repository.dart';
+import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/modules/auth/domain/entities/user_entity.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/i_login_usecase.dart';
 
@@ -35,6 +36,7 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
         accessToken: user.token,
         roles: user.roles,
       );
+      await NotificationService.login(user.id);
       emit(LoginSuccess(user));
     } else {
       emit(LoginFailure(result.exceptionOrNull()!.toString()));
