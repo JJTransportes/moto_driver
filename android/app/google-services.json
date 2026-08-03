@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "38497755668",
+    "project_id": "moto-driver-ccba7",
+    "storage_bucket": "moto-driver-ccba7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:38497755668:android:b7f1cd578dbdb5c6f8fd01",
+        "android_client_info": {
+          "package_name": "br.com.rockservicos.moto_driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCrbjK60fV_xBW5s0bHqxJtjw2eK-c8e7I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

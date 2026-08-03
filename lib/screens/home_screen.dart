@@ -35,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _userName;
 
   final Set<String> _deniedOrderIds = {};
+  bool _isProcessingPendingOrder = false;
 
   @override
   Widget build(BuildContext context) {
@@ -203,6 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUserId();
     _checkActiveTravelHttp();
     _connectSignalR();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkPendingOrder());
   }
 
   Future<void> _loadUserId() async {
@@ -271,7 +273,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadActiveTravelFromLocal() async {
     final travelRepo = Modular.get<TravelLocalRepository>();
     final active = await travelRepo.getActiveTravel();
-    if (active != null && mounted) {
+    // Só restaura viagens ativas (Accepted/InProgress).
+    // Viagens finalizadas/canceladas no cache NÃO devem setar _currentTravelId,
+    // pois isso bloquearia o recebimento de novos pedidos via SignalR.
+    if (active != null && mounted &&
+        (active.status == 'Accepted' || active.status == 'InProgress')) {
       setState(() {
         _currentTravelId = active.travelId;
         _currentTravelStatus = active.status;
@@ -283,52 +289,56 @@ class _HomeScreenState extends State<HomeScreen> {
     final signalR = Modular.get<SignalRService>();
     final authStorage = Modular.get<AuthStorage>();
     final token = await authStorage.getToken();
-    if (token == null) return;
-
-    await signalR.connect(
-      'travel-orders',
-      '${AppConfig.getBaseUrl()}/hubs/travel-orders',
-      token,
-    );
-
-    // Also connect to travel-management for cancellation events
-    try {
-      await signalR.connect(
-        'travel-management',
-        '${AppConfig.getBaseUrl()}/hubs/travel-management',
-        token,
-      );
-    } catch (_) {
-      // Non-critical — cancels won't arrive in real-time without this hub
+    if (token == null) {
+      debugPrint('SignalR: token nulo — conexão abortada');
+      return;
     }
 
-    // Start periodic location reporting for dashboard map
-    _startLocationReporting(signalR);
+    // -------------------------------------------------------------------
+    // IMPORTANTE: registrar listeners ANTES de conectar para evitar perda
+    // de eventos (condição de corrida com broadcast stream sem buffer).
+    // -------------------------------------------------------------------
 
     _newOrderSub = signalR.onNewOrder.listen((data) {
-      if (_currentTravelId != null) return; // Already in a travel
+      debugPrint('HomeScreen: NewOrder recebido do stream — $data');
+      try {
+        if (_currentTravelId != null) {
+          debugPrint('HomeScreen: NewOrder ignorado — viagem ativa $_currentTravelId');
+          return;
+        }
 
-      final orderId = data['orderId'] as String?;
-      if (orderId == null) return;
+        final orderId = data['orderId'] as String?;
+        if (orderId == null) {
+          debugPrint('HomeScreen: NewOrder ignorado — orderId nulo');
+          return;
+        }
 
-      // If this order was already denied, ignore the re-send
-      if (_deniedOrderIds.contains(orderId)) return;
+        // If this order was already shown (denied or currently displayed), skip
+        if (_deniedOrderIds.contains(orderId)) {
+          debugPrint('HomeScreen: NewOrder ignorado — orderId $orderId já exibido');
+          return;
+        }
 
-      // A new (non-denied) order signals a fresh dispatch round — clear old denials
-      if (_deniedOrderIds.isNotEmpty) {
-        _deniedOrderIds.clear();
+        // A new (non-denied) order signals a fresh dispatch round — clear old denials
+        if (_deniedOrderIds.isNotEmpty) {
+          _deniedOrderIds.clear();
+        }
+
+        // Track this order to prevent duplicate display (SignalR + push)
+        _deniedOrderIds.add(orderId);
+
+        IncomingOrderSheet.show(
+          context,
+          data,
+          onDenied: () {
+            // orderId já está em _deniedOrderIds — evita reexibição
+          },
+        );
+      } catch (e) {
+        debugPrint('HomeScreen: ERRO ao processar NewOrder — $e');
       }
-
-      IncomingOrderSheet.show(
-        context,
-        data,
-        onDenied: () {
-          _deniedOrderIds.add(orderId);
-        },
-      );
     });
 
-    // Listen for travel cancellations
     _travelCancelledSub = signalR.onTravelCancelled.listen((data) {
       if (!mounted) return;
       final travelId = data['travelId'] as String?;
@@ -356,6 +366,85 @@ class _HomeScreenState extends State<HomeScreen> {
     _reconnectedSub = signalR.onReconnected.listen((_) {
       setState(() => _isReconnecting = false);
     });
+
+    // Conectar hubs (listeners já estão prontos)
+    try {
+      await signalR.connect(
+        'travel-orders',
+        '${AppConfig.getBaseUrl()}/hubs/travel-orders',
+        token,
+      );
+      debugPrint('SignalR: conectado ao hub travel-orders');
+    } catch (e) {
+      debugPrint('SignalR: FALHA ao conectar travel-orders — $e');
+    }
+
+    // Also connect to travel-management for cancellation events
+    try {
+      await signalR.connect(
+        'travel-management',
+        '${AppConfig.getBaseUrl()}/hubs/travel-management',
+        token,
+      );
+      debugPrint('SignalR: conectado ao hub travel-management');
+    } catch (e) {
+      debugPrint('SignalR: travel-management não conectado — $e');
+    }
+
+    // Start periodic location reporting for dashboard map
+    _startLocationReporting(signalR);
+  }
+
+  /// Verifica se há um pedido pendente vindo de uma notificação push.
+  /// Lê [pendingOrderId] dos route arguments e busca os detalhes via REST.
+  Future<void> _checkPendingOrder() async {
+    if (!mounted) return;
+    final routeArgs = ModalRoute.of(context)?.settings.arguments;
+    if (routeArgs is Map<String, dynamic>) {
+      final orderId = routeArgs['pendingOrderId'] as String?;
+      if (orderId != null && orderId.isNotEmpty) {
+        await _fetchAndShowOrder(orderId);
+      }
+    }
+  }
+
+  /// Busca detalhes de um pedido via REST e exibe a tela de aceitação/recusa.
+  /// Inclui guarda contra duplicação com o caminho SignalR.
+  Future<void> _fetchAndShowOrder(String orderId) async {
+    if (_isProcessingPendingOrder) return;
+
+    // Se o pedido já foi exibido (SignalR chegou primeiro), não duplica
+    if (_deniedOrderIds.contains(orderId)) return;
+    if (_currentTravelId != null) return;
+
+    _isProcessingPendingOrder = true;
+
+    try {
+      final dio = Modular.get<Dio>();
+      final response = await dio.get(
+        '${AppConfig.getBaseUrl()}/api/travels/orders/$orderId',
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200 && response.data != null) {
+        final orderData = response.data as Map<String, dynamic>;
+
+        // Re-verifica após a chamada de rede (estado pode ter mudado)
+        if (_currentTravelId != null || _deniedOrderIds.contains(orderId)) return;
+
+        // Track para evitar duplicação
+        _deniedOrderIds.add(orderId);
+
+        IncomingOrderSheet.show(context, orderData);
+      }
+    } on DioException {
+      // Pedido expirado, já aceito por outro motorista ou inválido — ignorar silenciosamente
+    } catch (e) {
+      debugPrint('Erro ao buscar pedido $orderId: $e');
+    } finally {
+      if (mounted) _isProcessingPendingOrder = false;
+    }
   }
 
   Future<void> _handleSignOut() async {

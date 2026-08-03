@@ -26,14 +26,13 @@ class NotificationService {
       debugPrint('OneSignal: inicializado com sucesso (appId: ${appId.substring(0, 8)}...).');
 
       _registerListeners();
+
+      await requestPermission();
     } catch (e) {
       debugPrint('OneSignal: erro ao inicializar — $e');
     }
   }
 
-  /// Vincula o [userId] como External ID no OneSignal.
-  ///
-  /// Chamar após login bem-sucedido.
   static Future<void> login(String userId) async {
     if (!_initialized) return;
 
@@ -45,9 +44,6 @@ class NotificationService {
     }
   }
 
-  /// Desvincula o External ID atual.
-  ///
-  /// Chamar durante o logout.
   static Future<void> logout() async {
     if (!_initialized) return;
 
@@ -82,14 +78,33 @@ class NotificationService {
 
   /// Handler de clique em notificação.
   ///
-  /// Extrai [travelId] dos dados adicionais para deep link
-  /// para a tela de corrida ativa.
+  /// Suporta dois tipos de notificação:
+  /// - `type: "new_order"` com `orderId`: busca detalhes do pedido e
+  ///   navega para home com o pedido pendente para aceitação/recusa.
+  /// - Padrão (com `travelId`): deep link para a tela de corrida ativa.
   static void _onNotificationClick(OSNotificationClickEvent event) {
     debugPrint('OneSignal: notificação clicada — notificationId: ${event.notification.notificationId}');
 
     final additionalData = event.notification.additionalData;
     if (additionalData == null) return;
 
+    final type = additionalData['type'] as String?;
+
+    // Nova corrida (dispatch) — ainda não tem travelId
+    if (type == 'new_order') {
+      final orderId = additionalData['orderId'] as String?;
+      if (orderId != null && orderId.isNotEmpty) {
+        debugPrint('OneSignal: nova corrida — orderId: $orderId');
+        try {
+          Modular.to.navigate('/home', arguments: {'pendingOrderId': orderId});
+        } catch (e) {
+          debugPrint('OneSignal: erro ao navegar para home — $e');
+        }
+      }
+      return;
+    }
+
+    // Viagem ativa — deep link para a tela de corrida
     final travelId = additionalData['travelId'] as String?;
     if (travelId != null && travelId.isNotEmpty) {
       debugPrint('OneSignal: deep link para /active-travel — travelId: $travelId');

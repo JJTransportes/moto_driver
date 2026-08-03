@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
 class SignalRService {
@@ -28,6 +29,8 @@ class SignalRService {
     await _connections[hubName]?.stop();
     _connections.remove(hubName);
 
+    debugPrint('SignalR: conectando ao hub $hubName em $hubUrl');
+
     final connection = HubConnectionBuilder()
         .withUrl(
           hubUrl,
@@ -43,6 +46,7 @@ class SignalRService {
 
     await connection.start();
     _connections[hubName] = connection;
+    debugPrint('SignalR: hub $hubName conectado com sucesso');
   }
 
   /// Envia um comando 'DenyOrder' para o hub de travel-orders.
@@ -109,24 +113,32 @@ class SignalRService {
     switch (hubName) {
       case 'travel-orders':
         connection.on('NewOrder', (args) {
+          debugPrint('SignalR: evento NewOrder recebido do hub — args: $args');
           if (args != null && args.isNotEmpty) {
-            _newOrderController.add(args.first as Map<String, dynamic>);
+            try {
+              _newOrderController.add(args.first as Map<String, dynamic>);
+            } catch (e) {
+              debugPrint('SignalR: erro ao processar NewOrder — $e');
+            }
           }
         });
         break;
 
       case 'travel-management':
         connection.on('TravelStarted', (args) {
+          debugPrint('SignalR: evento TravelStarted recebido — args: $args');
           if (args != null && args.isNotEmpty) {
             _travelStartedController.add(args.first as Map<String, dynamic>);
           }
         });
         connection.on('TravelCompleted', (args) {
+          debugPrint('SignalR: evento TravelCompleted recebido — args: $args');
           if (args != null && args.isNotEmpty) {
             _travelCompletedController.add(args.first as Map<String, dynamic>);
           }
         });
         connection.on('TravelCancelled', (args) {
+          debugPrint('SignalR: evento TravelCancelled recebido — args: $args');
           if (args != null && args.isNotEmpty) {
             _travelCancelledController.add(args.first as Map<String, dynamic>);
           }
