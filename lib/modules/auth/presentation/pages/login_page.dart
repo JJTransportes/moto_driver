@@ -1,10 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
-import 'package:flutter_modular/flutter_modular.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:moto_driver/core/brand/i_brand_cache_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
 import 'package:moto_driver/widgets/app_button.dart';
@@ -24,22 +20,6 @@ class _LoginPageState extends State<LoginPage> {
 
   String? _emailError;
   String? _passwordError;
-  String? _brandImagePath;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadBrandImage();
-  }
-
-  Future<void> _loadBrandImage() async {
-    final path = await Modular.get<IBrandCacheService>().getBrandImagePath();
-    if (mounted) {
-      setState(() {
-        _brandImagePath = path;
-      });
-    }
-  }
 
   @override
   void dispose() {
@@ -79,11 +59,11 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-     
+
     return BlocConsumer<LoginBloc, LoginState>(
       listener: (context, state) {
         if (state is LoginSuccess) {
-          Navigator.of(context).pushReplacementNamed('/home');
+          Navigator.of(context).pushReplacementNamed('/terms');
         }
       },
       builder: (context, state) {
@@ -99,7 +79,7 @@ class _LoginPageState extends State<LoginPage> {
                 vertical: 36,
               ),
               child: Column(
-                spacing: size.height * 0.1,
+                spacing: size.height * 0.016,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   GradientText(
@@ -110,7 +90,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _buildBrandImage(),
+                  _buildLogo(),
                   Column(
                     spacing: 16,
                     children: [
@@ -136,27 +116,27 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       if (errorMessage != null) ...[
-                    Text(
-                      errorMessage,
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontSize: 12,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+                        Text(
+                          errorMessage,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
-                  AppButton(
-                    label: 'Entrar',
-                    loading: isLoading,
-                    onPressed: _submit,
-                  ),
-                  TextButton(
-                          onPressed: () => Navigator.of(context).pushNamed('/driver-register/'),
-                    child: Text(
-                      'Criar conta',
-                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
-                    ),
-                  ),
+                      AppButton(
+                        label: 'Entrar',
+                        loading: isLoading,
+                        onPressed: _submit,
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pushNamed('/driver-register/'),
+                        child: Text(
+                          'Criar conta',
+                          style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -168,24 +148,13 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildBrandImage() {
-    if (_brandImagePath != null) {
-      return Image.file(
-        File(_brandImagePath!),
-        width: 224,
-        height: 90,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => _buildDefaultLogo(),
-      );
-    }
-    return _buildDefaultLogo();
-  }
+  Widget _buildLogo() {
+    final size = MediaQuery.sizeOf(context);
 
-  Widget _buildDefaultLogo() {
     return Image.asset(
-      'assets/images/logo.jpeg',
-      width: 224,
-      height: 90,
+      'assets/images/moto_driver_logo.png',
+      height: size.height * 0.4,
+      width: size.width * 0.4,
       fit: BoxFit.contain,
       errorBuilder: (_, __, ___) => const SizedBox(
         width: 224,
