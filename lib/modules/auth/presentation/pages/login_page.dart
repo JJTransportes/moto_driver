@@ -63,7 +63,7 @@ class _LoginPageState extends State<LoginPage> {
     return BlocConsumer<LoginBloc, LoginState>(
       listener: (context, state) {
         if (state is LoginSuccess) {
-          Navigator.of(context).pushReplacementNamed('/home');
+          Navigator.of(context).pushReplacementNamed('/terms');
         }
       },
       builder: (context, state) {
