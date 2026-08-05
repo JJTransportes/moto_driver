@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/auth/terms_storage.dart';
+import 'package:moto_driver/core/errors/exceptions.dart';
 import 'package:moto_driver/modules/usage_terms/data/datasources/usage_terms_datasource.dart';
 import 'package:moto_driver/modules/usage_terms/presentation/blocs/usage_terms_event.dart';
 import 'package:moto_driver/modules/usage_terms/presentation/blocs/usage_terms_state.dart';
@@ -7,8 +9,13 @@ import 'package:moto_driver/modules/usage_terms/presentation/blocs/usage_terms_s
 class UsageTermsBloc extends Bloc<UsageTermsEvent, UsageTermsState> {
   final UsageTermsDatasource _datasource;
   final TermsStorage _storage;
+  final SignOutService _signOutService;
 
-  UsageTermsBloc(this._datasource, this._storage) : super(const UsageTermsInitial()) {
+  static const _serverErrorMessage =
+      'Erro no servidor. Tente novamente em instantes.';
+
+  UsageTermsBloc(this._datasource, this._storage, this._signOutService)
+      : super(const UsageTermsInitial()) {
     on<CheckStatus>(_onCheckStatus);
     on<LoadTerms>(_onLoadTerms);
     on<AcceptTerms>(_onAcceptTerms);
@@ -27,6 +34,13 @@ class UsageTermsBloc extends Bloc<UsageTermsEvent, UsageTermsState> {
       } else {
         emit(const UsageTermsAccepted());
       }
+    } on UnauthorizedException {
+      await _signOutService.signOut();
+    } on ServerException {
+      emit(const UsageTermsError(
+        message: _serverErrorMessage,
+        isRetryable: true,
+      ));
     } catch (_) {
       emit(const UsageTermsError(
         message: 'Erro ao verificar termos. Verifique sua conexão.',
@@ -43,6 +57,13 @@ class UsageTermsBloc extends Bloc<UsageTermsEvent, UsageTermsState> {
     try {
       final terms = await _datasource.getActiveTerms();
       emit(UsageTermsLoaded(terms: terms));
+    } on UnauthorizedException {
+      await _signOutService.signOut();
+    } on ServerException {
+      emit(const UsageTermsError(
+        message: _serverErrorMessage,
+        isRetryable: true,
+      ));
     } catch (_) {
       emit(const UsageTermsError(
         message: 'Erro ao carregar termos. Tente novamente.',
@@ -70,6 +91,13 @@ class UsageTermsBloc extends Bloc<UsageTermsEvent, UsageTermsState> {
       final response = await _datasource.acceptTerms();
       await _storage.saveAcceptedTermId(response.usageTermId);
       emit(const UsageTermsAccepted());
+    } on UnauthorizedException {
+      await _signOutService.signOut();
+    } on ServerException {
+      emit(const UsageTermsError(
+        message: _serverErrorMessage,
+        isRetryable: true,
+      ));
     } catch (_) {
       emit(const UsageTermsError(
         message: 'Erro ao aceitar termos. Tente novamente.',

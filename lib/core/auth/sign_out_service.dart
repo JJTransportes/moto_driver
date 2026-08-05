@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/terms_storage.dart';
@@ -20,14 +21,28 @@ class SignOutService {
     this._termsStorage,
   );
 
+  /// Limpa a sessão e volta para o login.
+  ///
+  /// As limpezas são sequenciais (escritas concorrentes no secure storage
+  /// corrompem a chave AES no web) e individualmente tolerantes a falha: este é
+  /// o caminho de recuperação de sessão inválida, então a navegação para
+  /// `/login` tem que acontecer mesmo que alguma limpeza falhe.
   Future<void> signOut() async {
-    await Future.wait([
-      _authStorage.clear(),
-      _authLocal.clearAuth(),
-      _profileLocal.clearProfile(),
-      _travelLocal.clearTravels(),
-      _termsStorage.clear(),
-    ]);
+    await _runSafely('authStorage', _authStorage.clear);
+    await _runSafely('termsStorage', _termsStorage.clear);
+    await _runSafely('authLocal', _authLocal.clearAuth);
+    await _runSafely('profileLocal', _profileLocal.clearProfile);
+    await _runSafely('travelLocal', _travelLocal.clearTravels);
+
     Modular.to.navigate('/login');
+  }
+
+  Future<void> _runSafely(String label, Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (e) {
+      // Uma limpeza que falha não pode impedir o motorista de voltar ao login.
+      debugPrint('SignOutService: falha ao limpar $label — $e');
+    }
   }
 }
