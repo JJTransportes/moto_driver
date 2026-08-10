@@ -41,10 +41,9 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: true
-  image_path_android: "assets/images/moto_icon.png"
-  image_path_ios: "assets/images/moto_icon.png"
+  image_path_android: "assets/images/moto_driver_icon.png"
+  image_path_ios: "assets/images/moto_driver_icon.png"
   adaptatvie_icon_background: "#ffffff"
-  adaptatvie_icon_foreground: "assets/images/moto_icon_adaptative.png"
 
 flutter:
   uses-material-design: true
