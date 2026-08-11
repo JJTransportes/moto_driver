@@ -30,6 +30,7 @@ workflows:
       script: |
         cat > .env << EOF
         API_BASE_URL=$API_BASE_URL
+        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
         EOF
     - name: Build App Bundle
       script: flutter build appbundle --release
