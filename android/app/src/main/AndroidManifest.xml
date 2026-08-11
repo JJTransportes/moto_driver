@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="Motô"
         android:name="${applicationName}"
@@ -13,6 +14,9 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${androidMapsApiKey}" />
+        <meta-data
+            android:name="com.onesignal.NotificationSmallIcon"
+            android:resource="@drawable/ic_notification" />
 
         <activity
             android:name=".MainActivity"

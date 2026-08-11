@@ -8,8 +8,8 @@ import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
-import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
+import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -112,14 +112,10 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         }
 
         // Extract coordinates from routes
-        _passengerLat = (_pickupRoute?['destinationLatitude'] as num?)?.toDouble()
-            ?? (routes.isNotEmpty ? (routes[0]['initialLatitude'] as num?)?.toDouble() : null);
-        _passengerLng = (_pickupRoute?['destinationLongitude'] as num?)?.toDouble()
-            ?? (routes.isNotEmpty ? (routes[0]['initialLongitude'] as num?)?.toDouble() : null);
-        _destLat = (_tripRoute?['destinationLatitude'] as num?)?.toDouble()
-            ?? (routes.isNotEmpty ? (routes[0]['destinationLatitude'] as num?)?.toDouble() : null);
-        _destLng = (_tripRoute?['destinationLongitude'] as num?)?.toDouble()
-            ?? (routes.isNotEmpty ? (routes[0]['destinationLongitude'] as num?)?.toDouble() : null);
+        _passengerLat = (_pickupRoute?['destinationLatitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['initialLatitude'] as num?)?.toDouble() : null);
+        _passengerLng = (_pickupRoute?['destinationLongitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['initialLongitude'] as num?)?.toDouble() : null);
+        _destLat = (_tripRoute?['destinationLatitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['destinationLatitude'] as num?)?.toDouble() : null);
+        _destLng = (_tripRoute?['destinationLongitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['destinationLongitude'] as num?)?.toDouble() : null);
 
         // Endereços das rotas
         _departureAddress = _pickupRoute?['destinationAddress'] as String?;
@@ -372,7 +368,8 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
     if (destLat == null || destLng == null) return;
 
-    final url = 'https://www.google.com/maps/dir/?api=1'
+    final url =
+        'https://www.google.com/maps/dir/?api=1'
         '&destination=$destLat,$destLng'
         '&travelmode=driving';
 
