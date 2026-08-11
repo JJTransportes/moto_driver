@@ -12,6 +12,7 @@ import 'package:moto_driver/core/local_db/repositories/travel_local_repository.d
 import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/core/notifications/notification_service.dart';
 
 class IncomingOrderSheet extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -300,6 +301,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // Close the sheet immediately
       if (!context.mounted) return;
       Navigator.of(context).pop();
+      
+      // RF05: Sheet fechado — permitir foreground notifications novamente
+      NotificationService.setSheetVisible(false);
 
       // Persist travel locally
       final travelRepo = Modular.get<TravelLocalRepository>();
@@ -349,6 +353,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
 
     // Close the sheet immediately — denial is fire-and-forget
     Navigator.of(context).pop();
+
+    // RF05: Sheet fechado — permitir foreground notifications novamente
+    NotificationService.setSheetVisible(false);
 
     try {
       final signalR = Modular.get<SignalRService>();

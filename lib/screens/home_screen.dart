@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/modules/driver_home/presentation/widgets/incoming_order_sheet.dart';
 import 'package:moto_driver/widgets/profile_header.dart';
@@ -36,9 +38,14 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _userName;
 
   final Set<String> _deniedOrderIds = {};
+  String? _processedOrderId; // Evita processar mesmo pushOrderId duas vezes
+  bool _permissionDenied = false;
 
   @override
   Widget build(BuildContext context) {
+    // RF04: Capturar pushOrderId em warm start (app já está em /home)
+    _checkPushOrderInArgs();
+
     return Scaffold(
       backgroundColor: AppColors.white,
       body: SafeArea(
@@ -63,6 +70,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
+              // RF06: Banner de permissão de notificação negada
+              if (_permissionDenied) _buildPermissionBanner(),
               ProfileHeader(
                 fullName: _userName ?? 'Motorista',
                 photoUrl: _userPhotoUrl,
@@ -205,6 +214,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUserId();
     _checkActiveTravelHttp();
     _connectSignalR();
+
+    // RF04: Verificar se abriu via push notification (cold start)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handlePushOrder();
+    });
+
+    // RF06: Verificar permissão de notificação
+    _checkNotificationPermission();
+
+    // RF02: Tentar late login se falhou antes
+    _tryLateLogin();
   }
 
   Future<void> _loadUserId() async {
@@ -309,8 +329,12 @@ class _HomeScreenState extends State<HomeScreen> {
         data,
         onDenied: () {
           _deniedOrderIds.add(orderId);
+          NotificationService.setSheetVisible(false);
         },
       );
+
+      // RF05: Marcar sheet como visível para suprimir foreground dup
+      NotificationService.setSheetVisible(true);
     });
 
     // Listen for travel cancellations
@@ -424,5 +448,111 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       },
     );
+  }
+
+  // ── Push Notification Methods (RF04, RF05, RF06) ──
+
+  /// Verifica se há pushOrderId nos argumentos da rota (warm start).
+  void _checkPushOrderInArgs() {
+    final args = Modular.args.data;
+    if (args is Map) {
+      final orderId = args['pushOrderId'] as String?;
+      if (orderId != null && _processedOrderId != orderId) {
+        _processedOrderId = orderId;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _fetchAndShowOrder(orderId);
+        });
+      }
+    }
+  }
+
+  /// RF04: Processa pushOrderId recebido via argumentos de rota.
+  void _handlePushOrder() {
+    final args = Modular.args.data;
+    final pushOrderId = args is Map ? args['pushOrderId'] as String? : null;
+    if (pushOrderId == null) return;
+
+    _processedOrderId = pushOrderId;
+    _fetchAndShowOrder(pushOrderId);
+  }
+
+  /// RF04: Busca dados completos do pedido e exibe IncomingOrderSheet.
+  Future<void> _fetchAndShowOrder(String orderId) async {
+    try {
+      final dio = Modular.get<Dio>();
+      final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId');
+      if (!mounted) return;
+
+      final data = response.data as Map<String, dynamic>;
+      final status = data['status'] as String?;
+
+      // RF04: Tratamento de erros de negócio
+      if (status == 'cancelled' || status == 'accepted') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pedido não está mais disponível')),
+          );
+        }
+        return;
+      }
+
+      // RF05: Marcar sheet como visível (suprime foreground dup)
+      NotificationService.setSheetVisible(true);
+
+      if (mounted) {
+        IncomingOrderSheet.show(
+          context,
+          data,
+          onDenied: () {
+            _deniedOrderIds.add(orderId);
+            NotificationService.setSheetVisible(false);
+          },
+        );
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 403) {
+        // RF04: Não pertence ao motorista — ignorar silenciosamente
+        developer.log('[PUSH] Order $orderId does not belong to current driver',
+            name: 'push');
+      } else {
+        developer.log('[PUSH] Failed to fetch order $orderId: $e', name: 'push', level: 900);
+      }
+    }
+  }
+
+  /// RF06: Banner informativo quando permissão de notificação está negada.
+  Widget _buildPermissionBanner() {
+    return Container(
+      color: Colors.orange.shade50,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.notifications_off, color: Colors.orange, size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Notificações desativadas — você pode perder novas corridas. Ative nas Configurações do app.',
+              style: TextStyle(color: Colors.orange, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// RF06: Verifica status da permissão de notificação.
+  Future<void> _checkNotificationPermission() async {
+    final granted = await NotificationService.permissionGranted;
+    if (mounted) {
+      setState(() => _permissionDenied = !granted);
+    }
+  }
+
+  /// RF02: Tenta recuperar OneSignal.login se o primeiro fluxo falhou.
+  Future<void> _tryLateLogin() async {
+    final userId = _userId;
+    if (userId != null) {
+      NotificationService.tryLateLogin(userId);
+    }
   }
 }

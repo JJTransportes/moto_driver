@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
+import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/modules/auth/domain/repositories/i_auth_repository.dart';
 
@@ -40,6 +41,9 @@ class _SplashScreenState extends State<SplashScreen> {
           // Refresh succeeded — save new tokens (rotation)
           await authStorage.saveToken(success.accessToken, success.userId);
           await authStorage.saveRefreshToken(success.refreshToken);
+
+          // RF02: Tentar recuperar OneSignal.login se falhou antes
+          NotificationService.tryLateLogin(success.userId);
 
           // Navigate to terms guard — it will determine final destination
           Modular.to.navigate('/terms');
