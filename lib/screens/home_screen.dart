@@ -22,6 +22,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription? _newOrderSub;
+  StreamSubscription? _orderCancelledSub;
   StreamSubscription? _reconnectingSub;
   StreamSubscription? _reconnectedSub;
   StreamSubscription? _travelCancelledSub;
@@ -191,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _locationTimer?.cancel();
     _newOrderSub?.cancel();
+    _orderCancelledSub?.cancel();
     _travelCancelledSub?.cancel();
     _reconnectingSub?.cancel();
     _reconnectedSub?.cancel();
@@ -285,26 +287,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final token = await authStorage.getToken();
     if (token == null) return;
 
-    await signalR.connect(
-      'travel-orders',
-      '${AppConfig.getBaseUrl()}/hubs/travel-orders',
-      token,
-    );
-
-    // Also connect to travel-management for cancellation events
-    try {
-      await signalR.connect(
-        'travel-management',
-        '${AppConfig.getBaseUrl()}/hubs/travel-management',
-        token,
-      );
-    } catch (_) {
-      // Non-critical — cancels won't arrive in real-time without this hub
-    }
-
-    // Start periodic location reporting for dashboard map
-    _startLocationReporting(signalR);
-
+    // ── Subscribe to events BEFORE connecting ──
+    // The backend sends NewOrder during OnConnectedAsync (re-dispatch).
+    // If we subscribe after connect(), the event is lost.
     _newOrderSub = signalR.onNewOrder.listen((data) {
       if (_currentTravelId != null) return; // Already in a travel
 
@@ -356,6 +341,40 @@ class _HomeScreenState extends State<HomeScreen> {
     _reconnectedSub = signalR.onReconnected.listen((_) {
       setState(() => _isReconnecting = false);
     });
+
+    _orderCancelledSub = signalR.onOrderCancelled.listen((data) {
+      if (!mounted) return;
+      // Dismiss any open bottom sheet and notify the driver
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pedido cancelado pelo passageiro.'),
+          duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    });
+
+    // ── Now connect to hubs (listeners are already registered) ──
+    await signalR.connect(
+      'travel-orders',
+      '${AppConfig.getBaseUrl()}/hubs/travel-orders',
+      token,
+    );
+
+    try {
+      await signalR.connect(
+        'travel-management',
+        '${AppConfig.getBaseUrl()}/hubs/travel-management',
+        token,
+      );
+    } catch (_) {
+      // Non-critical — cancels won't arrive in real-time without this hub
+    }
+
+    _startLocationReporting(signalR);
   }
 
   Future<void> _handleSignOut() async {
