@@ -16,14 +16,25 @@ class NotificationService {
   static bool _sheetVisible = false;
 
   // ── Player ID Stream (RF03) ──
-  // Stream reativo — evita race condition: registerDevice só é chamado
-  // quando o playerId realmente está disponível.
+  // BehaviorSubject pattern: armazena último valor + emite para novos listeners.
 
+  static String? _lastPlayerId;
   static final StreamController<String> _playerIdController =
       StreamController<String>.broadcast();
 
   /// Stream que emite o playerId do OneSignal assim que disponível.
+  /// Para consumo único, prefira [getPlayerId] que resolve imediatamente
+  /// se o playerId já estiver disponível.
   static Stream<String> get onPlayerIdChanged => _playerIdController.stream;
+
+  /// Obtém o playerId: retorna imediatamente se disponível,
+  /// ou aguarda o stream com timeout de 10s.
+  static Future<String> getPlayerId({Duration timeout = const Duration(seconds: 10)}) async {
+    if (_lastPlayerId != null) {
+      return _lastPlayerId!;
+    }
+    return onPlayerIdChanged.first.timeout(timeout);
+  }
 
   // ── Inicialização (RF01) ──
 
@@ -38,6 +49,7 @@ class NotificationService {
       OneSignal.User.pushSubscription.addObserver((state) {
         final id = state.current.id;
         if (id != null) {
+          _lastPlayerId = id;
           _playerIdController.add(id);
         }
       });
@@ -115,14 +127,17 @@ class NotificationService {
     required String platform,
   }) async {
     try {
-      await dio.post('/api/notifications/register-device', data: {
+      final response = await dio.post('/api/notifications/register-device', data: {
         'playerId': playerId,
         'platform': platform,
       });
-      log('[PUSH] Device registered: $platform / $playerId', name: 'push');
+      log('[PUSH] Device registered: $platform / $playerId (status=${response.statusCode})',
+          name: 'push');
+    } on DioException catch (e) {
+      log('[PUSH] register-device failed (status=${e.response?.statusCode}, body=${e.response?.data}): $e',
+          name: 'push', level: 900);
     } catch (e) {
-      log('[PUSH] register-device failed: $e', name: 'push', level: 900);
-      // Não bloqueante — targeting é via external_user_ids
+      log('[PUSH] register-device unexpected error: $e', name: 'push', level: 900);
     }
   }
 
