@@ -56,21 +56,20 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
   /// RF02 + RF03 + RF06: Setup completo de push notifications.
   Future<void> _setupPushNotifications(String userId) async {
     try {
-      // RF06: Solicitar permissão
-      final permitted = await NotificationService.requestPermission();
-      if (!permitted) {
-        log('[PUSH] Permission denied — skipping push registration', name: 'push');
-        return;
-      }
+      // RF06: Solicitar permissão (fire-and-forget — não bloqueia o fluxo).
+      // OneSignal.login + register-device executam independente da resposta.
+      // O targeting via external_user_ids funciona mesmo sem permissão
+      // explícita (APNs/FCM entregam ao device de qualquer forma).
+      NotificationService.requestPermission();
 
       // RF02: OneSignal.login com retry 3x
       await NotificationService.login(userId);
 
-      // RF03: Registrar device token — aguardar playerId via stream
+      // RF03: Registrar device token — usar getPlayerId() que resolve
+      // imediatamente se o playerId já estiver disponível (evita race condition
+      // do .first timeout quando o stream já emitiu antes do listener).
       try {
-        final playerId = await NotificationService.onPlayerIdChanged
-            .first
-            .timeout(const Duration(seconds: 10));
+        final playerId = await NotificationService.getPlayerId();
         final dio = Modular.get<Dio>();
         final platform = Platform.isIOS ? 'ios' : 'android';
         await NotificationService.registerDevice(

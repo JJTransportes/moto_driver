@@ -22,7 +22,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _newOrderSub;
   StreamSubscription? _orderCancelledSub;
   StreamSubscription? _reconnectingSub;
@@ -199,6 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _locationTimer?.cancel();
     _newOrderSub?.cancel();
     _orderCancelledSub?.cancel();
@@ -211,6 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUserId();
     _checkActiveTravelHttp();
     _connectSignalR();
@@ -225,6 +227,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // RF02: Tentar late login se falhou antes
     _tryLateLogin();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // RF06: Reavaliar permissão ao voltar ao foreground
+      // (usuário pode ter ido às Configurações e concedido permissão)
+      _checkNotificationPermission();
+    }
   }
 
   Future<void> _loadUserId() async {
