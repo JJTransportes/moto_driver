@@ -11,6 +11,9 @@ import 'package:moto_driver/core/local_db/models/local_data_models.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
+import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/core/notifications/notification_service.dart';
+
 class IncomingOrderSheet extends StatefulWidget {
   final Map<String, dynamic> order;
   final VoidCallback? onDenied;
@@ -298,6 +301,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // Close the sheet immediately
       if (!context.mounted) return;
       Navigator.of(context).pop();
+      
+      // RF05: Sheet fechado — permitir foreground notifications novamente
+      NotificationService.setSheetVisible(false);
 
       // Persist travel locally
       final travelRepo = Modular.get<TravelLocalRepository>();
@@ -348,12 +354,20 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     // Close the sheet immediately — denial is fire-and-forget
     Navigator.of(context).pop();
 
+    // RF05: Sheet fechado — permitir foreground notifications novamente
+    NotificationService.setSheetVisible(false);
+
     try {
-      final dio = Modular.get<Dio>();
-      await dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
-    } on DioException catch (e) {
-      // Log the error but don't block the UI — backend already recorded the denial
-      log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
+      final signalR = Modular.get<SignalRService>();
+      await signalR.denyOrder(orderId);
+    } catch (_) {
+      try {
+        final dio = Modular.get<Dio>();
+        await dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
+      } on DioException catch (e) {
+        // Log the error but don't block the UI — backend already recorded the denial
+        log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
+      }
     }
   }
 
@@ -378,12 +392,17 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     // Close the sheet
     Navigator.of(context).pop();
 
-    // Fire-and-forget deny request
+    // Fire-and-forget deny request (SignalR first, REST fallback)
     try {
-      final dio = Modular.get<Dio>();
-      dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
-    } on DioException catch (e) {
-      log('Auto-deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
+      final signalR = Modular.get<SignalRService>();
+      signalR.denyOrder(orderId);
+    } catch (_) {
+      try {
+        final dio = Modular.get<Dio>();
+        dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
+      } on DioException catch (e) {
+        log('Auto-deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
+      }
     }
   }
 
@@ -484,10 +503,16 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   }
 
   String _resolveDistanceText(int distance) {
+    if (distance >= 1000) {
+      return '${(distance / 1000).toStringAsFixed(1)} km até o passageiro';
+    }
     return '$distance m até o passageiro';
   }
 
   String _resolveTotalDestText(int totalDest) {
+    if (totalDest >= 1000) {
+      return '${(totalDest / 1000).toStringAsFixed(1)} km até o destino';
+    }
     return '$totalDest m até o destino';
   }
 

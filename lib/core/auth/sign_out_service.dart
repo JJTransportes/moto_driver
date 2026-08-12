@@ -5,6 +5,7 @@ import 'package:moto_driver/core/auth/terms_storage.dart';
 import 'package:moto_driver/core/local_db/repositories/auth_local_repository.dart';
 import 'package:moto_driver/core/local_db/repositories/profile_local_repository.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
+import 'package:moto_driver/core/notifications/notification_service.dart';
 
 class SignOutService {
   final AuthStorage _authStorage;
@@ -28,12 +29,16 @@ class SignOutService {
   /// o caminho de recuperação de sessão inválida, então a navegação para
   /// `/login` tem que acontecer mesmo que alguma limpeza falhe.
   Future<void> signOut() async {
-    await _runSafely('authStorage', _authStorage.clear);
-    await _runSafely('termsStorage', _termsStorage.clear);
-    await _runSafely('authLocal', _authLocal.clearAuth);
-    await _runSafely('profileLocal', _profileLocal.clearProfile);
-    await _runSafely('travelLocal', _travelLocal.clearTravels);
+    // RF02: Desvincular External ID antes de limpar dados
+    await NotificationService.logout();
 
+    await Future.wait([
+      _authStorage.clear(),
+      _authLocal.clearAuth(),
+      _profileLocal.clearProfile(),
+      _travelLocal.clearTravels(),
+      _termsStorage.clear(),
+    ]);
     Modular.to.navigate('/login');
   }
 
