@@ -20,7 +20,8 @@ PODS:
     - Flutter
   - onesignal_flutter (5.6.7):
     - Flutter
-    - OneSignalXCFramework (= 5.5.5)
+    - OneSignalXCFramework/OneSignal (= 5.5.5)
+    - OneSignalXCFramework/OneSignalInAppMessages (= 5.5.5)
   - OneSignalXCFramework (5.5.5):
     - OneSignalXCFramework/OneSignalComplete (= 5.5.5)
   - OneSignalXCFramework/OneSignal (5.5.5):
@@ -89,6 +90,7 @@ DEPENDENCIES:
   - google_maps_flutter_ios (from `.symlinks/plugins/google_maps_flutter_ios/ios`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - onesignal_flutter (from `.symlinks/plugins/onesignal_flutter/ios`)
+  - OneSignalXCFramework
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
@@ -130,13 +132,13 @@ SPEC CHECKSUMS:
   google_maps_flutter_ios: 3213e1e5f5588b6134935cb8fc59acb4e6d88377
   GoogleMaps: 8939898920281c649150e0af74aa291c60f2e77d
   image_picker_ios: 7fe1ff8e34c1790d6fff70a32484959f563a928a
-  onesignal_flutter: 29eeda57e99e9615280a7f10dc103840ed6f4746
+  onesignal_flutter: 7c54486bcf26464bee36e75e7f866c2824f9fe5e
   OneSignalXCFramework: 48e5b7c5b51d4e67bab3405229f963efde1a3894
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
   url_launcher_ios: 694010445543906933d732453a59da0a173ae33d
 
-PODFILE CHECKSUM: 3db742337549f6a7d57151680ef7eabe0f7dc55b
+PODFILE CHECKSUM: 7a80d6cb1ac307f5a67402147e8d4894f7533381
 
 COCOAPODS: 1.17.0
