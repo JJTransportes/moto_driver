@@ -46,8 +46,8 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
 
       // ── Push Notification flow (RF02 + RF03 + RF06 + RF08) ──
       // Executado em background após emitir sucesso
-      unawaited(_setupPushNotifications(user.id));
-      unawaited(_processPendingDeepLink());
+      await _setupPushNotifications(user.id);
+      await _processPendingDeepLink();
     } else {
       emit(LoginFailure(result.exceptionOrNull()!.toString()));
     }

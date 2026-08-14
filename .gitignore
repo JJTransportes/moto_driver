@@ -50,3 +50,6 @@ app.*.map.json
 .pi/
 .vscode/launch.json
 ios/Flutter/Secrets.xcconfig
+
+# FVM Version Cache
+.fvm/
