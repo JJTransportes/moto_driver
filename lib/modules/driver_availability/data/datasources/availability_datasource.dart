@@ -19,11 +19,15 @@ class AvailabilityDatasource {
     }
   }
 
-  /// POST /api/drivers/availability/activate
-  /// Ativa o modo de atendimento por 4h (janela controlada pelo backend).
-  Future<DriverAvailabilityEntity> activate() async {
+  /// POST /api/drivers/availability/update
+  /// Define a intenção do cliente sobre o modo de atendimento.
+  /// [action]: 'activate' (habilita por 4h) | 'deactivate' (desabilita).
+  Future<DriverAvailabilityEntity> updateAvailability(String action) async {
     try {
-      final response = await _dio.post('/api/drivers/availability/activate');
+      final response = await _dio.post(
+        '/api/drivers/availability/update',
+        data: {'action': action},
+      );
       return DriverAvailabilityEntity.fromJson(
         response.data as Map<String, dynamic>,
       );
@@ -31,6 +35,15 @@ class AvailabilityDatasource {
       throw _mapDioException(e);
     }
   }
+
+  /// Ativa o modo de atendimento por 4h (janela controlada pelo backend).
+  /// Usado pelo modal de atendimento ao tocar em "Confirmar".
+  Future<DriverAvailabilityEntity> activate() =>
+      updateAvailability('activate');
+
+  /// Desativa o modo de atendimento (usado no logout/delete de conta).
+  Future<DriverAvailabilityEntity> deactivate() =>
+      updateAvailability('deactivate');
 
   Exception _mapDioException(DioException e) {
     switch (e.response?.statusCode) {
