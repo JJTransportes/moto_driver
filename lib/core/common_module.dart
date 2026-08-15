@@ -14,6 +14,7 @@ import 'package:moto_driver/modules/auth/data/datasources/auth_datasource.dart';
 import 'package:moto_driver/modules/auth/data/datasources/i_auth_datasource.dart';
 import 'package:moto_driver/modules/auth/data/repositories/auth_repository.dart';
 import 'package:moto_driver/modules/auth/domain/repositories/i_auth_repository.dart';
+import 'package:moto_driver/modules/driver_availability/data/datasources/availability_datasource.dart';
 import 'package:moto_driver/modules/usage_terms/data/datasources/usage_terms_datasource.dart';
 
 class CommonModule extends Module {
@@ -32,5 +33,6 @@ class CommonModule extends Module {
     i.add<IAuthRepository>(AuthRepository.new);
     i.addSingleton<TermsStorage>(TermsStorage.new);
     i.addSingleton<UsageTermsDatasource>(UsageTermsDatasource.new);
+    i.addSingleton<AvailabilityDatasource>(AvailabilityDatasource.new);
   }
 }
