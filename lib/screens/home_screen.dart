@@ -12,6 +12,9 @@ import 'package:moto_driver/core/local_db/repositories/travel_local_repository.d
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/modules/driver_availability/data/datasources/availability_datasource.dart';
+import 'package:moto_driver/modules/driver_availability/domain/entities/driver_availability_entity.dart';
+import 'package:moto_driver/modules/driver_availability/presentation/widgets/availability_sheet.dart';
 import 'package:moto_driver/modules/driver_home/presentation/widgets/incoming_order_sheet.dart';
 import 'package:moto_driver/widgets/profile_header.dart';
 
@@ -40,6 +43,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final Set<String> _deniedOrderIds = {};
   String? _processedOrderId; // Evita processar mesmo pushOrderId duas vezes
   bool _permissionDenied = false;
+
+  // ── Disponibilidade (modo de atendimento) ──
+  DriverAvailabilityEntity? _availability;
+  Timer? _availabilityTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -201,6 +208,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _locationTimer?.cancel();
+    _availabilityTimer?.cancel();
     _newOrderSub?.cancel();
     _orderCancelledSub?.cancel();
     _travelCancelledSub?.cancel();
@@ -227,6 +235,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // RF02: Tentar late login se falhou antes
     _tryLateLogin();
+
+    // Disponibilidade: verificar status ao entrar no app (concorrente)
+    _checkAvailability();
   }
 
   @override
@@ -433,9 +444,55 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (confirmed != true || !context.mounted) return;
 
+    _stopAvailabilityTimer();
     await Modular.get<SignalRService>().disconnectAll();
     await Modular.get<TravelLocalRepository>().clearTravels();
     await Modular.get<SignOutService>().signOut();
+  }
+
+  // ── Disponibilidade (modo de atendimento) ──
+
+  /// Verifica o status de disponibilidade ao entrar no app.
+  /// Fire-and-forget — não bloqueia SignalR nem viagem ativa.
+  Future<void> _checkAvailability() async {
+    try {
+      final datasource = Modular.get<AvailabilityDatasource>();
+      final availability = await datasource.getAvailability();
+      if (!mounted) return;
+
+      setState(() => _availability = availability);
+
+      if (availability.isActive) {
+        _startAvailabilityTimer();
+      } else if (!AvailabilitySheet.isOpen) {
+        final result = await AvailabilitySheet.show(context, datasource: datasource);
+        if (!mounted || result == null) return; // cancelou — permanece inactive
+        setState(() => _availability = result);
+        _startAvailabilityTimer();
+      }
+    } catch (e) {
+      // RF06: falha silenciosa — re-tenta na próxima entrada do app
+      developer.log('[AVAILABILITY] GET failed: $e', name: 'availability');
+    }
+  }
+
+  void _startAvailabilityTimer() {
+    _stopAvailabilityTimer();
+    final availability = _availability;
+    if (availability == null || !availability.isActive) return;
+
+    _availabilityTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      setState(() {}); // recalcula a contagem regressiva
+      if (availability.isExpired) {
+        _stopAvailabilityTimer(); // indicador passa a exibir ramo inativo
+      }
+    });
+  }
+
+  void _stopAvailabilityTimer() {
+    _availabilityTimer?.cancel();
+    _availabilityTimer = null;
   }
 
   void _startLocationReporting(SignalRService signalR) {
