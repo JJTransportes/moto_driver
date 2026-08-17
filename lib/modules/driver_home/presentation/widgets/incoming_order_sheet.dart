@@ -14,11 +14,25 @@ import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 
+/// Decisão do motorista sobre o pedido, delegada ao dono do card
+/// (modo embutido — OrderAlertPage).
+enum OrderDecision { accepted, denied }
+
 class IncomingOrderSheet extends StatefulWidget {
   final Map<String, dynamic> order;
   final VoidCallback? onDenied;
 
-  const IncomingOrderSheet({super.key, required this.order, this.onDenied});
+  /// Quando fornecido, o card NÃO faz pop nem navega sozinho: executa as
+  /// chamadas de API/persistência e delega a saída ao dono (OrderAlertPage).
+  /// Quando nulo (modal via SignalR), o comportamento atual é preservado.
+  final void Function(OrderDecision decision, Map<String, dynamic>? acceptResult)? onDecision;
+
+  const IncomingOrderSheet({
+    super.key,
+    required this.order,
+    this.onDenied,
+    this.onDecision,
+  });
 
   @override
   State<IncomingOrderSheet> createState() => _IncomingOrderSheetState();
@@ -298,6 +312,22 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       final pickupRoute = routesList.isNotEmpty ? routesList[0] as Map<String, dynamic> : null;
       final tripRoute = routesList.length > 1 ? routesList[1] as Map<String, dynamic> : null;
 
+      final acceptResult = {
+        'travelId': travelId,
+        'pickupRoute': pickupRoute,
+        'tripRoute': tripRoute,
+      };
+
+      // Modo embutido: o dono (OrderAlertPage) decide a navegação de saída.
+      final onDecision = widget.onDecision;
+      if (onDecision != null) {
+        NotificationService.setSheetVisible(false);
+        await _persistActiveTravel(travelId, pickupRoute, tripRoute);
+        onDecision(OrderDecision.accepted, acceptResult);
+        return;
+      }
+
+      // Modo modal (SignalR): comportamento atual preservado.
       // Close the sheet immediately
       if (!context.mounted) return;
       Navigator.of(context).pop();
@@ -305,24 +335,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // RF05: Sheet fechado — permitir foreground notifications novamente
       NotificationService.setSheetVisible(false);
 
-      // Persist travel locally
-      final travelRepo = Modular.get<TravelLocalRepository>();
-      await travelRepo.saveActiveTravel(
-        TravelLocalData(
-          travelId: travelId,
-          status: 'Accepted',
-          departureAddress: pickupRoute?['destinationAddress'] as String? ?? widget.order['departureAddress'] as String?,
-          destinationAddress: tripRoute?['destinationAddress'] as String? ?? widget.order['destinationAddress'] as String?,
-          createdAt: DateTime.now(),
-        ),
-      );
+      await _persistActiveTravel(travelId, pickupRoute, tripRoute);
 
       // Navigate to active travel with route data
-      Modular.to.pushNamed('/active-travel', arguments: {
-        'travelId': travelId,
-        'pickupRoute': pickupRoute,
-        'tripRoute': tripRoute,
-      });
+      Modular.to.pushNamed('/active-travel', arguments: acceptResult);
     } on DioException catch (e) {
       String message;
       switch (e.response?.statusCode) {
@@ -346,16 +362,40 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     }
   }
 
+  /// Persiste a viagem aceita no cache local (usado nos dois modos).
+  Future<void> _persistActiveTravel(
+    String travelId,
+    Map<String, dynamic>? pickupRoute,
+    Map<String, dynamic>? tripRoute,
+  ) async {
+    final travelRepo = Modular.get<TravelLocalRepository>();
+    await travelRepo.saveActiveTravel(
+      TravelLocalData(
+        travelId: travelId,
+        status: 'Accepted',
+        departureAddress: pickupRoute?['destinationAddress'] as String? ?? widget.order['departureAddress'] as String?,
+        destinationAddress: tripRoute?['destinationAddress'] as String? ?? widget.order['destinationAddress'] as String?,
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
   Future<void> _deny(BuildContext context, String orderId) async {
     _rejectTimer?.cancel();
-    // Notify parent that this order was denied (for duplicate tracking)
-    widget.onDenied?.call();
 
-    // Close the sheet immediately — denial is fire-and-forget
-    Navigator.of(context).pop();
-
-    // RF05: Sheet fechado — permitir foreground notifications novamente
-    NotificationService.setSheetVisible(false);
+    final onDecision = widget.onDecision;
+    if (onDecision != null) {
+      // Modo embutido: o dono decide a saída; sem pop.
+      NotificationService.setSheetVisible(false);
+      onDecision(OrderDecision.denied, null);
+    } else {
+      // Modo modal: notifica o pai (duplicate tracking) e fecha o sheet.
+      widget.onDenied?.call();
+      // Close the sheet immediately — denial is fire-and-forget
+      Navigator.of(context).pop();
+      // RF05: Sheet fechado — permitir foreground notifications novamente
+      NotificationService.setSheetVisible(false);
+    }
 
     try {
       final signalR = Modular.get<SignalRService>();
@@ -386,11 +426,17 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     if (!mounted) return;
     final orderId = widget.order['orderId'] as String;
 
-    // Notify parent for duplicate tracking
-    widget.onDenied?.call();
-
-    // Close the sheet
-    Navigator.of(context).pop();
+    final onDecision = widget.onDecision;
+    if (onDecision != null) {
+      // Modo embutido: sem pop — o dono decide a saída.
+      NotificationService.setSheetVisible(false);
+      onDecision(OrderDecision.denied, null);
+    } else {
+      // Modo modal: notifica o pai (duplicate tracking) e fecha o sheet.
+      widget.onDenied?.call();
+      // Close the sheet
+      Navigator.of(context).pop();
+    }
 
     // Fire-and-forget deny request (SignalR first, REST fallback)
     try {
