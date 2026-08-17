@@ -46,13 +46,14 @@ workflows:
       script: |
         cat > .env << EOF
         API_BASE_URL=$API_BASE_URL
+        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
         EOF
 
     - name: Flutter build ipa
       script: |+
         flutter build ipa --release \
           --build-name=1.0.0 \
-          --build-number=14 \
+          --build-number=25 \
           --export-options-plist=/Users/builder/export_options.plist
           
     artifacts:
