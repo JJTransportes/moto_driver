@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +10,11 @@ import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/modules/driver_availability/data/datasources/availability_datasource.dart';
+import 'package:moto_driver/modules/driver_availability/domain/entities/driver_availability_entity.dart';
+import 'package:moto_driver/modules/driver_availability/presentation/widgets/availability_sheet.dart';
 import 'package:moto_driver/modules/driver_home/presentation/widgets/incoming_order_sheet.dart';
 import 'package:moto_driver/widgets/profile_header.dart';
 
@@ -20,8 +25,9 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _newOrderSub;
+  StreamSubscription? _orderCancelledSub;
   StreamSubscription? _reconnectingSub;
   StreamSubscription? _reconnectedSub;
   StreamSubscription? _travelCancelledSub;
@@ -35,6 +41,11 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _userName;
 
   final Set<String> _deniedOrderIds = {};
+  bool _permissionDenied = false;
+
+  // ── Disponibilidade (modo de atendimento) ──
+  DriverAvailabilityEntity? _availability;
+  Timer? _availabilityTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +73,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
+              // RF06: Banner de permissão de notificação negada
+              if (_permissionDenied) _buildPermissionBanner(),
               ProfileHeader(
                 fullName: _userName ?? 'Motorista',
                 photoUrl: _userPhotoUrl,
@@ -189,8 +202,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _locationTimer?.cancel();
+    _availabilityTimer?.cancel();
     _newOrderSub?.cancel();
+    _orderCancelledSub?.cancel();
     _travelCancelledSub?.cancel();
     _reconnectingSub?.cancel();
     _reconnectedSub?.cancel();
@@ -200,9 +216,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUserId();
     _checkActiveTravelHttp();
     _connectSignalR();
+
+    _checkAvailability();
   }
 
   Future<void> _loadUserId() async {
@@ -222,8 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (response.statusCode == 200 && response.data != null) {
         final name = response.data['name'] as String?;
         var photoUrl = response.data['photoUrl'] as String?;
-        if (photoUrl != null && photoUrl.isNotEmpty
-            && !photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+        if (photoUrl != null && photoUrl.isNotEmpty && !photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
           photoUrl = '${AppConfig.getBaseUrl()}$photoUrl';
         }
         setState(() {
@@ -285,27 +303,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final token = await authStorage.getToken();
     if (token == null) return;
 
-    await signalR.connect(
-      'travel-orders',
-      '${AppConfig.getBaseUrl()}/hubs/travel-orders',
-      token,
-    );
-
-    // Also connect to travel-management for cancellation events
-    try {
-      await signalR.connect(
-        'travel-management',
-        '${AppConfig.getBaseUrl()}/hubs/travel-management',
-        token,
-      );
-    } catch (_) {
-      // Non-critical — cancels won't arrive in real-time without this hub
-    }
-
-    // Start periodic location reporting for dashboard map
-    _startLocationReporting(signalR);
-
+    // ── Subscribe to events BEFORE connecting ──
+    // The backend sends NewOrder during OnConnectedAsync (re-dispatch).
+    // If we subscribe after connect(), the event is lost.
     _newOrderSub = signalR.onNewOrder.listen((data) {
+      if (NotificationService.orderAlertOpen) return; // página de pedido aberta
       if (_currentTravelId != null) return; // Already in a travel
 
       final orderId = data['orderId'] as String?;
@@ -324,8 +326,12 @@ class _HomeScreenState extends State<HomeScreen> {
         data,
         onDenied: () {
           _deniedOrderIds.add(orderId);
+          NotificationService.setSheetVisible(false);
         },
       );
+
+      // RF05: Marcar sheet como visível para suprimir foreground dup
+      NotificationService.setSheetVisible(true);
     });
 
     // Listen for travel cancellations
@@ -356,6 +362,43 @@ class _HomeScreenState extends State<HomeScreen> {
     _reconnectedSub = signalR.onReconnected.listen((_) {
       setState(() => _isReconnecting = false);
     });
+
+    _orderCancelledSub = signalR.onOrderCancelled.listen((data) {
+      if (!mounted) return;
+      // Página de pedido aberta: quem trata o cancelamento é a própria página
+      // (RF10) — o popUntil abaixo arrancaria a /order-alert da pilha.
+      if (NotificationService.orderAlertOpen) return;
+      // Dismiss any open bottom sheet and notify the driver
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pedido cancelado pelo passageiro.'),
+          duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    });
+
+    // ── Now connect to hubs (listeners are already registered) ──
+    await signalR.connect(
+      'travel-orders',
+      '${AppConfig.getBaseUrl()}/hubs/travel-orders',
+      token,
+    );
+
+    try {
+      await signalR.connect(
+        'travel-management',
+        '${AppConfig.getBaseUrl()}/hubs/travel-management',
+        token,
+      );
+    } catch (_) {
+      // Non-critical — cancels won't arrive in real-time without this hub
+    }
+
+    _startLocationReporting(signalR);
   }
 
   Future<void> _handleSignOut() async {
@@ -379,9 +422,55 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (confirmed != true || !context.mounted) return;
 
+    _stopAvailabilityTimer();
     await Modular.get<SignalRService>().disconnectAll();
     await Modular.get<TravelLocalRepository>().clearTravels();
     await Modular.get<SignOutService>().signOut();
+  }
+
+  // ── Disponibilidade (modo de atendimento) ──
+
+  /// Verifica o status de disponibilidade ao entrar no app.
+  /// Fire-and-forget — não bloqueia SignalR nem viagem ativa.
+  Future<void> _checkAvailability() async {
+    try {
+      final datasource = Modular.get<AvailabilityDatasource>();
+      final availability = await datasource.getAvailability();
+      if (!mounted) return;
+
+      setState(() => _availability = availability);
+
+      if (availability.isActive) {
+        _startAvailabilityTimer();
+      } else if (!AvailabilitySheet.isOpen) {
+        final result = await AvailabilitySheet.show(context, datasource: datasource);
+        if (!mounted || result == null) return; // cancelou — permanece inactive
+        setState(() => _availability = result);
+        _startAvailabilityTimer();
+      }
+    } catch (e) {
+      // RF06: falha silenciosa — re-tenta na próxima entrada do app
+      developer.log('[AVAILABILITY] GET failed: $e', name: 'availability');
+    }
+  }
+
+  void _startAvailabilityTimer() {
+    _stopAvailabilityTimer();
+    final availability = _availability;
+    if (availability == null || !availability.isActive) return;
+
+    _availabilityTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      setState(() {}); // recalcula a contagem regressiva
+      if (availability.isExpired) {
+        _stopAvailabilityTimer(); // indicador passa a exibir ramo inativo
+      }
+    });
+  }
+
+  void _stopAvailabilityTimer() {
+    _availabilityTimer?.cancel();
+    _availabilityTimer = null;
   }
 
   void _startLocationReporting(SignalRService signalR) {
@@ -404,6 +493,28 @@ class _HomeScreenState extends State<HomeScreen> {
           // Silently skip on error
         }
       },
+    );
+  }
+
+  // ── Push Notification Methods (RF04, RF05, RF06) ──
+
+  /// RF06: Banner informativo quando permissão de notificação está negada.
+  Widget _buildPermissionBanner() {
+    return Container(
+      color: Colors.orange.shade50,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.notifications_off, color: Colors.orange, size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Notificações desativadas — você pode perder novas corridas. Ative nas Configurações do app.',
+              style: TextStyle(color: Colors.orange, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

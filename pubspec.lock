@@ -465,7 +465,7 @@ packages:
     source: hosted
     version: "2.16.0"
   google_maps_flutter_platform_interface:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: google_maps_flutter_platform_interface
       sha256: e8b1232419fcdd35c1fdafff96843f5a40238480365599d8ca661dde96d283dd
@@ -728,6 +728,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.2"
+  onesignal_flutter:
+    dependency: "direct main"
+    description:
+      name: onesignal_flutter
+      sha256: f11e6a592ad7402d85f1fd095d8617cabd29e1f5e2be065f37ce134e4048c1bd
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.6.7"
   package_config:
     dependency: transitive
     description:
