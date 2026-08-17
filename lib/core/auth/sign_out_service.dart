@@ -27,19 +27,16 @@ class SignOutService {
   );
 
   Future<void> signOut() async {
-    // Invalida o modo de atendimento ANTES de limpar o token
-    // (o AuthInterceptor precisa da credencial para a chamada).
-    // Falha silenciosa — o logout prossegue; o servidor mantém o
-    // status até expirar na janela de 4h.
     try {
       await _availability.deactivate();
     } catch (e) {
-      log('[AVAILABILITY] deactivate failed on signOut: $e',
-          name: 'availability');
+      log('[AVAILABILITY] deactivate failed on signOut: $e', name: 'availability');
     }
 
-    // RF02: Desvincular External ID antes de limpar dados
-    await NotificationService.logout();
+    // RF12: pendente/flags não podem vazar entre sessões (o device continua
+    // registrado no OneSignal após o logout).
+    NotificationService.clearPendingOrder();
+    NotificationService.setOrderAlertOpen(false);
 
     await Future.wait([
       _authStorage.clear(),

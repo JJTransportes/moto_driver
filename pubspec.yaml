@@ -37,6 +37,7 @@ dev_dependencies:
   mocktail: ^1.0.4
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.4
+  google_maps_flutter_platform_interface: ^2.14.0
 
 flutter_launcher_icons:
   android: true
