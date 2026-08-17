@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moto_driver/core/errors/exceptions.dart';
+import 'package:moto_driver/core/notifications/inotification_service.dart';
 import 'package:moto_driver/modules/auth/data/datasources/i_auth_datasource.dart';
 import 'package:moto_driver/modules/auth/data/models/refresh_token_response_model.dart';
 import 'package:moto_driver/modules/auth/data/models/sign_in_response_model.dart';
@@ -8,13 +9,19 @@ import 'package:moto_driver/modules/auth/data/repositories/auth_repository.dart'
 import 'package:moto_driver/modules/auth/domain/entities/user_entity.dart';
 import 'package:result_dart/result_dart.dart';
 
+class MockNotificationService extends Mock implements INotificationService {}
+
 void main() {
   late MockAuthDatasource mockDatasource;
+  late MockNotificationService mockNotificationService;
   late AuthRepository repository;
 
   setUp(() {
+    String idFake = 'idFake';
     mockDatasource = MockAuthDatasource();
-    repository = AuthRepository(mockDatasource);
+    mockNotificationService = MockNotificationService();
+    when(() => mockNotificationService.login(any(), any())).thenAnswer((_) async => idFake);
+    repository = AuthRepository(mockDatasource, mockNotificationService);
   });
 
   final model = SignInResponseModel(
@@ -33,8 +40,6 @@ void main() {
   );
 
   group('signIn', () {
-
-
     test('returns Success with UserEntity on datasource success', () async {
       when(() => mockDatasource.signIn(any(), any())).thenAnswer((_) async => model);
 
@@ -84,8 +89,7 @@ void main() {
 
   group('refreshToken', () {
     test('returns Success with RefreshTokenResponseModel on success', () async {
-      when(() => mockDatasource.refreshToken(any()))
-          .thenAnswer((_) async => refreshModel);
+      when(() => mockDatasource.refreshToken(any())).thenAnswer((_) async => refreshModel);
 
       final result = await repository.refreshToken('old_refresh');
 

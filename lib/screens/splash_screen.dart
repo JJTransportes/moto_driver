@@ -28,11 +28,9 @@ class _SplashScreenState extends State<SplashScreen> {
     final authRepository = Modular.get<IAuthRepository>();
     final signOutService = Modular.get<SignOutService>();
 
-    // Check for refresh token (source of truth for session persistence)
     final refreshToken = await authStorage.getRefreshToken();
 
     if (refreshToken != null) {
-      // Try to refresh the access token proactively
       final result = await authRepository.refreshToken(refreshToken);
 
       result.fold(
@@ -41,7 +39,6 @@ class _SplashScreenState extends State<SplashScreen> {
           await authStorage.saveToken(success.accessToken, success.userId);
           await authStorage.saveRefreshToken(success.refreshToken);
 
-          // Navigate to terms guard — it will determine final destination
           Modular.to.navigate('/terms');
         },
         (_) {
@@ -52,8 +49,6 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
-    // No refresh token — try legacy access token (backward compatibility
-    // for users upgrading from an older version without refresh tokens)
     final token = await authStorage.getToken();
     if (token != null) {
       Modular.to.navigate('/terms');
