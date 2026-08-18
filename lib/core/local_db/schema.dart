@@ -55,6 +55,11 @@ class Schema {
       cached_at           TEXT NOT NULL DEFAULT (datetime('now'))
     )
     ''',
+    '''
+    CREATE TABLE IF NOT EXISTS notifications (
+      player_id           TEXT NOT NULL
+    )
+    ''',
   ];
 
   static Future<void> onCreate(Database db, int version) async {
@@ -67,8 +72,7 @@ class Schema {
     });
   }
 
-  static Future<void> onUpgrade(Database db, int oldVersion,
-      int newVersion) async {
+  static Future<void> onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('''
         ALTER TABLE active_travel ADD COLUMN passenger_name TEXT

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/modules/usage_terms/presentation/blocs/usage_terms_bloc.dart';
 import 'package:moto_driver/modules/usage_terms/presentation/blocs/usage_terms_event.dart';
@@ -27,7 +28,15 @@ class _TermsPageState extends State<TermsPage> {
     return BlocConsumer<UsageTermsBloc, UsageTermsState>(
       listener: (context, state) {
         if (state is UsageTermsAccepted) {
-          Modular.to.navigate('/home');
+          // RF13: pedido pendente (push) tem prioridade — o fluxo de pedido
+          // abre no fim do fluxo de sessão (anti-soterramento).
+          final pending = NotificationService.peekPendingOrder();
+          if (pending != null) {
+            Modular.to.pushReplacementNamed('/order-refresh',
+                arguments: {'orderId': pending});
+          } else {
+            Modular.to.navigate('/home');
+          }
         }
       },
       builder: (context, state) {

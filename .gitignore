@@ -50,5 +50,9 @@ app.*.map.json
 .pi/
 .vscode/launch.json
 ios/Flutter/Secrets.xcconfig
+
 CLAUDE.md
 cloud-front/
+
+# FVM Version Cache
+.fvm/

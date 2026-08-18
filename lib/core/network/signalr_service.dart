@@ -47,6 +47,12 @@ class SignalRService {
     _connections[hubName] = connection;
   }
 
+  /// Indica se já existe conexão ativa para o hub [hubName].
+  /// Necessário porque [connect] para e recria a conexão com o mesmo nome —
+  /// a OrderAlertPage usa este check para não derrubar a conexão da home
+  /// (warm start) ao abrir.
+  bool isConnected(String hubName) => _connections.containsKey(hubName);
+
   /// Envia um comando 'DenyOrder' para o hub de travel-orders.
   /// Lança exceção se a conexão não estiver estabelecida.
   Future<void> denyOrder(String travelId) async {
