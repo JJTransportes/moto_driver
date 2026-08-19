@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:moto_driver/blocs/bloc/bootstrap_bloc.dart';
 import 'package:moto_driver/core/common_module.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/i_login_usecase.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/login_usecase.dart';
@@ -15,6 +16,7 @@ import 'package:moto_driver/modules/user_deletion/user_deletion_module.dart';
 import 'package:moto_driver/modules/usage_terms/presentation/blocs/usage_terms_bloc.dart';
 import 'package:moto_driver/modules/usage_terms/presentation/pages/terms_page.dart';
 import 'package:moto_driver/screens/active_travel_page.dart';
+import 'package:moto_driver/screens/bootstrap_screen.dart';
 import 'package:moto_driver/screens/home_screen.dart';
 import 'package:moto_driver/screens/splash_screen.dart';
 import 'package:moto_driver/screens/travel_history_page.dart';
@@ -27,6 +29,7 @@ class AppModule extends Module {
 
   @override
   void binds(i) {
+    i.add<BootstrapBloc>(BootstrapBloc.new);
     i.add<ILoginUsecase>(LoginUsecase.new);
     i.addSingleton<LoginBloc>(LoginBloc.new);
     i.addSingleton<UsageTermsBloc>(UsageTermsBloc.new);
@@ -35,6 +38,13 @@ class AppModule extends Module {
   @override
   void routes(r) {
     r.child('/', child: (_) => const SplashScreen());
+    r.child(
+      '/bootstrap',
+      child: (_) => BlocProvider.value(
+        value: Modular.get<BootstrapBloc>(),
+        child: const BootstrapScreen(),
+      ),
+    );
     r.child(
       '/login',
       child: (_) => BlocProvider.value(

@@ -17,8 +17,6 @@ class LocationResult {
 }
 
 class LocationService {
-  /// Call at app startup to request location permission early.
-  /// Does nothing if permission is already granted or denied forever.
   static Future<void> requestPermissionIfNeeded() async {
     final permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {

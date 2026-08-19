@@ -76,18 +76,6 @@ class OneSignalNotificationService implements INotificationService {
     }
   }
 
-  /// Trata o toque do motorista numa notificação push de novo pedido.
-  ///
-  /// Fluxo (RF05/DA04):
-  /// - `type == 'NewOrder'` → extrai `order_id` (snake_case do backend) com
-  ///   fallback para `orderId`;
-  /// - registra o pedido pendente (rede de segurança p/ cliques antes do
-  ///   runApp) e navega via push para `/order-refresh` (que renova o token e
-  ///   abre `/order-alert` com o `orderId` como parâmetro de rota);
-  /// - guardas: página de pedido já aberta (só atualiza o pendente —
-  ///   reexibição pós-saída), fluxo de sessão em andamento (guarda de termos
-  ///   abre o fluxo no fim), sem sessão (aguarda login) e viagem ativa
-  ///   (ignora o clique por completo).
   @override
   Future<void> handleForegroundNotification() async {
     OneSignal.Notifications.addClickListener((event) async {
@@ -96,42 +84,31 @@ class OneSignalNotificationService implements INotificationService {
     });
   }
 
-  /// Lógica de decisão do toque na notificação — separada do registro do
-  /// listener do SDK para permitir teste unitário da tomada de decisão.
   @visibleForTesting
   Future<void> handleNotificationClick(Map<String, dynamic>? data) async {
     if (data == null || data['type'] != 'NewOrder') return;
 
-    // Payload do backend: data = { type: 'NewOrder', order_id } (snake_case).
     final orderId = data['order_id'] as String? ?? data['orderId'] as String?;
     if (orderId == null || orderId.isEmpty) return;
 
     log('[PUSH] Notification clicked: orderId=$orderId', name: 'push');
 
-    // Página de pedido já aberta — apenas atualiza o pendente
-    // (reexibição pós-saída, RF11).
     if (NotificationService.orderAlertOpen) {
       NotificationService.setPendingOrder(orderId);
       return;
     }
 
-    // Rede de segurança: pendente registrado ANTES de qualquer navegação
-    // (cliques antes do runApp lançam no try/catch e sobrevivem no holder).
     NotificationService.setPendingOrder(orderId);
 
     try {
       final path = Modular.to.path;
 
-      // Fluxo de sessão em andamento — a guarda de termos abre o fluxo no
-      // fim (evita corrida de duplo refresh de token com o splash).
       if (path == '/' || path == '/terms' || path == '/order-refresh') return;
 
-      // Sem sessão — o pendente aguarda o próximo login (guarda de termos).
       final authStorage = Modular.get<AuthStorage>();
       final refreshToken = await authStorage.getRefreshToken();
       if (refreshToken == null) return;
 
-      // Viagem ativa: pedido não pode interromper a viagem — ignora.
       final travelRepo = Modular.get<TravelLocalRepository>();
       final activeTravel = await travelRepo.getActiveTravel();
       if (activeTravel != null) {
