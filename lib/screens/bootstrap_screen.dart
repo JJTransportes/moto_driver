@@ -10,15 +10,27 @@ class BootstrapScreen extends StatefulWidget {
   State<BootstrapScreen> createState() => _BootstrapScreenState();
 }
 
-class _BootstrapScreenState extends State<BootstrapScreen> {
+class _BootstrapScreenState extends State<BootstrapScreen> with SingleTickerProviderStateMixin {
   late final BootstrapBloc _bloc;
+  late final AnimationController _gearController;
 
   @override
   void initState() {
     super.initState();
 
+    _gearController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+
     _bloc = context.read<BootstrapBloc>();
     _bloc.add(ConfigureApplicationEvent());
+  }
+
+  @override
+  void dispose() {
+    _gearController.dispose();
+    super.dispose();
   }
 
   @override
@@ -47,9 +59,12 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.settings,
-                  size: MediaQuery.sizeOf(context).height * 0.072,
+                RotationTransition(
+                  turns: _gearController,
+                  child: Icon(
+                    Icons.settings,
+                    size: MediaQuery.sizeOf(context).height * 0.072,
+                  ),
                 ),
                 Text(
                   'Olá! Estamos preparando o app.\nPor favor aguarde',
