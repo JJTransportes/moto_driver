@@ -1,4 +1,7 @@
 part of 'bootstrap_bloc.dart';
 
-@immutable
 sealed class BootstrapEvents {}
+
+class ConfigureApplicationEvent extends BootstrapEvents {}
+
+class CheckAuthEvent extends BootstrapEvents {}
