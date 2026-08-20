@@ -51,25 +51,29 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     final refreshToken = await _authStorage.getRefreshToken();
 
     if (refreshToken != null) {
+      bool userAuthenticated = false;
+
       final result = await _authRepository.refreshToken(refreshToken);
 
       result.fold(
         (success) async {
-          await _authStorage.saveToken(success.accessToken, success.userId);
-          await _authStorage.saveRefreshToken(success.refreshToken);
+          userAuthenticated = true;
 
-          emit(TermsNavigationState());
+          await Future.wait([
+            _authStorage.saveToken(success.accessToken, success.userId),
+            _authStorage.saveRefreshToken(success.refreshToken),
+          ]);
         },
-        (_) {
-          _signOutService.signOut();
+        (_) async {
+          await _signOutService.signOut();
         },
       );
-      return;
-    }
 
-    final token = await _authStorage.getToken();
-    if (token != null) {
-      emit(TermsNavigationState());
+      emit(
+        userAuthenticated
+            ? TermsNavigationState() //
+            : LoginNavigationState(),
+      );
     } else {
       emit(LoginNavigationState());
     }
