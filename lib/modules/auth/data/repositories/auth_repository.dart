@@ -15,9 +15,10 @@ class AuthRepository implements IAuthRepository {
   Future<Result<UserEntity>> signIn(
     String email,
     String password,
+    String device,
   ) async {
     try {
-      final model = await _datasource.signIn(email, password);
+      final model = await _datasource.signIn(email, password, device);
       await _notificationService.login(model.userId, model.accessToken);
 
       return Success(model.toEntity());
@@ -29,9 +30,10 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<Result<RefreshTokenResponseModel>> refreshToken(
     String refreshToken,
+    String device,
   ) async {
     try {
-      final model = await _datasource.refreshToken(refreshToken);
+      final model = await _datasource.refreshToken(refreshToken, device);
       return Success(model);
     } on Exception catch (e) {
       return Failure(e);
