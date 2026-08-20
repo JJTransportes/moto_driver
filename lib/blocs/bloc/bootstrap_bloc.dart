@@ -4,6 +4,7 @@ import 'package:bloc/bloc.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
+import 'package:moto_driver/core/config/device_type.dart';
 import 'package:moto_driver/core/local_db/local_database_service.dart';
 import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/notifications/inotification_service.dart';
@@ -53,7 +54,7 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     if (refreshToken != null) {
       bool userAuthenticated = false;
 
-      final result = await _authRepository.refreshToken(refreshToken);
+      final result = await _authRepository.refreshToken(refreshToken, deviceType);
 
       result.fold(
         (success) async {

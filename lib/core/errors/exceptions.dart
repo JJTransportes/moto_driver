@@ -47,3 +47,23 @@ class ServerException implements Exception {
   @override
   String toString() => message;
 }
+
+/// 409 no sign-in: já existe sessão ativa vinculada a outro tipo de dispositivo.
+class DeviceConflictException implements Exception {
+  final String message;
+  const DeviceConflictException([
+    this.message = 'Já existe uma sessão ativa em outro tipo de dispositivo. Faça logout lá primeiro.',
+  ]);
+  @override
+  String toString() => message;
+}
+
+/// 403 no refresh: o refresh token está vinculado a outro tipo de dispositivo.
+class DeviceMismatchException implements Exception {
+  final String message;
+  const DeviceMismatchException([
+    this.message = 'Sessão vinculada a outro tipo de dispositivo. Faça logout no dispositivo original.',
+  ]);
+  @override
+  String toString() => message;
+}

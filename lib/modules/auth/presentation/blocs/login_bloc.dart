@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
+import 'package:moto_driver/core/config/device_type.dart';
 import 'package:moto_driver/core/local_db/repositories/auth_local_repository.dart';
 import 'package:moto_driver/modules/auth/domain/entities/user_entity.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/i_login_usecase.dart';
@@ -24,7 +25,11 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
   ) async {
     emit(const LoginLoading());
 
-    final result = await _loginUsecase.call(event.email, event.password);
+    final result = await _loginUsecase.call(
+      event.email,
+      event.password,
+      deviceType,
+    );
 
     if (result.isSuccess()) {
       final user = result.getOrNull()!;

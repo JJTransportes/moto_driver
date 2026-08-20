@@ -41,9 +41,9 @@ void main() {
 
   group('signIn', () {
     test('returns Success with UserEntity on datasource success', () async {
-      when(() => mockDatasource.signIn(any(), any())).thenAnswer((_) async => model);
+      when(() => mockDatasource.signIn(any(), any(), any())).thenAnswer((_) async => model);
 
-      final result = await repository.signIn('joao@moto.com', '123456');
+      final result = await repository.signIn('joao@moto.com', '123456', 'android');
 
       expect(result, isA<Result<UserEntity>>());
       result.fold(
@@ -58,11 +58,11 @@ void main() {
     });
 
     test('returns Failure on UnauthorizedException', () async {
-      when(() => mockDatasource.signIn(any(), any())).thenThrow(
+      when(() => mockDatasource.signIn(any(), any(), any())).thenThrow(
         const UnauthorizedException('E-mail ou senha inválidos'),
       );
 
-      final result = await repository.signIn('joao@moto.com', 'wrong');
+      final result = await repository.signIn('joao@moto.com', 'wrong', 'android');
 
       expect(result, isA<Result<UserEntity>>());
       result.fold(
@@ -75,9 +75,9 @@ void main() {
     });
 
     test('returns Failure on NetworkException', () async {
-      when(() => mockDatasource.signIn(any(), any())).thenThrow(const NetworkException());
+      when(() => mockDatasource.signIn(any(), any(), any())).thenThrow(const NetworkException());
 
-      final result = await repository.signIn('joao@moto.com', '123');
+      final result = await repository.signIn('joao@moto.com', '123', 'android');
 
       expect(result, isA<Result<UserEntity>>());
       result.fold(
@@ -89,9 +89,9 @@ void main() {
 
   group('refreshToken', () {
     test('returns Success with RefreshTokenResponseModel on success', () async {
-      when(() => mockDatasource.refreshToken(any())).thenAnswer((_) async => refreshModel);
+      when(() => mockDatasource.refreshToken(any(), any())).thenAnswer((_) async => refreshModel);
 
-      final result = await repository.refreshToken('old_refresh');
+      final result = await repository.refreshToken('old_refresh', 'android');
 
       expect(result, isA<Result<RefreshTokenResponseModel>>());
       result.fold(
@@ -104,15 +104,15 @@ void main() {
         (_) => fail('Expected success'),
       );
 
-      verify(() => mockDatasource.refreshToken('old_refresh')).called(1);
+      verify(() => mockDatasource.refreshToken('old_refresh', 'android')).called(1);
     });
 
     test('returns Failure on UnauthorizedException', () async {
-      when(() => mockDatasource.refreshToken(any())).thenThrow(
+      when(() => mockDatasource.refreshToken(any(), any())).thenThrow(
         const UnauthorizedException('Refresh token inválido'),
       );
 
-      final result = await repository.refreshToken('invalid_refresh');
+      final result = await repository.refreshToken('invalid_refresh', 'android');
 
       expect(result, isA<Result<RefreshTokenResponseModel>>());
       result.fold(
@@ -125,11 +125,11 @@ void main() {
     });
 
     test('returns Failure on NetworkException', () async {
-      when(() => mockDatasource.refreshToken(any())).thenThrow(
+      when(() => mockDatasource.refreshToken(any(), any())).thenThrow(
         const NetworkException(),
       );
 
-      final result = await repository.refreshToken('some_token');
+      final result = await repository.refreshToken('some_token', 'android');
 
       expect(result, isA<Result<RefreshTokenResponseModel>>());
       result.fold(

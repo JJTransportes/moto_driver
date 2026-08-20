@@ -22,9 +22,9 @@ void main() {
 
   group('call', () {
     test('returns Success on repository success', () async {
-      when(() => mockRepository.signIn(any(), any())).thenAnswer((_) async => Success(user));
+      when(() => mockRepository.signIn(any(), any(), any())).thenAnswer((_) async => Success(user));
 
-      final result = await usecase.call('joao@moto.com', '123456');
+      final result = await usecase.call('joao@moto.com', '123456', 'android');
 
       expect(result, isA<Result<UserEntity>>());
       result.fold(
@@ -35,15 +35,15 @@ void main() {
         },
         (_) => fail('Expected success'),
       );
-      verify(() => mockRepository.signIn('joao@moto.com', '123456')).called(1);
+      verify(() => mockRepository.signIn('joao@moto.com', '123456', 'android')).called(1);
     });
 
     test('returns Failure on repository failure', () async {
-      when(() => mockRepository.signIn(any(), any())).thenAnswer(
+      when(() => mockRepository.signIn(any(), any(), any())).thenAnswer(
         (_) async => Failure(Exception('E-mail ou senha inválidos')),
       );
 
-      final result = await usecase.call('joao@moto.com', 'wrong');
+      final result = await usecase.call('joao@moto.com', 'wrong', 'android');
 
       expect(result, isA<Result<UserEntity>>());
       result.fold(
