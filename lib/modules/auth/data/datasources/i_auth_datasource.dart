@@ -12,4 +12,24 @@ abstract class IAuthDatasource {
   ///
   /// Throws a typed exception on failure.
   Future<RefreshTokenResponseModel> refreshToken(String refreshToken);
+
+  /// Solicita o código de redefinição de senha para [email].
+  ///
+  /// Não lança para e-mail não cadastrado (HTTP 404) — por design anti
+  /// enumeração o backend/app tratam "e-mail existe" e "e-mail não existe"
+  /// da mesma forma para quem está do lado de fora. Só [RateLimitedException]
+  /// e falhas de rede/servidor são propagadas.
+  Future<void> requestPasswordReset(String email);
+
+  /// Confirma a redefinição de senha com o [code] de 6 dígitos recebido por
+  /// e-mail e a [newPassword].
+  ///
+  /// Lança [ValidationException] (código inválido/expirado ou senha fora da
+  /// política — a mensagem do servidor distingue os dois), [ConflictException]
+  /// (código já utilizado) ou [RateLimitedException].
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+  });
 }
