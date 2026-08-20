@@ -5,9 +5,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_modular/flutter_modular.dart';
-import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/local_db/repositories/notifications_local_repository.dart';
-import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/notifications/inotification_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
@@ -100,26 +98,6 @@ class OneSignalNotificationService implements INotificationService {
 
     NotificationService.setPendingOrder(orderId);
 
-    try {
-      final path = Modular.to.path;
-
-      if (path == '/' || path == '/terms' || path == '/order-refresh') return;
-
-      final authStorage = Modular.get<AuthStorage>();
-      final refreshToken = await authStorage.getRefreshToken();
-      if (refreshToken == null) return;
-
-      final travelRepo = Modular.get<TravelLocalRepository>();
-      final activeTravel = await travelRepo.getActiveTravel();
-      if (activeTravel != null) {
-        NotificationService.clearPendingOrder();
-        log('[PUSH] Click ignored — driver has active travel', name: 'push');
-        return;
-      }
-
-      await Modular.to.pushNamed('/order-refresh', arguments: {'orderId': orderId});
-    } catch (e) {
-      log('[PUSH] Navigate skipped (cold start / Modular not ready): $e', name: 'push');
-    }
+    Modular.to.pushNamed('/order-refresh', arguments: {'orderId': orderId});
   }
 }

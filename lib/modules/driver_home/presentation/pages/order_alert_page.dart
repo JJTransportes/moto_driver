@@ -15,16 +15,6 @@ import 'package:moto_driver/widgets/app_button.dart';
 
 enum _PageState { loading, order, unavailable, error }
 
-/// Página dedicada ao handling de pedidos vindos de push notification.
-///
-/// Recebe o `orderId` como parâmetro de rota (fallback para o pendente do
-/// `NotificationService`), busca o pedido na API, exibe os dados do
-/// `IncomingOrderSheet` (modo embutido) e conecta o hub `travel-orders` para
-/// receber eventos em tempo real mesmo em cold start (sem a home na pilha).
-///
-/// Saídas (a página é dona da navegação):
-/// - Aceitar → `/active-travel` (próxima tela do fluxo de viagem);
-/// - Recusar / timeout / cancelado / indisponível / erro → `_exitToHome()`.
 class OrderAlertPage extends StatefulWidget {
   final String? orderId;
 
@@ -108,8 +98,7 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
 
     try {
       final dio = Modular.get<Dio>();
-      final response =
-          await dio.get('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId');
+      final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId');
       if (!mounted) return;
 
       final entity = TravelOrderEntity.fromJson(response.data as Map<String, dynamic>);
@@ -172,11 +161,14 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
     if (decision == OrderDecision.accepted) {
       // Em viagem, novo pedido pendente é descartado (RF08/RF12).
       NotificationService.clearPendingOrder();
-      Modular.to.pushReplacementNamed('/active-travel', arguments: {
-        'travelId': result?['travelId'],
-        'pickupRoute': result?['pickupRoute'],
-        'tripRoute': result?['tripRoute'],
-      });
+      Modular.to.pushReplacementNamed(
+        '/active-travel',
+        arguments: {
+          'travelId': result?['travelId'],
+          'pickupRoute': result?['pickupRoute'],
+          'tripRoute': result?['tripRoute'],
+        },
+      );
       return;
     }
 
@@ -233,8 +225,7 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
       case _PageState.unavailable:
         return _buildMessage(_message ?? 'Pedido não está mais disponível.');
       case _PageState.error:
-        return _buildMessage(_message ?? 'Não foi possível carregar o pedido.',
-            showRetry: true);
+        return _buildMessage(_message ?? 'Não foi possível carregar o pedido.', showRetry: true);
     }
   }
 
