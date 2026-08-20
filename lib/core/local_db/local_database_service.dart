@@ -17,14 +17,16 @@ class LocalDatabaseService {
         onUpgrade: Schema.onUpgrade,
       );
     } catch (_) {
-      // App continues without local cache if init fails
+      throw Exception('Local persistence bootstrap failure.');
     }
   }
 
   static Database get instance {
     if (_db == null) {
-      throw StateError('LocalDatabaseService not initialized. '
-          'Call LocalDatabaseService.init() before accessing the database.');
+      throw StateError(
+        'LocalDatabaseService not initialized. '
+        'Call LocalDatabaseService.init() before accessing the database.',
+      );
     }
     return _db!;
   }

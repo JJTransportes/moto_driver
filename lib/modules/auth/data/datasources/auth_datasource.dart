@@ -10,11 +10,15 @@ class AuthDatasource implements IAuthDatasource {
   AuthDatasource(this._dio);
 
   @override
-  Future<SignInResponseModel> signIn(String email, String password) async {
+  Future<SignInResponseModel> signIn(
+    String email,
+    String password,
+    String device,
+  ) async {
     try {
       final response = await _dio.post(
         '/api/auth/sign-in',
-        data: {'email': email, 'password': password},
+        data: {'email': email, 'password': password, 'device': device},
       );
       return SignInResponseModel.fromJson(
         response.data as Map<String, dynamic>,
@@ -25,11 +29,14 @@ class AuthDatasource implements IAuthDatasource {
   }
 
   @override
-  Future<RefreshTokenResponseModel> refreshToken(String refreshToken) async {
+  Future<RefreshTokenResponseModel> refreshToken(
+    String refreshToken,
+    String device,
+  ) async {
     try {
       final response = await _dio.post(
         '/api/auth/refresh',
-        data: {'refreshToken': refreshToken},
+        data: {'refreshToken': refreshToken, 'device': device},
       );
       return RefreshTokenResponseModel.fromJson(
         response.data as Map<String, dynamic>,
@@ -99,14 +106,6 @@ class AuthDatasource implements IAuthDatasource {
     }
   }
 
-  String? _extractErrorMessage(DioException e) {
-    final data = e.response?.data;
-    if (data is Map && data['error'] is String) {
-      return data['error'] as String;
-    }
-    return null;
-  }
-
   Exception _mapDioException(DioException e) {
     switch (e.response?.statusCode) {
       case 400:
@@ -115,8 +114,20 @@ class AuthDatasource implements IAuthDatasource {
         );
       case 401:
         return const UnauthorizedException('E-mail ou senha inválidos');
+      case 403:
+        // Refresh com token vinculado a outro tipo de dispositivo.
+        return DeviceMismatchException(
+          _extractErrorMessage(e) ??
+              'Sessão vinculada a outro tipo de dispositivo. Faça logout no dispositivo original.',
+        );
       case 404:
         return const NotFoundException('Usuário não encontrado');
+      case 409:
+        // Sign-in com sessão ativa vinculada a outro tipo de dispositivo.
+        return DeviceConflictException(
+          _extractErrorMessage(e) ??
+              'Já existe uma sessão ativa em outro tipo de dispositivo. Faça logout lá primeiro.',
+        );
       case 429:
         return const RateLimitedException();
       case var code when code != null && code >= 500:
@@ -129,5 +140,18 @@ class AuthDatasource implements IAuthDatasource {
         }
         return NetworkException(e.message ?? 'Erro inesperado');
     }
+  }
+
+  /// Extrai a mensagem do corpo de erro do backend (se presente) para
+  /// repassar ao usuário nos conflitos de dispositivo.
+  String? _extractErrorMessage(DioException e) {
+    final data = e.response?.data;
+    if (data is Map) {
+      final raw =
+          data['error'] ?? data['message'] ?? data['detail'] ?? data['title'];
+      if (raw is String && raw.isNotEmpty) return raw;
+    }
+    if (data is String && data.isNotEmpty) return data;
+    return null;
   }
 }

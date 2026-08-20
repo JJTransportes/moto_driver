@@ -83,7 +83,7 @@ void main() {
       (tester) async {
     when(() => authStorage.getRefreshToken())
         .thenAnswer((_) async => 'refresh-token');
-    when(() => authRepository.refreshToken('refresh-token')).thenAnswer(
+    when(() => authRepository.refreshToken('refresh-token', any())).thenAnswer(
       (_) async => Success(
         RefreshTokenResponseModel(
           accessToken: 'new-access',
@@ -99,7 +99,7 @@ void main() {
 
     await pumpRefreshPage(tester);
 
-    verify(() => authRepository.refreshToken('refresh-token')).called(1);
+    verify(() => authRepository.refreshToken('refresh-token', any())).called(1);
     verify(() => authStorage.saveToken('new-access', 'u1')).called(1);
     verify(() => authStorage.saveRefreshToken('new-refresh')).called(1);
     verify(
@@ -113,7 +113,7 @@ void main() {
   testWidgets('falha no refresh → signOut', (tester) async {
     when(() => authStorage.getRefreshToken())
         .thenAnswer((_) async => 'refresh-token');
-    when(() => authRepository.refreshToken('refresh-token'))
+    when(() => authRepository.refreshToken('refresh-token', any()))
         .thenAnswer((_) async => Failure(Exception('refresh failed')));
     when(() => signOutService.signOut()).thenAnswer((_) async {});
 

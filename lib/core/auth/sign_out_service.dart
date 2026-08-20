@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:developer' show log;
 
+import 'package:dio/dio.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/terms_storage.dart';
@@ -13,6 +14,7 @@ import 'package:moto_driver/modules/driver_availability/data/datasources/availab
 
 class SignOutService {
   final AuthStorage _authStorage;
+  final Dio _dio;
   final AuthLocalRepository _authLocal;
   final ProfileLocalRepository _profileLocal;
   final TravelLocalRepository _travelLocal;
@@ -21,6 +23,7 @@ class SignOutService {
 
   SignOutService(
     this._authStorage,
+    this._dio,
     this._authLocal,
     this._profileLocal,
     this._travelLocal,
@@ -39,6 +42,17 @@ class SignOutService {
       await _availability.deactivate();
     } catch (e) {
       log('[AVAILABILITY] deactivate failed on signOut: $e', name: 'availability');
+    }
+
+    // Device binding: libera a sessão no backend (device=NULL nos tokens
+    // ativos) para que outro tipo de dispositivo possa logar. O AuthInterceptor
+    // anexa o Bearer token automaticamente — por isso roda ANTES do clear.
+    try {
+      if (await _authStorage.getToken() != null) {
+        await _dio.post('/api/auth/sign-out');
+      }
+    } catch (e) {
+      log('[AUTH] sign-out API failed (best-effort): $e', name: 'auth');
     }
 
     // RF12: pendente/flags não podem vazar entre sessões (o device continua

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
+import 'package:moto_driver/core/config/device_type.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/modules/auth/domain/repositories/i_auth_repository.dart';
 
@@ -38,7 +39,7 @@ class _OrderRefreshPageState extends State<OrderRefreshPage> {
       return;
     }
 
-    final result = await authRepository.refreshToken(refreshToken);
+    final result = await authRepository.refreshToken(refreshToken, deviceType);
     result.fold(
       (success) async {
         await authStorage.saveToken(success.accessToken, success.userId);

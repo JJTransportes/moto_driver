@@ -31,17 +31,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _reconnectingSub;
   StreamSubscription? _reconnectedSub;
   StreamSubscription? _travelCancelledSub;
+  StreamSubscription? _travelStartedSub;
+  StreamSubscription? _travelCompletedSub;
   bool _isReconnecting = false;
+  bool _checkingActiveTravel = false;
   String? _currentTravelStatus;
   String? _currentTravelId;
   String? _currentPassengerName;
   Timer? _locationTimer;
+  Timer? _activeTravelPollTimer;
   String? _userId;
   String? _userPhotoUrl;
   String? _userName;
 
   final Set<String> _deniedOrderIds = {};
-  bool _permissionDenied = false;
 
   // ── Disponibilidade (modo de atendimento) ──
   DriverAvailabilityEntity? _availability;
@@ -73,8 +76,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-              // RF06: Banner de permissão de notificação negada
-              if (_permissionDenied) _buildPermissionBanner(),
               ProfileHeader(
                 fullName: _userName ?? 'Motorista',
                 photoUrl: _userPhotoUrl,
@@ -86,9 +87,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 },
               ),
               const SizedBox(height: 24),
-              // Active travel card
-              if (_currentTravelId != null && _currentTravelStatus != 'Cancelled' && _currentTravelStatus != 'Completed') _buildActiveTravelCard(),
-              if (_currentTravelId == null || _currentTravelStatus == 'Cancelled' || _currentTravelStatus == 'Completed')
+              // Active travel card — exibido quando existe viagem ativa (Accepted/InProgress)
+              if (_currentTravelId != null) _buildActiveTravelCard(),
+              if (_currentTravelId == null)
                 const Expanded(
                   child: Center(
                     child: Text('Aguardando novas viagens...', style: TextStyle(color: Color(0xFF4E4E4E), fontSize: 16)),
@@ -120,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final isInProgress = _currentTravelStatus == 'InProgress';
 
     return GestureDetector(
-      onTap: () => Modular.to.pushNamed('/active-travel', arguments: {'travelId': _currentTravelId}),
+      onTap: _openActiveTravel,
       child: Card(
         elevation: 4,
         shape: RoundedRectangleBorder(
@@ -189,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  onPressed: () => Modular.to.pushNamed('/active-travel', arguments: {'travelId': _currentTravelId}),
+                  onPressed: _openActiveTravel,
                   child: const Text('Abrir Viagem', style: TextStyle(color: Colors.white, fontSize: 14)),
                 ),
               ),
@@ -205,9 +206,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _locationTimer?.cancel();
     _availabilityTimer?.cancel();
+    _activeTravelPollTimer?.cancel();
     _newOrderSub?.cancel();
     _orderCancelledSub?.cancel();
     _travelCancelledSub?.cancel();
+    _travelStartedSub?.cancel();
+    _travelCompletedSub?.cancel();
     _reconnectingSub?.cancel();
     _reconnectedSub?.cancel();
     super.dispose();
@@ -222,6 +226,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _connectSignalR();
 
     _checkAvailability();
+
+    // Rede de segurança: re-consulta o estado canônico periodicamente,
+    // cobrindo eventos SignalR perdidos (não há replay para o motorista).
+    _activeTravelPollTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _checkActiveTravelHttp(),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Ao voltar de background, re-consulta a viagem ativa para refletir
+    // mudanças de status ocorridas enquanto o app não estava visível.
+    if (state == AppLifecycleState.resumed) {
+      _checkActiveTravelHttp();
+    }
   }
 
   Future<void> _loadUserId() async {
@@ -255,34 +275,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _checkActiveTravelHttp() async {
+    if (_checkingActiveTravel) return;
+    _checkingActiveTravel = true;
     try {
       final dio = Modular.get<Dio>();
       final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/active');
       if (!mounted) return;
 
+      // Contrato do endpoint GET /api/travels/active:
+      // 200 com objeto {travelId, status, passengerName, ...} = viagem ativa;
+      // 204 No Content = sem viagem ativa.
+      // Viagens só nascem em Accepted/InProgress (o enum Pending é vestigial),
+      // então a existência da resposta já garante o estado — sem filtro de status.
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data as Map<String, dynamic>?;
         if (data != null && data['travelId'] != null) {
-          final status = data['status'] as String?;
-          if (status == 'Accepted' || status == 'InProgress') {
-            setState(() {
-              _currentTravelId = data['travelId'] as String;
-              _currentTravelStatus = status;
-              _currentPassengerName = data['passengerName'] as String?;
-            });
-            return;
-          }
+          setState(() {
+            _currentTravelId = data['travelId'] as String;
+            _currentTravelStatus = data['status'] as String?;
+            _currentPassengerName = data['passengerName'] as String?;
+          });
+          return;
         }
       }
-      // Sem viagem ativa via REST — limpa estado
+      // 204 (ou resposta sem travelId) = sem viagem ativa — limpa estado
       setState(() {
         _currentTravelId = null;
         _currentTravelStatus = null;
         _currentPassengerName = null;
       });
     } catch (_) {
-      // Fallback silencioso para cache local
+      // Falha de rede/erro de servidor — fallback silencioso para cache local
       await _loadActiveTravelFromLocal();
+    } finally {
+      _checkingActiveTravel = false;
     }
   }
 
@@ -293,8 +319,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {
         _currentTravelId = active.travelId;
         _currentTravelStatus = active.status;
+        _currentPassengerName = active.passengerName;
       });
     }
+  }
+
+  /// Abre a página da viagem ativa e, ao voltar, re-consulta o estado canônico
+  /// para que mudanças de status feitas na página reflitam na home na hora.
+  Future<void> _openActiveTravel() async {
+    await Modular.to.pushNamed('/active-travel', arguments: {'travelId': _currentTravelId});
+    if (mounted) _checkActiveTravelHttp();
   }
 
   Future<void> _connectSignalR() async {
@@ -303,12 +337,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final token = await authStorage.getToken();
     if (token == null) return;
 
-    // ── Subscribe to events BEFORE connecting ──
-    // The backend sends NewOrder during OnConnectedAsync (re-dispatch).
-    // If we subscribe after connect(), the event is lost.
     _newOrderSub = signalR.onNewOrder.listen((data) {
-      if (NotificationService.orderAlertOpen) return; // página de pedido aberta
-      if (_currentTravelId != null) return; // Already in a travel
+      if (NotificationService.orderAlertOpen) return;
+      if (_currentTravelId != null) return;
 
       final orderId = data['orderId'] as String?;
       if (orderId == null) return;
@@ -352,6 +383,46 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             behavior: SnackBarBehavior.floating,
           ),
         );
+        _checkActiveTravelHttp();
+      }
+    });
+
+    // Accepted → InProgress: o card passa a "Em andamento" imediatamente e o
+    // estado canônico é re-consultado (payload só traz travelId/startedAt).
+    // Se a home ainda não conhece a viagem (aceite via /order-alert), adota.
+    _travelStartedSub = signalR.onTravelStarted.listen((data) {
+      if (!mounted) return;
+      final travelId = data['travelId'] as String?;
+      if (travelId == null) return;
+      if (travelId == _currentTravelId || _currentTravelId == null) {
+        setState(() {
+          _currentTravelId = travelId;
+          _currentTravelStatus = 'InProgress';
+        });
+        _checkActiveTravelHttp();
+      }
+    });
+
+    // InProgress → Completed: encerra a viagem ativa na home (limpa card,
+    // cache local e informa o motorista).
+    _travelCompletedSub = signalR.onTravelCompleted.listen((data) {
+      if (!mounted) return;
+      final travelId = data['travelId'] as String?;
+      if (travelId != null && travelId == _currentTravelId) {
+        setState(() {
+          _currentTravelId = null;
+          _currentTravelStatus = null;
+          _currentPassengerName = null;
+        });
+        Modular.get<TravelLocalRepository>().clearTravels();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Viagem concluída'),
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _checkActiveTravelHttp();
       }
     });
 
@@ -361,6 +432,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     _reconnectedSub = signalR.onReconnected.listen((_) {
       setState(() => _isReconnecting = false);
+      // Sem replay de eventos para o motorista: ao reconectar, re-consulta
+      // o estado canônico para refletir transições perdidas.
+      _checkActiveTravelHttp();
     });
 
     _orderCancelledSub = signalR.onOrderCancelled.listen((data) {
@@ -493,28 +567,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           // Silently skip on error
         }
       },
-    );
-  }
-
-  // ── Push Notification Methods (RF04, RF05, RF06) ──
-
-  /// RF06: Banner informativo quando permissão de notificação está negada.
-  Widget _buildPermissionBanner() {
-    return Container(
-      color: Colors.orange.shade50,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.notifications_off, color: Colors.orange, size: 18),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'Notificações desativadas — você pode perder novas corridas. Ative nas Configurações do app.',
-              style: TextStyle(color: Colors.orange, fontSize: 13),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
