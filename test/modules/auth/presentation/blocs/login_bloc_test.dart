@@ -36,7 +36,7 @@ void main() {
     blocTest<LoginBloc, LoginState>(
       'emits [LoginLoading, LoginSuccess] when login succeeds and persists token',
       build: () {
-        when(() => mockUsecase.call(any(), any()))
+        when(() => mockUsecase.call(any(), any(), any()))
             .thenAnswer((_) async => Success(user));
         when(() => mockAuthStorage.saveToken(any(), any()))
             .thenAnswer((_) async {});
@@ -72,7 +72,7 @@ void main() {
     blocTest<LoginBloc, LoginState>(
       'emits [LoginLoading, LoginSuccess] and persists refreshToken when present',
       build: () {
-        when(() => mockUsecase.call(any(), any()))
+        when(() => mockUsecase.call(any(), any(), any()))
             .thenAnswer((_) async => Success(userWithRefresh));
         when(() => mockAuthStorage.saveToken(any(), any()))
             .thenAnswer((_) async {});
@@ -108,7 +108,7 @@ void main() {
     blocTest<LoginBloc, LoginState>(
       'emits [LoginLoading, LoginFailure] when login fails and does not persist',
       build: () {
-        when(() => mockUsecase.call(any(), any())).thenAnswer(
+        when(() => mockUsecase.call(any(), any(), any())).thenAnswer(
           (_) async => Failure(Exception('E-mail ou senha inválidos')),
         );
         return LoginBloc(mockUsecase, mockAuthStorage, mockAuthLocal);
@@ -133,7 +133,7 @@ void main() {
     blocTest<LoginBloc, LoginState>(
       'calls usecase with correct credentials',
       build: () {
-        when(() => mockUsecase.call(any(), any()))
+        when(() => mockUsecase.call(any(), any(), any()))
             .thenAnswer((_) async => Success(user));
         when(() => mockAuthStorage.saveToken(any(), any()))
             .thenAnswer((_) async {});
@@ -149,7 +149,7 @@ void main() {
             email: 'driver@moto.com', password: 'secret123'),
       ),
       verify: (_) {
-        verify(() => mockUsecase.call('driver@moto.com', 'secret123'))
+        verify(() => mockUsecase.call('driver@moto.com', 'secret123', any()))
             .called(1);
       },
     );
