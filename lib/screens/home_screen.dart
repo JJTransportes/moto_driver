@@ -41,7 +41,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _userName;
 
   final Set<String> _deniedOrderIds = {};
-  bool _permissionDenied = false;
 
   // ── Disponibilidade (modo de atendimento) ──
   DriverAvailabilityEntity? _availability;
@@ -73,8 +72,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-              // RF06: Banner de permissão de notificação negada
-              if (_permissionDenied) _buildPermissionBanner(),
               ProfileHeader(
                 fullName: _userName ?? 'Motorista',
                 photoUrl: _userPhotoUrl,
@@ -86,9 +83,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 },
               ),
               const SizedBox(height: 24),
-              // Active travel card
-              if (_currentTravelId != null && _currentTravelStatus != 'Cancelled' && _currentTravelStatus != 'Completed') _buildActiveTravelCard(),
-              if (_currentTravelId == null || _currentTravelStatus == 'Cancelled' || _currentTravelStatus == 'Completed')
+              // Active travel card — exibido quando existe viagem ativa (Accepted/InProgress)
+              if (_currentTravelId != null) _buildActiveTravelCard(),
+              if (_currentTravelId == null)
                 const Expanded(
                   child: Center(
                     child: Text('Aguardando novas viagens...', style: TextStyle(color: Color(0xFF4E4E4E), fontSize: 16)),
@@ -260,28 +257,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/active');
       if (!mounted) return;
 
+      // Contrato do endpoint GET /api/travels/active:
+      // 200 com objeto {travelId, status, passengerName, ...} = viagem ativa;
+      // 204 No Content = sem viagem ativa.
+      // Viagens só nascem em Accepted/InProgress (o enum Pending é vestigial),
+      // então a existência da resposta já garante o estado — sem filtro de status.
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data as Map<String, dynamic>?;
         if (data != null && data['travelId'] != null) {
-          final status = data['status'] as String?;
-          if (status == 'Accepted' || status == 'InProgress') {
-            setState(() {
-              _currentTravelId = data['travelId'] as String;
-              _currentTravelStatus = status;
-              _currentPassengerName = data['passengerName'] as String?;
-            });
-            return;
-          }
+          setState(() {
+            _currentTravelId = data['travelId'] as String;
+            _currentTravelStatus = data['status'] as String?;
+            _currentPassengerName = data['passengerName'] as String?;
+          });
+          return;
         }
       }
-      // Sem viagem ativa via REST — limpa estado
+      // 204 (ou resposta sem travelId) = sem viagem ativa — limpa estado
       setState(() {
         _currentTravelId = null;
         _currentTravelStatus = null;
         _currentPassengerName = null;
       });
     } catch (_) {
-      // Fallback silencioso para cache local
+      // Falha de rede/erro de servidor — fallback silencioso para cache local
       await _loadActiveTravelFromLocal();
     }
   }
@@ -293,6 +292,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {
         _currentTravelId = active.travelId;
         _currentTravelStatus = active.status;
+        _currentPassengerName = active.passengerName;
       });
     }
   }
@@ -303,12 +303,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final token = await authStorage.getToken();
     if (token == null) return;
 
-    // ── Subscribe to events BEFORE connecting ──
-    // The backend sends NewOrder during OnConnectedAsync (re-dispatch).
-    // If we subscribe after connect(), the event is lost.
     _newOrderSub = signalR.onNewOrder.listen((data) {
-      if (NotificationService.orderAlertOpen) return; // página de pedido aberta
-      if (_currentTravelId != null) return; // Already in a travel
+      if (NotificationService.orderAlertOpen) return;
+      if (_currentTravelId != null) return;
 
       final orderId = data['orderId'] as String?;
       if (orderId == null) return;
@@ -493,28 +490,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           // Silently skip on error
         }
       },
-    );
-  }
-
-  // ── Push Notification Methods (RF04, RF05, RF06) ──
-
-  /// RF06: Banner informativo quando permissão de notificação está negada.
-  Widget _buildPermissionBanner() {
-    return Container(
-      color: Colors.orange.shade50,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.notifications_off, color: Colors.orange, size: 18),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'Notificações desativadas — você pode perder novas corridas. Ative nas Configurações do app.',
-              style: TextStyle(color: Colors.orange, fontSize: 13),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
