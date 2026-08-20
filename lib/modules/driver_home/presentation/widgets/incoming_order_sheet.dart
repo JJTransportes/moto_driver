@@ -14,17 +14,12 @@ import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 
-/// Decisão do motorista sobre o pedido, delegada ao dono do card
-/// (modo embutido — OrderAlertPage).
 enum OrderDecision { accepted, denied }
 
 class IncomingOrderSheet extends StatefulWidget {
   final Map<String, dynamic> order;
   final VoidCallback? onDenied;
 
-  /// Quando fornecido, o card NÃO faz pop nem navega sozinho: executa as
-  /// chamadas de API/persistência e delega a saída ao dono (OrderAlertPage).
-  /// Quando nulo (modal via SignalR), o comportamento atual é preservado.
   final void Function(OrderDecision decision, Map<String, dynamic>? acceptResult)? onDecision;
 
   const IncomingOrderSheet({
@@ -74,7 +69,6 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     final timeHours = (widget.order['averageTravelTimeInHours'] as int?) ?? 0;
     final timeMinutes = (widget.order['averageTravelTimeInMinutes'] as int?) ?? 0;
     final totalDest = (widget.order['distanceToDestinationInMeters'] as int?) ?? 0;
-
 
     final passLat = (widget.order['passengerLatitude'] as num).toDouble();
     final passLng = (widget.order['passengerLongitude'] as num).toDouble();
@@ -331,7 +325,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // Close the sheet immediately
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      
+
       // RF05: Sheet fechado — permitir foreground notifications novamente
       NotificationService.setSheetVisible(false);
 

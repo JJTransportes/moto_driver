@@ -47,7 +47,7 @@ class _BootstrapScreenState extends State<BootstrapScreen> with SingleTickerProv
             Modular.to.navigate('/terms');
           }
 
-          if (state is ConfigurationSuccessState) {
+          if (state is LoginNavigationState) {
             Modular.to.navigate('/login');
           }
         },
