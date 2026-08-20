@@ -26,9 +26,7 @@ class AuthRepository implements IAuthRepository {
       return Failure(e);
     }
 
-    // Registro de push é best-effort e roda fora do try acima de propósito:
-    // uma falha aqui (plugin ausente na plataforma, backend de push fora)
-    // nunca pode transformar um login com credenciais corretas em falha.
+
     try {
       await _notificationService.login(user.id, user.token);
     } catch (e) {
