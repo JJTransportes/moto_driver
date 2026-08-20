@@ -2,7 +2,7 @@ name: moto_driver
 description: "Moto Driver app."
 publish_to: 'none'
 
-version: 1.0.0+29
+version: 1.0.0+31
 
 environment:
   sdk: ^3.8.1
