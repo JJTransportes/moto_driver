@@ -2,9 +2,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/blocs/bloc/bootstrap_bloc.dart';
 import 'package:moto_driver/core/common_module.dart';
+import 'package:moto_driver/modules/auth/domain/usecases/confirm_password_reset_usecase.dart';
+import 'package:moto_driver/modules/auth/domain/usecases/i_confirm_password_reset_usecase.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/i_login_usecase.dart';
+import 'package:moto_driver/modules/auth/domain/usecases/i_request_password_reset_usecase.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/login_usecase.dart';
+import 'package:moto_driver/modules/auth/domain/usecases/request_password_reset_usecase.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
+import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_bloc.dart';
+import 'package:moto_driver/modules/auth/presentation/blocs/password_reset_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/login_page.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/password_recovery_page.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/password_reset_page.dart';
@@ -31,7 +37,10 @@ class AppModule extends Module {
   void binds(i) {
     i.add<BootstrapBloc>(BootstrapBloc.new);
     i.add<ILoginUsecase>(LoginUsecase.new);
+    i.add<IRequestPasswordResetUsecase>(RequestPasswordResetUsecase.new);
+    i.add<IConfirmPasswordResetUsecase>(ConfirmPasswordResetUsecase.new);
     i.addSingleton<LoginBloc>(LoginBloc.new);
+    i.addSingleton<PasswordRecoveryBloc>(PasswordRecoveryBloc.new);
     i.addSingleton<UsageTermsBloc>(UsageTermsBloc.new);
   }
 
@@ -52,8 +61,26 @@ class AppModule extends Module {
         child: const LoginPage(),
       ),
     );
-    r.child('/recovery', child: (_) => const PasswordRecoveryPage());
-    r.child('/reset-password', child: (_) => const PasswordResetPage());
+    r.child(
+      '/recovery',
+      child: (_) => BlocProvider.value(
+        value: Modular.get<PasswordRecoveryBloc>(),
+        child: const PasswordRecoveryPage(),
+      ),
+    );
+    r.child(
+      '/reset-password',
+      child: (_) {
+        final email = Modular.args.data['email'] as String;
+        return BlocProvider(
+          create: (_) => PasswordResetBloc(
+            Modular.get<IConfirmPasswordResetUsecase>(),
+            email: email,
+          ),
+          child: const PasswordResetPage(),
+        );
+      },
+    );
     r.child('/home', child: (_) => const HomeScreen());
     r.child(
       '/order-refresh',

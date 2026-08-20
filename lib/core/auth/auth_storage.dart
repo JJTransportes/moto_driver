@@ -9,13 +9,16 @@ class AuthStorage {
   static const _refreshTokenKey = 'moto_driver_refresh_token';
   static const _userIdKey = 'moto_driver_user_id';
 
-  AuthStorage() : _storage = const FlutterSecureStorage();
+  AuthStorage({FlutterSecureStorage? storage})
+      : _storage = storage ?? const FlutterSecureStorage();
 
+  /// As escritas são sequenciais de propósito.
+  /// No web o flutter_secure_storage cria a chave AES preguiçosamente na
+  /// primeira escrita; duas escritas concorrentes geram duas chaves e a última
+  /// sobrescreve a da outra, deixando um valor indecifrável (OperationError).
   Future<void> saveToken(String token, String userId) async {
-    await Future.wait([
-      _storage.write(key: _tokenKey, value: token),
-      _storage.write(key: _userIdKey, value: userId),
-    ]);
+    await _storage.write(key: _tokenKey, value: token);
+    await _storage.write(key: _userIdKey, value: userId);
   }
 
   Future<String?> getToken() => _safeRead(_tokenKey);
@@ -27,12 +30,11 @@ class AuthStorage {
 
   Future<String?> getRefreshToken() => _safeRead(_refreshTokenKey);
 
+  /// Sequencial pelo mesmo motivo de [saveToken].
   Future<void> clear() async {
-    await Future.wait([
-      _storage.delete(key: _tokenKey),
-      _storage.delete(key: _refreshTokenKey),
-      _storage.delete(key: _userIdKey),
-    ]);
+    await _storage.delete(key: _tokenKey);
+    await _storage.delete(key: _refreshTokenKey);
+    await _storage.delete(key: _userIdKey);
   }
 
   Future<String?> _safeRead(String key) async {
