@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/masks.dart';
+import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/driver_registration/domain/usecases/register_params.dart';
 import 'package:moto_driver/modules/driver_registration/presentation/blocs/register_bloc.dart';
 import 'package:moto_driver/widgets/app_button.dart';
@@ -31,6 +34,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   String? _fullNameError;
   String? _cpfError;
   String? _rgError;
+  String? _registrationError;
   String? _birthdateError;
   String? _emailError;
   String? _passwordError;
@@ -58,6 +62,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       _fullNameError = null;
       _cpfError = null;
       _rgError = null;
+      _registrationError = null;
       _birthdateError = null;
       _emailError = null;
       _passwordError = null;
@@ -67,38 +72,71 @@ class _RegistrationPageState extends State<RegistrationPage> {
       if (_fullNameController.text.trim().isEmpty) {
         _fullNameError = 'Campo obrigatório';
         valid = false;
+      } else {
+        _fullNameError = validators.validateMaxLength(
+                _fullNameController.text, 100, 'Nome completo') ??
+            validators.validateSafeText(_fullNameController.text, 'Nome completo');
+        if (_fullNameError != null) valid = false;
       }
+
       if (_cpfController.text.trim().isEmpty) {
         _cpfError = 'Campo obrigatório';
         valid = false;
+      } else {
+        _cpfError = validators.validateCpf(_cpfController.text);
+        if (_cpfError != null) valid = false;
       }
+
       if (_rgController.text.trim().isEmpty) {
         _rgError = 'Campo obrigatório';
         valid = false;
+      } else {
+        _rgError = validators.validateRg(_rgController.text);
+        if (_rgError != null) valid = false;
       }
+
+      if (_registrationController.text.trim().isEmpty) {
+        _registrationError = 'Campo obrigatório';
+        valid = false;
+      } else {
+        _registrationError = validators.validateAlphanumericFormat(
+            _registrationController.text, 'Matrícula', 30);
+        if (_registrationError != null) valid = false;
+      }
+
       if (_birthdate == null) {
         _birthdateError = 'Campo obrigatório';
         valid = false;
       }
+
       if (_emailController.text.trim().isEmpty) {
         _emailError = 'Campo obrigatório';
         valid = false;
-      } else if (!_emailController.text.trim().contains('@')) {
-        _emailError = 'E-mail inválido';
-        valid = false;
+      } else {
+        _emailError = validators.validateEmailFormat(_emailController.text.trim()) ??
+            validators.validateMaxLength(_emailController.text, 100, 'E-mail');
+        if (_emailError != null) valid = false;
       }
+
       if (_passwordController.text.isEmpty) {
         _passwordError = 'Campo obrigatório';
         valid = false;
+      } else {
+        _passwordError = validators.validatePasswordLength(_passwordController.text);
+        if (_passwordError != null) valid = false;
       }
-      final phoneDigits = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
-      if (phoneDigits.isNotEmpty && phoneDigits.length < 10) {
-        _phoneError = 'Telefone inválido';
-        valid = false;
+
+      if (_phoneController.text.trim().isNotEmpty) {
+        _phoneError = validators.validatePhone(_phoneController.text);
+        if (_phoneError != null) valid = false;
       }
+
       if (_cnhController.text.trim().isEmpty) {
         _cnhError = 'Campo obrigatório';
         valid = false;
+      } else {
+        _cnhError = validators.validateCnh(_cnhController.text);
+        if (_cnhError != null) valid = false;
       }
     });
     return valid;
@@ -111,7 +149,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       fullName: _fullNameController.text.trim(),
       cpf: _cpfController.text.trim(),
       rg: _rgController.text.trim(),
-      registration: _registrationController.text.trim().isEmpty ? null : _registrationController.text.trim(),
+      registration: _registrationController.text.trim(),
       birthdate: _birthdate!,
       email: _emailController.text.trim(),
       initialPassword: _passwordController.text,
@@ -180,29 +218,38 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 spacing: 16,
                 children: [
                   AppTextField(
-                    label: 'Nome completo',
+                    label: 'Nome completo *',
                     hint: 'Informe seu nome completo',
                     controller: _fullNameController,
                     errorText: _fullNameError,
+                    maxLength: 100,
                   ),
                   AppTextField(
-                    label: 'CPF',
+                    label: 'CPF *',
                     hint: '000.000.000-00',
                     controller: _cpfController,
                     keyboardType: TextInputType.number,
                     errorText: _cpfError,
+                    inputFormatters: [CpfInputFormatter()],
+                    maxLength: 14,
                   ),
                   AppTextField(
-                    label: 'RG',
-                    hint: '00.000.000-0',
+                    label: 'RG *',
+                    hint: 'Somente letras e números (7 a 12 caracteres)',
                     controller: _rgController,
+                    keyboardType: TextInputType.text,
                     errorText: _rgError,
+                    inputFormatters: [AlphanumericInputFormatter(maxLength: 12)],
+                    maxLength: 12,
                   ),
                   AppTextField(
-                    label: 'Matrícula',
-                    hint: 'N° de matrícula',
+                    label: 'Matrícula *',
+                    hint: 'N° de matrícula (letras e números)',
                     controller: _registrationController,
-                    keyboardType: TextInputType.number,
+                    keyboardType: TextInputType.text,
+                    errorText: _registrationError,
+                    inputFormatters: [AlphanumericInputFormatter(maxLength: 30)],
+                    maxLength: 30,
                   ),
                   AppTextField(
                     label: 'Telefone',
@@ -210,22 +257,27 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     errorText: _phoneError,
+                    inputFormatters: [PhoneInputFormatter()],
+                    maxLength: 15,
                   ),
                   _buildDateField(),
                   AppTextField(
-                    label: 'E-mail',
+                    label: 'E-mail *',
                     hint: 'Informe seu e-mail',
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     errorText: _emailError,
+                    maxLength: 100,
                   ),
                   _buildPasswordField(),
                   AppTextField(
-                    label: 'CNH',
+                    label: 'CNH *',
                     hint: 'Número da CNH',
                     controller: _cnhController,
                     errorText: _cnhError,
                     keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    maxLength: 11,
                   ),
                   if (errorMessage != null)
                     Text(
@@ -265,7 +317,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Data de nascimento',
+          'Data de nascimento *',
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w700,
@@ -314,7 +366,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Senha',
+          'Senha *',
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w700,
@@ -327,6 +379,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
         TextField(
           controller: _passwordController,
           obscureText: _obscurePassword,
+          maxLength: 72,
+          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w300,
