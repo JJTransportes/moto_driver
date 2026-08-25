@@ -1,3 +1,5 @@
+
+import 'package:flutter/foundation.dart';
 import 'dart:developer' show log;
 
 import 'package:dio/dio.dart';
@@ -29,6 +31,12 @@ class SignOutService {
     this._availability,
   );
 
+  /// Limpa a sessão e volta para o login.
+  ///
+  /// As limpezas são sequenciais (escritas concorrentes no secure storage
+  /// corrompem a chave AES no web) e individualmente tolerantes a falha: este é
+  /// o caminho de recuperação de sessão inválida, então a navegação para
+  /// `/login` tem que acontecer mesmo que alguma limpeza falhe.
   Future<void> signOut() async {
     try {
       await _availability.deactivate();
@@ -60,5 +68,14 @@ class SignOutService {
       _termsStorage.clear(),
     ]);
     Modular.to.navigate('/login');
+  }
+
+  Future<void> _runSafely(String label, Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (e) {
+      // Uma limpeza que falha não pode impedir o motorista de voltar ao login.
+      debugPrint('SignOutService: falha ao limpar $label — $e');
+    }
   }
 }
