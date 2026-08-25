@@ -1,6 +1,6 @@
 workflows:
   android_staging:
-    name: Moto Android Pre Release
+    name: Moto Android Release
     instance_type: mac_mini_m2
     max_build_duration: 30
 
@@ -8,14 +8,14 @@ workflows:
       events:
       - push
       branch_patterns:
-      - pattern: "android_pre_release"
+      - pattern: "android_release"
       - include: false
       - source: false
 
     environment:
       flutter: 3.32.2
       groups:
-      - pre_release
+      - release
       android_signing:
       - moto_keystore
 
@@ -50,5 +50,5 @@ workflows:
 
       google_play:
         credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
-        track: "Pre Release"
+        track: "Production"
         submit_as_draft: false
