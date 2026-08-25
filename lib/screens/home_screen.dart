@@ -9,6 +9,7 @@ import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
+import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
@@ -49,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // ── Disponibilidade (modo de atendimento) ──
   DriverAvailabilityEntity? _availability;
   Timer? _availabilityTimer;
+  Timer? _driverPositionTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -206,6 +208,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _locationTimer?.cancel();
     _availabilityTimer?.cancel();
+    _driverPositionTimer?.cancel();
     _activeTravelPollTimer?.cancel();
     _newOrderSub?.cancel();
     _orderCancelledSub?.cancel();
@@ -233,6 +236,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       const Duration(seconds: 15),
       (_) => _checkActiveTravelHttp(),
     );
+
+    _driverPositionTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _updateDriverPosition(),
+    );
+  }
+
+  Future<void> _updateDriverPosition() async {
+    try {
+      final dio = Modular.get<Dio>();
+      final localtionService = Modular.get<LocationService>();
+      final position = await localtionService.getCurrentPosition();
+
+      final response = await dio.post(
+        '/api/positions/drivers/$_userId',
+        data: {
+          "latitude": position.position?.latitude,
+          "longitude": position.position?.longitude,
+        },
+      );
+
+      developer.log('${response.statusCode}');
+    } on DioException catch (e) {
+      developer.log(e.message ?? "");
+      return;
+    }
   }
 
   @override
