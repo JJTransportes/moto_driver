@@ -28,6 +28,12 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
   String? _status;
   String? _passengerName;
+  String? _passengerPhotoUrl;
+  int? _passengerSolicitationCount;
+  String? _passengerPartitionName;
+  String? _passengerDepartments;
+  DateTime? _requestedAt;
+  String? _authToken;
   String? _departureAddress;
   String? _destinationAddress;
 
@@ -98,10 +104,12 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
       final data = response.data as Map<String, dynamic>;
       final routes = (data['routes'] as List?) ?? [];
+      final passengerId = data['passengerId'] as String?;
 
       setState(() {
         _status = data['status'] as String?;
         _passengerName = data['passengerName'] as String?;
+        _requestedAt = DateTime.tryParse(data['createdAt']?.toString() ?? '');
 
         // Parse routes from API response (fallback if not passed via args)
         if (_pickupRoute == null && routes.isNotEmpty) {
@@ -126,6 +134,10 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
       _updateMapMarkers();
 
+      if (passengerId != null) {
+        _fetchPassengerPhoto(passengerId);
+      }
+
       // Connect to travel-management hub
       // Only start location tracking when travel is InProgress
       if (_status == 'Accepted' || _status == 'InProgress') {
@@ -141,6 +153,53 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         _error = e.toString();
       });
     }
+  }
+
+  /// Fetches the passenger's full profile (GET /api/travels/{id} only
+  /// returns passengerName, not photo/solicitation count) via GET
+  /// /api/passengers/{id}. Best-effort — a failure here just means the
+  /// avatar falls back to an icon and the extra details stay hidden.
+  Future<void> _fetchPassengerPhoto(String passengerId) async {
+    try {
+      final authStorage = Modular.get<AuthStorage>();
+      _authToken = await authStorage.getToken();
+
+      final dio = Modular.get<Dio>();
+      final response = await dio.get('${AppConfig.getBaseUrl()}/api/passengers/$passengerId');
+      if (!mounted) return;
+      final data = response.data as Map<String, dynamic>;
+      final departments = (data['departments'] as List?)
+          ?.map((d) => (d as Map<String, dynamic>)['name'] as String?)
+          .whereType<String>()
+          .toList();
+
+      setState(() {
+        _passengerPhotoUrl = data['photoUrl'] as String?;
+        _passengerSolicitationCount = data['solicitationCount'] as int?;
+        _passengerPartitionName = data['publicPartitionName'] as String?;
+        _passengerDepartments = (departments != null && departments.isNotEmpty) ? departments.join(', ') : null;
+      });
+    } catch (_) {
+      // Non-critical — UI falls back to a generic person icon.
+    }
+  }
+
+  String _resolveImageUrl(String url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return '${AppConfig.getBaseUrl()}$url';
+  }
+
+  Map<String, String>? get _authHeaders {
+    final token = _authToken;
+    if (token == null) return null;
+    return {'Authorization': 'Bearer $token'};
+  }
+
+  String _formatTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 
   Future<void> _connectManagementHub() async {
@@ -485,33 +544,59 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            color: isAccepted ? Colors.orange.shade50 : Colors.green.shade50,
+            color: Colors.white,
             child: Row(
               children: [
-                Icon(
-                  isAccepted ? Icons.access_time : Icons.directions_car,
-                  color: isAccepted ? Colors.orange : Colors.green,
-                  size: 28,
-                ),
-                const SizedBox(width: 12),
+                if (_passengerName != null) ...[
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFF4685C0).withAlpha(30),
+                    backgroundImage: _passengerPhotoUrl != null && _passengerPhotoUrl!.isNotEmpty
+                        ? NetworkImage(_resolveImageUrl(_passengerPhotoUrl!), headers: _authHeaders)
+                        : null,
+                    child: _passengerPhotoUrl == null || _passengerPhotoUrl!.isEmpty
+                        ? const Icon(Icons.person, color: Color(0xFF4685C0))
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                ] else ...[
+                  Icon(
+                    isAccepted ? Icons.access_time : Icons.directions_car,
+                    color: const Color(0xFF4685C0),
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         isAccepted ? 'Aguardando início' : 'Em andamento',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: isAccepted ? Colors.orange.shade800 : Colors.green.shade800,
+                          color: Color(0xFF4E4E4E),
                         ),
                       ),
                       if (_passengerName != null) ...[
                         const SizedBox(height: 4),
                         Text(
                           'Passageiro: $_passengerName',
-                          style: TextStyle(color: isAccepted ? Colors.orange.shade700 : Colors.green.shade700),
+                          style: const TextStyle(color: Color(0xFF4E4E4E)),
                         ),
+                        if (_passengerSolicitationCount != null)
+                          Text(
+                            '$_passengerSolicitationCount solicitaç${_passengerSolicitationCount == 1 ? 'ão' : 'ões'} realizada${_passengerSolicitationCount == 1 ? '' : 's'}',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF4E4E4E)),
+                          ),
+                        if (_passengerPartitionName != null)
+                          Text(
+                            _passengerDepartments != null
+                                ? '$_passengerPartitionName · $_passengerDepartments'
+                                : _passengerPartitionName!,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF4E4E4E)),
+                          ),
                       ],
                     ],
                   ),
@@ -551,6 +636,20 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (_requestedAt != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.event_note, color: Color(0xFF4685C0), size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Solicitada às ${_formatTime(_requestedAt!)}',
+                          style: const TextStyle(color: Color(0xFF4E4E4E), fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
                 // Dados da rota atual
                 if (isAccepted && _departureAddress != null)
                   Padding(
@@ -637,7 +736,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                       style: const TextStyle(color: Colors.white, fontSize: 14),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isAccepted ? Colors.orange : Colors.green,
+                      backgroundColor: const Color(0xFF4685C0),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
@@ -664,7 +763,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                       child: ElevatedButton(
                         onPressed: _isActing ? null : (isAccepted ? _startTravel : _finishTravel),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isAccepted ? Colors.orange : Colors.green,
+                          backgroundColor: const Color(0xFF4685C0),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
