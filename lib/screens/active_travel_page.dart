@@ -28,6 +28,8 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
   String? _status;
   String? _passengerName;
+  String? _passengerPhotoUrl;
+  String? _authToken;
   String? _departureAddress;
   String? _destinationAddress;
 
@@ -98,6 +100,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
       final data = response.data as Map<String, dynamic>;
       final routes = (data['routes'] as List?) ?? [];
+      final passengerId = data['passengerId'] as String?;
 
       setState(() {
         _status = data['status'] as String?;
@@ -126,6 +129,10 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
       _updateMapMarkers();
 
+      if (passengerId != null) {
+        _fetchPassengerPhoto(passengerId);
+      }
+
       // Connect to travel-management hub
       // Only start location tracking when travel is InProgress
       if (_status == 'Accepted' || _status == 'InProgress') {
@@ -141,6 +148,35 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         _error = e.toString();
       });
     }
+  }
+
+  /// Fetches the passenger's photo (GET /api/travels/{id} only returns
+  /// passengerName, not photoUrl) via GET /api/passengers/{id}. Best-effort —
+  /// a failure here just means the avatar falls back to an icon.
+  Future<void> _fetchPassengerPhoto(String passengerId) async {
+    try {
+      final authStorage = Modular.get<AuthStorage>();
+      _authToken = await authStorage.getToken();
+
+      final dio = Modular.get<Dio>();
+      final response = await dio.get('${AppConfig.getBaseUrl()}/api/passengers/$passengerId');
+      if (!mounted) return;
+      final data = response.data as Map<String, dynamic>;
+      setState(() => _passengerPhotoUrl = data['photoUrl'] as String?);
+    } catch (_) {
+      // Non-critical — UI falls back to a generic person icon.
+    }
+  }
+
+  String _resolveImageUrl(String url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return '${AppConfig.getBaseUrl()}$url';
+  }
+
+  Map<String, String>? get _authHeaders {
+    final token = _authToken;
+    if (token == null) return null;
+    return {'Authorization': 'Bearer $token'};
   }
 
   Future<void> _connectManagementHub() async {
@@ -488,12 +524,26 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
             color: isAccepted ? Colors.orange.shade50 : Colors.green.shade50,
             child: Row(
               children: [
-                Icon(
-                  isAccepted ? Icons.access_time : Icons.directions_car,
-                  color: isAccepted ? Colors.orange : Colors.green,
-                  size: 28,
-                ),
-                const SizedBox(width: 12),
+                if (_passengerName != null) ...[
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: (isAccepted ? Colors.orange : Colors.green).withAlpha(30),
+                    backgroundImage: _passengerPhotoUrl != null && _passengerPhotoUrl!.isNotEmpty
+                        ? NetworkImage(_resolveImageUrl(_passengerPhotoUrl!), headers: _authHeaders)
+                        : null,
+                    child: _passengerPhotoUrl == null || _passengerPhotoUrl!.isEmpty
+                        ? Icon(Icons.person, color: isAccepted ? Colors.orange : Colors.green)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                ] else ...[
+                  Icon(
+                    isAccepted ? Icons.access_time : Icons.directions_car,
+                    color: isAccepted ? Colors.orange : Colors.green,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
