@@ -15,6 +15,7 @@ void main() {
     fullName: 'João Santos',
     cpf: '987.654.321-00',
     rg: '98.765.432-1',
+    registration: '12345',
     birthdate: DateTime(1985, 6, 20),
     email: 'joao@example.com',
     initialPassword: 'securePassword456',
@@ -75,7 +76,11 @@ void main() {
       expect(body.containsKey('publicPartitionId'), isFalse);
     });
 
-    test('omits registration and department from body when null', () async {
+    // O backend rejeita pontuação em cpf/rg (regex alfanumérico puro). O
+    // formulário aplica máscara visual ("987.654.321-00", "98.765.432-1"),
+    // então o datasource precisa limpar antes de montar o corpo — senão todo
+    // cadastro cai em 400.
+    test('sends cpf and rg without mask punctuation', () async {
       when(() => mockDio.post(
             any(),
             data: any(named: 'data'),
@@ -94,11 +99,34 @@ void main() {
           )).captured;
       final body = captured[1] as Map<String, dynamic>;
 
-      expect(body.containsKey('registration'), isFalse);
+      expect(body['cpf'], '98765432100');
+      expect(body['rg'], '987654321');
+    });
+
+    test('always includes registration (now a required field) and omits department when null', () async {
+      when(() => mockDio.post(
+            any(),
+            data: any(named: 'data'),
+          )).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: ''),
+          statusCode: 201,
+        ),
+      );
+
+      await datasource.register(validParams);
+
+      final captured = verify(() => mockDio.post(
+            captureAny(),
+            data: captureAny(named: 'data'),
+          )).captured;
+      final body = captured[1] as Map<String, dynamic>;
+
+      expect(body['registration'], '12345');
       expect(body.containsKey('department'), isFalse);
     });
 
-    test('includes registration and department when provided', () async {
+    test('includes department when provided', () async {
       when(() => mockDio.post(
             any(),
             data: any(named: 'data'),
