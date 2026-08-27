@@ -53,7 +53,7 @@ workflows:
       script: |+
         flutter build ipa --release \
           --build-name=2.0.0 \
-          --build-number=37 \
+          --build-number=38 \
           --export-options-plist=/Users/builder/export_options.plist
           
     artifacts:
