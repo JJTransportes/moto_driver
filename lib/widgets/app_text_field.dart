@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 
@@ -9,6 +10,8 @@ class AppTextField extends StatefulWidget {
   final bool obscureText;
   final String? errorText;
   final TextInputType keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final int? maxLength;
 
   const AppTextField({
     super.key,
@@ -18,6 +21,8 @@ class AppTextField extends StatefulWidget {
     this.obscureText = false,
     this.errorText,
     this.keyboardType = TextInputType.text,
+    this.inputFormatters,
+    this.maxLength,
   });
 
   @override
@@ -53,6 +58,9 @@ class _AppTextFieldState extends State<AppTextField> {
           controller: widget.controller,
           obscureText: _obscured,
           keyboardType: widget.keyboardType,
+          inputFormatters: widget.inputFormatters,
+          maxLength: widget.maxLength,
+          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w300,

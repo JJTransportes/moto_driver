@@ -2,7 +2,7 @@ class RegisterParams {
   final String fullName;
   final String cpf;
   final String rg;
-  final String? registration;
+  final String registration;
   final DateTime birthdate;
   final String email;
   final String initialPassword;
@@ -14,7 +14,7 @@ class RegisterParams {
     required this.fullName,
     required this.cpf,
     required this.rg,
-    this.registration,
+    required this.registration,
     required this.birthdate,
     required this.email,
     required this.initialPassword,
