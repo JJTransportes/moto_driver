@@ -58,7 +58,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   _AcceptStatus _status = _AcceptStatus.idle;
   String? _errorMessage;
 
-  static const int _rejectTimeoutSeconds = 60;
+  static const int _rejectTimeoutSeconds = 15;
   int _remainingSeconds = _rejectTimeoutSeconds;
   Timer? _rejectTimer;
 
