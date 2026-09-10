@@ -72,8 +72,18 @@ String? validateCnh(String cnh) {
   return null;
 }
 
+/// Local part: one or more dot-separated segments (no leading/trailing dot,
+/// no `..`). Domain: one or more dot-separated labels, each not starting or
+/// ending with `-`, requiring at least one label after the last dot (TLD).
+/// Rejects things the old permissive regex let through, e.g. `a@b...com`.
+final RegExp _emailPattern = RegExp(
+  r"^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*"
+  r'@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?'
+  r'(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+$',
+);
+
 String? validateEmailFormat(String email) {
-  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+  if (!_emailPattern.hasMatch(email)) {
     return 'E-mail inválido.';
   }
   final safeTextError = validateSafeText(email, 'E-mail');

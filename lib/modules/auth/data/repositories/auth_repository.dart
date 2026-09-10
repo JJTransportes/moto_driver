@@ -17,11 +17,17 @@ class AuthRepository implements IAuthRepository {
   Future<Result<UserEntity>> signIn(
     String email,
     String password,
-    String device,
-  ) async {
+    String device, {
+    String? expectedRole,
+  }) async {
     final UserEntity user;
     try {
-      final model = await _datasource.signIn(email, password, device);
+      final model = await _datasource.signIn(
+        email,
+        password,
+        device,
+        expectedRole: expectedRole,
+      );
       user = model.toEntity();
     } on Exception catch (e) {
       return Failure(e);

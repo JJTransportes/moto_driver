@@ -41,7 +41,8 @@ void main() {
 
   group('signIn', () {
     test('returns Success with UserEntity on datasource success', () async {
-      when(() => mockDatasource.signIn(any(), any(), any())).thenAnswer((_) async => model);
+      when(() => mockDatasource.signIn(any(), any(), any(), expectedRole: any(named: 'expectedRole')))
+          .thenAnswer((_) async => model);
 
       final result = await repository.signIn('joao@moto.com', '123456', 'android');
 
@@ -58,7 +59,8 @@ void main() {
     });
 
     test('returns Failure on UnauthorizedException', () async {
-      when(() => mockDatasource.signIn(any(), any(), any())).thenThrow(
+      when(() => mockDatasource.signIn(any(), any(), any(), expectedRole: any(named: 'expectedRole')))
+          .thenThrow(
         const UnauthorizedException('E-mail ou senha inválidos'),
       );
 
@@ -75,7 +77,8 @@ void main() {
     });
 
     test('returns Failure on NetworkException', () async {
-      when(() => mockDatasource.signIn(any(), any(), any())).thenThrow(const NetworkException());
+      when(() => mockDatasource.signIn(any(), any(), any(), expectedRole: any(named: 'expectedRole')))
+          .thenThrow(const NetworkException());
 
       final result = await repository.signIn('joao@moto.com', '123', 'android');
 

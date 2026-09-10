@@ -182,6 +182,49 @@ void main() {
         throwsA(isA<DeviceConflictException>()),
       );
     });
+
+    test('sends expectedRole when provided', () async {
+      when(() => mockDio.post(
+            any(),
+            data: any(named: 'data'),
+          )).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: ''),
+          data: validResponse,
+          statusCode: 200,
+        ),
+      );
+
+      await datasource.signIn('joao@moto.com', '123456', 'android', expectedRole: 'Driver');
+
+      verify(() => mockDio.post(
+            '/api/auth/sign-in',
+            data: {
+              'email': 'joao@moto.com',
+              'password': '123456',
+              'device': 'android',
+              'expectedRole': 'Driver',
+            },
+          )).called(1);
+    });
+
+    test('throws RoleMismatchException on 403 (wrong role)', () async {
+      when(() => mockDio.post(any(), data: any(named: 'data'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: ''),
+          response: Response(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 403,
+            data: {'error': 'This account is not authorized for this app.'},
+          ),
+        ),
+      );
+
+      expect(
+        () => datasource.signIn('joao@moto.com', '123456', 'android', expectedRole: 'Driver'),
+        throwsA(isA<RoleMismatchException>()),
+      );
+    });
   });
 
   group('refreshToken', () {

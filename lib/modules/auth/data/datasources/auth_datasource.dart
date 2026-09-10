@@ -13,18 +13,24 @@ class AuthDatasource implements IAuthDatasource {
   Future<SignInResponseModel> signIn(
     String email,
     String password,
-    String device,
-  ) async {
+    String device, {
+    String? expectedRole,
+  }) async {
     try {
       final response = await _dio.post(
         '/api/auth/sign-in',
-        data: {'email': email, 'password': password, 'device': device},
+        data: {
+          'email': email,
+          'password': password,
+          'device': device,
+          if (expectedRole != null) 'expectedRole': expectedRole,
+        },
       );
       return SignInResponseModel.fromJson(
         response.data as Map<String, dynamic>,
       );
     } on DioException catch (e) {
-      throw _mapDioException(e);
+      throw _mapDioException(e, isSignIn: true);
     }
   }
 
@@ -106,7 +112,7 @@ class AuthDatasource implements IAuthDatasource {
     }
   }
 
-  Exception _mapDioException(DioException e) {
+  Exception _mapDioException(DioException e, {bool isSignIn = false}) {
     switch (e.response?.statusCode) {
       case 400:
         return const ValidationException(
@@ -115,6 +121,12 @@ class AuthDatasource implements IAuthDatasource {
       case 401:
         return const UnauthorizedException('E-mail ou senha inválidos');
       case 403:
+        if (isSignIn) {
+          // Sign-in com `expectedRole` informado e conta sem esse role.
+          return RoleMismatchException(
+            _extractErrorMessage(e) ?? 'Esta conta não é de motorista.',
+          );
+        }
         // Refresh com token vinculado a outro tipo de dispositivo.
         return DeviceMismatchException(
           _extractErrorMessage(e) ??

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
+import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/modules/profile_configuration/domain/entities/profile_entity.dart';
 import 'package:moto_driver/modules/profile_configuration/presentation/blocs/profile_configuration_bloc.dart';
 import 'package:moto_driver/modules/profile_configuration/presentation/blocs/profile_configuration_event.dart';
@@ -26,6 +28,7 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
   final ProfileImagePicker _imagePicker = ProfileImagePicker();
   final GlobalKey<ProfileFormState> _formKey = GlobalKey<ProfileFormState>();
   bool _hasActiveTravel = false;
+  bool _isEditing = false;
 
   @override
   void initState() {
@@ -55,7 +58,12 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
       body: BlocConsumer<ProfileConfigurationBloc, ProfileConfigurationState>(
         listener: (context, state) {
           if (state is ProfileUpdateSuccess) {
-            _showSnackbar('Dados atualizados com sucesso!');
+            if (state.emailChanged) {
+              _forceLogoutAfterEmailChange();
+            } else {
+              setState(() => _isEditing = false);
+              _showSnackbar('Dados atualizados com sucesso!');
+            }
           }
           if (state is ProfileUpdateFailure) {
             _showSnackbar(state.error.toString(), isError: true);
@@ -83,6 +91,7 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
             final isSaving = state is ProfileUpdateLoading;
             final uploadState = state is ProfileImageUploadLoading ? state : null;
             final isUploading = uploadState != null;
+            final canEdit = !_hasActiveTravel;
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -115,7 +124,7 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                   ],
                   const SizedBox(height: 8),
                   TextButton.icon(
-                    onPressed: isUploading ? null : _onPickImage,
+                    onPressed: isUploading || _hasActiveTravel ? null : _onPickImage,
                     icon: const Icon(Icons.camera_alt),
                     label: const Text('Alterar foto'),
                   ),
@@ -126,9 +135,79 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                     initialName: profile.name,
                     initialEmail: profile.email,
                     initialPhone: profile.phone ?? '',
-                    isLoading: isSaving,
-                    onSave: _onSave,
+                    isEditing: _isEditing,
+                    onChanged: () => setState(() {}),
                   ),
+                  if (_hasActiveTravel) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Não é possível editar o perfil enquanto houver uma viagem em andamento.',
+                      style: TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  if (!_isEditing)
+                    SizedBox(
+                      height: 48,
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: !canEdit ? null : _onEditTapped,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4685C0),
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text(
+                          'Editar',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: OutlinedButton(
+                              onPressed: isSaving ? null : _onCancelEdit,
+                              style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text('Cancelar'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: isSaving || !(_formKey.currentState?.isValid ?? false) ? null : _onSave,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4685C0),
+                                disabledBackgroundColor: Colors.grey.shade300,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: isSaving
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Text(
+                                      'Salvar',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 32),
                   const Divider(),
                   const SizedBox(height: 16),
@@ -157,13 +236,16 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: _hasActiveTravel ? null : () => Modular.to.pushNamed('/delete-account/'),
-                        icon: const Icon(Icons.delete_forever, color: Colors.red),
-                        label: const Text(
+                        icon: Icon(
+                          Icons.delete_forever,
+                          color: _hasActiveTravel ? Colors.grey.shade400 : Colors.red,
+                        ),
+                        label: Text(
                           'Excluir conta',
-                          style: TextStyle(color: Colors.red),
+                          style: TextStyle(color: _hasActiveTravel ? Colors.grey.shade400 : Colors.red),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.red),
+                          side: BorderSide(color: _hasActiveTravel ? Colors.grey.shade300 : Colors.red),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -230,17 +312,81 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
     }
   }
 
-  void _onSave() {
+  void _onEditTapped() => setState(() => _isEditing = true);
+
+  void _onCancelEdit() => setState(() => _isEditing = false);
+
+  Future<void> _onSave() async {
     final formState = _formKey.currentState;
     if (formState == null) return;
+    if (!formState.validate()) return;
+
+    final password = await _askPasswordToConfirm(emailChanged: formState.emailChanged);
+    if (password == null || password.isEmpty) return;
+    if (!mounted) return;
 
     context.read<ProfileConfigurationBloc>().add(
       ProfileUpdateEvent(
         name: formState.name,
         email: formState.email,
         phone: formState.phone,
+        password: password,
       ),
     );
+  }
+
+  Future<String?> _askPasswordToConfirm({required bool emailChanged}) {
+    final passwordController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirme sua senha'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                emailChanged
+                    ? 'Digite sua senha atual para confirmar a alteração. Como você está '
+                        'mudando o e-mail, isso vai encerrar sua sessão e você precisará '
+                        'fazer login novamente.'
+                    : 'Digite sua senha atual para confirmar a alteração dos seus dados.',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Senha',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(passwordController.text),
+              child: const Text('Confirmar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _forceLogoutAfterEmailChange() async {
+    _showSnackbar('E-mail atualizado! Faça login novamente.');
+    await context.read<SignalRService>().disconnectAll();
+    if (mounted) {
+      await context.read<SignOutService>().signOut();
+    }
   }
 
   void _showSnackbar(String message, {bool isError = false}) {

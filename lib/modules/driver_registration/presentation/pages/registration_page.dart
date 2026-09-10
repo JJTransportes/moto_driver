@@ -25,6 +25,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _rgController = TextEditingController();
   final _registrationController = TextEditingController();
   final _emailController = TextEditingController();
+  final _confirmEmailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _cnhController = TextEditingController();
@@ -37,11 +38,52 @@ class _RegistrationPageState extends State<RegistrationPage> {
   String? _registrationError;
   String? _birthdateError;
   String? _emailError;
+  String? _confirmEmailError;
   String? _passwordError;
   String? _phoneError;
   String? _cnhError;
 
   bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final controller in [
+      _fullNameController,
+      _cpfController,
+      _rgController,
+      _registrationController,
+      _emailController,
+      _confirmEmailController,
+      _passwordController,
+      _cnhController,
+    ]) {
+      controller.addListener(_onFieldsChanged);
+    }
+  }
+
+  void _onFieldsChanged() => setState(() {});
+
+  String? get _liveConfirmEmailError {
+    if (_confirmEmailController.text.isEmpty) return null;
+    if (_confirmEmailController.text.trim().toLowerCase() !=
+        _emailController.text.trim().toLowerCase()) {
+      return 'Os e-mails não coincidem';
+    }
+    return null;
+  }
+
+  bool get _isFormComplete =>
+      _fullNameController.text.trim().isNotEmpty &&
+      _cpfController.text.trim().isNotEmpty &&
+      _rgController.text.trim().isNotEmpty &&
+      _registrationController.text.trim().isNotEmpty &&
+      _birthdate != null &&
+      validators.validateEmailFormat(_emailController.text.trim()) == null &&
+      _confirmEmailController.text.trim().toLowerCase() ==
+          _emailController.text.trim().toLowerCase() &&
+      _passwordController.text.isNotEmpty &&
+      _cnhController.text.trim().isNotEmpty;
 
   @override
   void dispose() {
@@ -50,6 +92,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     _rgController.dispose();
     _registrationController.dispose();
     _emailController.dispose();
+    _confirmEmailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
     _cnhController.dispose();
@@ -65,6 +108,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       _registrationError = null;
       _birthdateError = null;
       _emailError = null;
+      _confirmEmailError = null;
       _passwordError = null;
       _phoneError = null;
       _cnhError = null;
@@ -116,6 +160,15 @@ class _RegistrationPageState extends State<RegistrationPage> {
         _emailError = validators.validateEmailFormat(_emailController.text.trim()) ??
             validators.validateMaxLength(_emailController.text, 100, 'E-mail');
         if (_emailError != null) valid = false;
+      }
+
+      if (_confirmEmailController.text.trim().isEmpty) {
+        _confirmEmailError = 'Campo obrigatório';
+        valid = false;
+      } else if (_confirmEmailController.text.trim().toLowerCase() !=
+          _emailController.text.trim().toLowerCase()) {
+        _confirmEmailError = 'Os e-mails não coincidem';
+        valid = false;
       }
 
       if (_passwordController.text.isEmpty) {
@@ -170,6 +223,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       helpText: 'Selecione a data de nascimento',
       cancelText: 'Cancelar',
       confirmText: 'Confirmar',
+      locale: const Locale('pt', 'BR'),
     );
     if (picked != null) {
       setState(() {
@@ -269,6 +323,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     errorText: _emailError,
                     maxLength: 100,
                   ),
+                  AppTextField(
+                    label: 'Confirmar E-mail *',
+                    hint: 'Digite novamente seu e-mail',
+                    controller: _confirmEmailController,
+                    keyboardType: TextInputType.emailAddress,
+                    errorText: _confirmEmailError ?? _liveConfirmEmailError,
+                    maxLength: 100,
+                  ),
                   _buildPasswordField(),
                   AppTextField(
                     label: 'CNH *',
@@ -291,7 +353,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   AppButton(
                     label: 'Cadastrar',
                     loading: isLoading,
-                    onPressed: _submit,
+                    onPressed: _isFormComplete ? _submit : null,
                   ),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),

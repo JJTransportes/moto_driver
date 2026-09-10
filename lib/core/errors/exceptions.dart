@@ -74,3 +74,13 @@ class DeviceMismatchException implements Exception {
   @override
   String toString() => message;
 }
+
+/// 403 no sign-in: a conta autenticada não tem o role esperado (`expectedRole`).
+class RoleMismatchException implements Exception {
+  final String message;
+  const RoleMismatchException([
+    this.message = 'Esta conta não é de motorista.',
+  ]);
+  @override
+  String toString() => message;
+}

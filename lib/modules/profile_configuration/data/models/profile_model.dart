@@ -7,12 +7,18 @@ class ProfileModel {
   final String? phone;
   final String? photoUrl;
 
+  /// Write-only: senha atual, exigida pelo backend para confirmar a
+  /// alteração de perfil. Nunca vem em uma resposta, então não é lido
+  /// em [fromJson] nem exposto na [ProfileEntity].
+  final String? password;
+
   const ProfileModel({
     required this.id,
     required this.name,
     required this.email,
     this.phone,
     this.photoUrl,
+    this.password,
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -31,6 +37,7 @@ class ProfileModel {
       'name': name,
       'email': email,
       'phone': phone,
+      if (password != null) 'password': password,
     };
   }
 

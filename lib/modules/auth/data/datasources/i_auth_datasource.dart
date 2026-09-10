@@ -5,10 +5,18 @@ abstract class IAuthDatasource {
   /// Signs in with the given [email] and [password], reporting the [device]
   /// type (`android` | `ios`) for refresh-token device binding.
   ///
+  /// [expectedRole] is optional; when sent, the backend rejects the login
+  /// with a 403 ([RoleMismatchException]) if the account doesn't have that role.
+  ///
   /// Returns raw [SignInResponseModel] on success.
   /// Throws a typed exception (e.g. [UnauthorizedException], [NetworkException],
-  /// [DeviceConflictException] on 409) on failure.
-  Future<SignInResponseModel> signIn(String email, String password, String device);
+  /// [DeviceConflictException] on 409, [RoleMismatchException] on 403) on failure.
+  Future<SignInResponseModel> signIn(
+    String email,
+    String password,
+    String device, {
+    String? expectedRole,
+  });
 
   /// Exchanges a [refreshToken] for a new pair of access + refresh tokens (rotation),
   /// reporting the [device] type for refresh-token device binding.

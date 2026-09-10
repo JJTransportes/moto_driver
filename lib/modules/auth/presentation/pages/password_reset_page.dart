@@ -26,6 +26,21 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
   String? _confirmError;
 
   @override
+  void initState() {
+    super.initState();
+    for (final controller in [_codeController, _passwordController, _confirmController]) {
+      controller.addListener(_onFieldsChanged);
+    }
+  }
+
+  void _onFieldsChanged() => setState(() {});
+
+  bool get _isFormComplete =>
+      _codeController.text.trim().isNotEmpty &&
+      _passwordController.text.isNotEmpty &&
+      _confirmController.text.isNotEmpty;
+
+  @override
   void dispose() {
     _codeController.dispose();
     _passwordController.dispose();
@@ -177,7 +192,7 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
               AppButton(
                 label: 'Confirmar',
                 loading: isLoading,
-                onPressed: _submit,
+                onPressed: _isFormComplete ? _submit : null,
               ),
             ],
           ),

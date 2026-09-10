@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
 import 'package:moto_driver/widgets/app_button.dart';
 import 'package:moto_driver/widgets/app_text_field.dart';
@@ -20,6 +21,19 @@ class _LoginPageState extends State<LoginPage> {
 
   String? _emailError;
   String? _passwordError;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_onFieldsChanged);
+    _passwordController.addListener(_onFieldsChanged);
+  }
+
+  void _onFieldsChanged() => setState(() {});
+
+  bool get _isFormComplete =>
+      validators.validateEmailFormat(_emailController.text.trim()) == null &&
+      _passwordController.text.isNotEmpty;
 
   @override
   void dispose() {
@@ -128,7 +142,7 @@ class _LoginPageState extends State<LoginPage> {
                       AppButton(
                         label: 'Entrar',
                         loading: isLoading,
-                        onPressed: _submit,
+                        onPressed: _isFormComplete ? _submit : null,
                       ),
                       TextButton(
                         onPressed: () => Navigator.of(context).pushNamed('/driver-register/'),

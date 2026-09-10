@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_event.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_state.dart';
@@ -19,18 +20,54 @@ class PasswordRecoveryPage extends StatefulWidget {
 
 class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
   final _emailController = TextEditingController();
+  final _confirmEmailController = TextEditingController();
   String? _emailError;
+  String? _confirmEmailError;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_onFieldsChanged);
+    _confirmEmailController.addListener(_onFieldsChanged);
+  }
+
+  void _onFieldsChanged() => setState(() {});
+
+  String? get _liveConfirmEmailError {
+    if (_confirmEmailController.text.isEmpty) return null;
+    if (_confirmEmailController.text.trim().toLowerCase() !=
+        _emailController.text.trim().toLowerCase()) {
+      return 'Os e-mails não coincidem';
+    }
+    return null;
+  }
+
+  bool get _isFormComplete =>
+      validators.validateEmailFormat(_emailController.text.trim()) == null &&
+      _confirmEmailController.text.trim().toLowerCase() ==
+          _emailController.text.trim().toLowerCase();
 
   @override
   void dispose() {
     _emailController.dispose();
+    _confirmEmailController.dispose();
     super.dispose();
   }
 
   void _submit() {
     final email = _emailController.text.trim();
-    setState(() => _emailError = email.isEmpty ? 'E-mail obrigatório' : null);
-    if (_emailError != null) return;
+    final confirmEmail = _confirmEmailController.text.trim();
+    setState(() {
+      _emailError = email.isEmpty ? 'E-mail obrigatório' : validators.validateEmailFormat(email);
+      if (confirmEmail.isEmpty) {
+        _confirmEmailError = 'Campo obrigatório';
+      } else if (confirmEmail.toLowerCase() != email.toLowerCase()) {
+        _confirmEmailError = 'Os e-mails não coincidem';
+      } else {
+        _confirmEmailError = null;
+      }
+    });
+    if (_emailError != null || _confirmEmailError != null) return;
 
     context.read<PasswordRecoveryBloc>().add(RequestCodeSubmitted(email));
   }
@@ -111,6 +148,14 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
                 keyboardType: TextInputType.emailAddress,
                 errorText: _emailError,
               ),
+              const SizedBox(height: 16),
+              AppTextField(
+                label: 'Confirmar E-mail',
+                hint: 'Digite novamente seu e-mail',
+                controller: _confirmEmailController,
+                keyboardType: TextInputType.emailAddress,
+                errorText: _confirmEmailError ?? _liveConfirmEmailError,
+              ),
               if (errorMessage != null) ...[
                 const SizedBox(height: 12),
                 Text(
@@ -123,7 +168,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
               AppButton(
                 label: 'Enviar',
                 loading: isLoading,
-                onPressed: _submit,
+                onPressed: _isFormComplete ? _submit : null,
               ),
             ],
           ),
