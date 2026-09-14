@@ -1,66 +1,88 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
+import 'package:moto_driver/core/models/password_policy.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/validators.dart' as validators;
+import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_usecase.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_reset_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_reset_event.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_reset_state.dart';
 import 'package:moto_driver/widgets/app_button.dart';
 import 'package:moto_driver/widgets/app_text_field.dart';
 import 'package:moto_driver/widgets/gradient_text.dart';
+import 'package:moto_driver/widgets/password_policy_checklist.dart';
 
+/// Tela 2 do reset de senha: define a nova senha usando o `resetToken`
+/// recebido da tela 1 (verificação de código). Exibe o checklist dinâmico
+/// da política de senha (Trilha B) assim que o campo ganha foco.
 class PasswordResetPage extends StatefulWidget {
-  const PasswordResetPage({super.key});
+  /// E-mail opcional (vindo da tela 1) usado apenas para oferecer "pedir
+  /// novo código" já com o e-mail em mãos, se o resetToken expirar.
+  final String? email;
+
+  const PasswordResetPage({super.key, this.email});
 
   @override
   State<PasswordResetPage> createState() => _PasswordResetPageState();
 }
 
 class _PasswordResetPageState extends State<PasswordResetPage> {
-  final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
 
-  String? _codeError;
-  String? _passwordError;
   String? _confirmError;
+  bool _passwordFocused = false;
+
+  // Usa o fallback estático até a política real chegar do backend — a tela
+  // nunca fica bloqueada esperando o GET (design D4).
+  PasswordPolicy _policy = const PasswordPolicy.fallback();
 
   @override
   void initState() {
     super.initState();
-    for (final controller in [_codeController, _passwordController, _confirmController]) {
+    for (final controller in [_passwordController, _confirmController]) {
       controller.addListener(_onFieldsChanged);
     }
+    _passwordFocusNode.addListener(() {
+      setState(() => _passwordFocused = _passwordFocusNode.hasFocus);
+    });
+    _loadPolicy();
+  }
+
+  Future<void> _loadPolicy() async {
+    final usecase = Modular.get<IGetPasswordPolicyUsecase>();
+    final result = await usecase.call();
+    if (!mounted) return;
+    result.fold(
+      (policy) => setState(() => _policy = policy),
+      // Usecase é sempre-sucesso (fallback interno); nada a fazer aqui.
+      (_) {},
+    );
   }
 
   void _onFieldsChanged() => setState(() {});
 
   bool get _isFormComplete =>
-      _codeController.text.trim().isNotEmpty &&
-      _passwordController.text.isNotEmpty &&
-      _confirmController.text.isNotEmpty;
+      validators.isPasswordValid(_passwordController.text, _policy) &&
+      _confirmController.text == _passwordController.text;
 
   @override
   void dispose() {
-    _codeController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
   bool _validate() {
     bool valid = true;
     setState(() {
-      _codeError = null;
-      _passwordError = null;
       _confirmError = null;
 
-      if (_codeController.text.trim().isEmpty) {
-        _codeError = 'Código obrigatório';
-        valid = false;
-      }
-      if (_passwordController.text.isEmpty) {
-        _passwordError = 'Senha obrigatória';
+      if (!validators.isPasswordValid(_passwordController.text, _policy)) {
         valid = false;
       }
       if (_confirmController.text != _passwordController.text) {
@@ -74,11 +96,16 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
   void _submit() {
     if (!_validate()) return;
     context.read<PasswordResetBloc>().add(
-      ResetConfirmSubmitted(
-        code: _codeController.text.trim(),
-        newPassword: _passwordController.text,
-      ),
+      ResetConfirmSubmitted(newPassword: _passwordController.text),
     );
+  }
+
+  void _requestNewCode() {
+    if (widget.email != null) {
+      Modular.to.pushReplacementNamed('/verify-reset-code', arguments: {'email': widget.email});
+    } else {
+      Navigator.of(context).pushReplacementNamed('/recovery');
+    }
   }
 
   @override
@@ -140,26 +167,24 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
               ),
               const SizedBox(height: 72),
               Text(
-                'Informe o código de verificação abaixo e redefina sua senha',
+                'Defina sua nova senha',
                 style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
               AppTextField(
-                label: 'Código de verificação',
-                hint: 'Informe o código de verificação',
-                controller: _codeController,
-                keyboardType: TextInputType.number,
-                errorText: _codeError,
-              ),
-              const SizedBox(height: 16),
-              AppTextField(
                 label: 'Senha',
                 hint: 'Defina sua senha',
                 controller: _passwordController,
+                focusNode: _passwordFocusNode,
                 obscureText: true,
-                errorText: _passwordError,
               ),
+              if (_passwordFocused) ...[
+                const SizedBox(height: 8),
+                PasswordPolicyChecklist(
+                  requirements: validators.evaluatePasswordPolicy(_passwordController.text, _policy),
+                ),
+              ],
               const SizedBox(height: 16),
               AppTextField(
                 label: 'Confirmar Senha',
@@ -175,11 +200,11 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
                   style: const TextStyle(color: Colors.red, fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
-                if (error.codeConsumed) ...[
+                if (error.canRequestNewCode) ...[
                   const SizedBox(height: 4),
                   Center(
                     child: TextButton(
-                      onPressed: () => Navigator.of(context).pushReplacementNamed('/recovery'),
+                      onPressed: _requestNewCode,
                       child: Text(
                         'Solicitar novo código',
                         style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),

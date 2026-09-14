@@ -6,9 +6,10 @@ import 'package:moto_driver/modules/auth/presentation/blocs/password_reset_state
 
 class PasswordResetBloc extends Bloc<PasswordResetEvent, PasswordResetState> {
   final IConfirmPasswordResetUsecase _confirmPasswordResetUsecase;
-  final String email;
+  final String resetToken;
 
-  PasswordResetBloc(this._confirmPasswordResetUsecase, {required this.email}) : super(const PasswordResetInitial()) {
+  PasswordResetBloc(this._confirmPasswordResetUsecase, {required this.resetToken})
+      : super(const PasswordResetInitial()) {
     on<ResetConfirmSubmitted>(_onResetConfirmSubmitted);
   }
 
@@ -19,21 +20,20 @@ class PasswordResetBloc extends Bloc<PasswordResetEvent, PasswordResetState> {
     emit(const PasswordResetSubmitting());
 
     final result = await _confirmPasswordResetUsecase.call(
-      email: email,
-      code: event.code,
+      resetToken: resetToken,
       newPassword: event.newPassword,
     );
 
     result.fold(
       (_) => emit(const PasswordResetSuccess()),
       (error) {
-        final (message, codeConsumed) = switch (error) {
+        final (message, canRequestNewCode) = switch (error) {
           ConflictException() => (error.message, true),
-          ValidationException() => (error.message, false),
+          ValidationException() => (error.message, true),
           RateLimitedException() => (error.message, false),
           _ => ('Erro ao redefinir a senha. Verifique sua conexão e tente novamente.', false),
         };
-        emit(PasswordResetError(message, codeConsumed: codeConsumed));
+        emit(PasswordResetError(message, canRequestNewCode: canRequestNewCode));
       },
     );
   }

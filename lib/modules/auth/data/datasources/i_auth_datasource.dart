@@ -1,3 +1,4 @@
+import 'package:moto_driver/core/models/password_policy.dart';
 import 'package:moto_driver/modules/auth/data/models/refresh_token_response_model.dart';
 import 'package:moto_driver/modules/auth/data/models/sign_in_response_model.dart';
 
@@ -25,12 +26,29 @@ abstract class IAuthDatasource {
   Future<RefreshTokenResponseModel> refreshToken(String refreshToken, String device);
 
   /// Solicita o código de redefinição de senha para o [email] informado.
+  /// Envia `expectedRole: "Driver"` fixo, exigido pelo backend.
+  ///
+  /// Throws [NotFoundException] (404, e-mail não cadastrado — inclusive
+  /// quando existe só em outra role) ou [RateLimitedException] (429).
   Future<void> requestPasswordReset(String email);
 
-  /// Confirma a redefinição de senha com o [code] recebido por e-mail.
+  /// Verifica o [code] recebido por e-mail para o [email] informado (tela 1
+  /// do reset). Retorna o `resetToken` de uso único (expira em 10 min) a ser
+  /// usado em [confirmPasswordReset].
+  ///
+  /// Throws [ValidationException] (400, código inválido/expirado),
+  /// [ConflictException] (409, código já usado) ou [RateLimitedException]
+  /// (429, muitas tentativas erradas — bloqueio de 30 min).
+  Future<String> verifyResetCode({required String email, required String code});
+
+  /// Confirma a redefinição de senha com o [resetToken] obtido em
+  /// [verifyResetCode] (tela 2). Não envia mais `email`/`code`.
   Future<void> confirmPasswordReset({
-    required String email,
-    required String code,
+    required String resetToken,
     required String newPassword,
   });
+
+  /// Busca a política de senha vigente (`GET /api/auth/password-policy`,
+  /// público, sem auth). Usada no checklist dinâmico do reset e do cadastro.
+  Future<PasswordPolicy> getPasswordPolicy();
 }

@@ -4,13 +4,16 @@ import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:moto_driver/core/models/password_policy.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/core/utils/masks.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
+import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_usecase.dart';
 import 'package:moto_driver/modules/driver_registration/domain/usecases/register_params.dart';
 import 'package:moto_driver/modules/driver_registration/presentation/blocs/register_bloc.dart';
 import 'package:moto_driver/widgets/app_button.dart';
 import 'package:moto_driver/widgets/app_text_field.dart';
+import 'package:moto_driver/widgets/password_policy_checklist.dart';
 
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key});
@@ -44,6 +47,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
   String? _cnhError;
 
   bool _obscurePassword = true;
+  final _passwordFocusNode = FocusNode();
+  bool _passwordFocused = false;
+
+  // Usa o fallback estático até a política real chegar do backend — o
+  // cadastro nunca fica bloqueado esperando o GET (design D4).
+  PasswordPolicy _passwordPolicy = const PasswordPolicy.fallback();
 
   @override
   void initState() {
@@ -60,6 +69,21 @@ class _RegistrationPageState extends State<RegistrationPage> {
     ]) {
       controller.addListener(_onFieldsChanged);
     }
+    _passwordFocusNode.addListener(() {
+      setState(() => _passwordFocused = _passwordFocusNode.hasFocus);
+    });
+    _loadPasswordPolicy();
+  }
+
+  Future<void> _loadPasswordPolicy() async {
+    final usecase = Modular.get<IGetPasswordPolicyUsecase>();
+    final result = await usecase.call();
+    if (!mounted) return;
+    result.fold(
+      (policy) => setState(() => _passwordPolicy = policy),
+      // Usecase é sempre-sucesso (fallback interno); nada a fazer aqui.
+      (_) {},
+    );
   }
 
   void _onFieldsChanged() => setState(() {});
@@ -82,7 +106,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       validators.validateEmailFormat(_emailController.text.trim()) == null &&
       _confirmEmailController.text.trim().toLowerCase() ==
           _emailController.text.trim().toLowerCase() &&
-      _passwordController.text.isNotEmpty &&
+      validators.isPasswordValid(_passwordController.text, _passwordPolicy) &&
       _cnhController.text.trim().isNotEmpty;
 
   @override
@@ -96,6 +120,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     _passwordController.dispose();
     _phoneController.dispose();
     _cnhController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -174,9 +199,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
       if (_passwordController.text.isEmpty) {
         _passwordError = 'Campo obrigatório';
         valid = false;
-      } else {
-        _passwordError = validators.validatePasswordLength(_passwordController.text);
-        if (_passwordError != null) valid = false;
+      } else if (!validators.isPasswordValid(_passwordController.text, _passwordPolicy)) {
+        _passwordError = 'Senha não atende aos requisitos da política.';
+        valid = false;
       }
 
       if (_phoneController.text.trim().isNotEmpty) {
@@ -440,6 +465,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
         const SizedBox(height: 8),
         TextField(
           controller: _passwordController,
+          focusNode: _passwordFocusNode,
           obscureText: _obscurePassword,
           maxLength: 72,
           buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
@@ -494,6 +520,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
             errorText: _passwordError,
           ),
         ),
+        if (_passwordFocused) ...[
+          const SizedBox(height: 8),
+          PasswordPolicyChecklist(
+            requirements: validators.evaluatePasswordPolicy(_passwordController.text, _passwordPolicy),
+          ),
+        ],
       ],
     );
   }

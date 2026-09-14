@@ -1,20 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
+import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:moto_driver/core/models/password_policy.dart';
+import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_usecase.dart';
 import 'package:moto_driver/modules/driver_registration/domain/usecases/i_register_usecase.dart';
 import 'package:moto_driver/modules/driver_registration/presentation/blocs/register_bloc.dart';
 import 'package:moto_driver/modules/driver_registration/presentation/pages/registration_page.dart';
+import 'package:result_dart/result_dart.dart';
 
 class MockRegisterUsecase extends Mock implements IRegisterUsecase {}
+
+class MockGetPasswordPolicyUsecase extends Mock implements IGetPasswordPolicyUsecase {}
+
+/// Módulo mínimo só para disponibilizar o [IGetPasswordPolicyUsecase] via
+/// `Modular.get` na página (design D4 — usecase compartilhado de CommonModule).
+class _TestModule extends Module {
+  final IGetPasswordPolicyUsecase usecase;
+  _TestModule(this.usecase);
+
+  @override
+  void binds(i) {
+    i.addInstance<IGetPasswordPolicyUsecase>(usecase);
+  }
+}
 
 void main() {
   late MockRegisterUsecase mockUsecase;
   late RegisterBloc registerBloc;
+  late MockGetPasswordPolicyUsecase mockPolicyUsecase;
 
   setUp(() {
     mockUsecase = MockRegisterUsecase();
     registerBloc = RegisterBloc(mockUsecase);
+    mockPolicyUsecase = MockGetPasswordPolicyUsecase();
+    when(() => mockPolicyUsecase.call()).thenAnswer(
+      (_) async => const Success(PasswordPolicy.fallback()),
+    );
+    Modular.init(_TestModule(mockPolicyUsecase));
+  });
+
+  tearDown(() {
+    try {
+      Modular.destroy();
+    } catch (_) {
+      // Tolerante a chamadas duplicadas de destroy entre testes.
+    }
   });
 
   Widget buildTestableWidget() {

@@ -104,7 +104,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
               const SizedBox(height: 32),
               AppButton(
                 label: 'Já tenho o código',
-                onPressed: () => Modular.to.pushNamed('/reset-password', arguments: {'email': email}),
+                onPressed: () => Modular.to.pushNamed('/verify-reset-code', arguments: {'email': email}),
               ),
               const SizedBox(height: 12),
               TextButton(

@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:moto_driver/core/errors/exceptions.dart';
+import 'package:moto_driver/core/models/password_policy.dart';
 import 'package:moto_driver/modules/auth/data/datasources/i_auth_datasource.dart';
+import 'package:moto_driver/modules/auth/data/models/password_policy_model.dart';
 import 'package:moto_driver/modules/auth/data/models/refresh_token_response_model.dart';
 import 'package:moto_driver/modules/auth/data/models/sign_in_response_model.dart';
 
@@ -57,45 +59,55 @@ class AuthDatasource implements IAuthDatasource {
     try {
       await _dio.post(
         '/api/auth/password-reset/request',
-        data: {'email': email},
+        data: {'email': email, 'expectedRole': 'Driver'},
       );
     } on DioException catch (e) {
-      // 404 (e-mail não cadastrado) é tratado como sucesso de propósito —
-      // ver doc no IAuthDatasource. Só rate limit e falhas reais propagam.
-      if (e.response?.statusCode == 404) return;
-      throw _mapDioException(e);
+      throw _mapRequestPasswordResetException(e);
+    }
+  }
+
+  /// 404 (e-mail não cadastrado, inclusive quando existe só em outra role) e
+  /// 429 (muitas tentativas), conforme contrato do backend.
+  Exception _mapRequestPasswordResetException(DioException e) {
+    final serverMessage = _extractErrorMessage(e);
+    switch (e.response?.statusCode) {
+      case 404:
+        return NotFoundException(serverMessage ?? 'Email não cadastrado.');
+      case 429:
+        return const RateLimitedException();
+      case var code when code != null && code >= 500:
+        return const ServerException();
+      default:
+        if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError) {
+          return const NetworkException();
+        }
+        return NetworkException(e.message ?? 'Erro inesperado');
     }
   }
 
   @override
-  Future<void> confirmPasswordReset({
-    required String email,
-    required String code,
-    required String newPassword,
-  }) async {
+  Future<String> verifyResetCode({required String email, required String code}) async {
     try {
-      await _dio.post(
-        '/api/auth/password-reset/confirm',
-        data: {
-          'email': email,
-          'code': code,
-          'newPassword': newPassword,
-        },
+      final response = await _dio.post(
+        '/api/auth/password-reset/verify-code',
+        data: {'email': email, 'code': code},
       );
+      final data = response.data as Map<String, dynamic>;
+      return data['resetToken'] as String;
     } on DioException catch (e) {
-      throw _mapPasswordResetConfirmException(e);
+      throw _mapVerifyResetCodeException(e);
     }
   }
 
-  /// O 400 do confirm cobre dois motivos distintos (código inválido/expirado
-  /// ou senha fora da política) — só a mensagem do servidor (campo `error`)
-  /// distingue os dois, então ela é repassada como está em vez de um texto
-  /// genérico fixo.
-  Exception _mapPasswordResetConfirmException(DioException e) {
+  /// 400 (código inválido/expirado), 409 (código já usado) e 429 (muitas
+  /// tentativas erradas — bloqueio de 30 min), conforme contrato do backend.
+  Exception _mapVerifyResetCodeException(DioException e) {
     final serverMessage = _extractErrorMessage(e);
     switch (e.response?.statusCode) {
       case 400:
-        return ValidationException(serverMessage ?? 'Código inválido ou senha não atende aos requisitos.');
+        return ValidationException(serverMessage ?? 'Código inválido ou expirado.');
       case 409:
         return ConflictException(serverMessage ?? 'Este código já foi utilizado.');
       case 429:
@@ -109,6 +121,59 @@ class AuthDatasource implements IAuthDatasource {
           return const NetworkException();
         }
         return NetworkException(e.message ?? 'Erro inesperado');
+    }
+  }
+
+  @override
+  Future<void> confirmPasswordReset({
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.post(
+        '/api/auth/password-reset/confirm',
+        data: {
+          'resetToken': resetToken,
+          'newPassword': newPassword,
+        },
+      );
+    } on DioException catch (e) {
+      throw _mapPasswordResetConfirmException(e);
+    }
+  }
+
+  /// O 400 do confirm cobre dois motivos distintos (token inválido/expirado
+  /// ou senha fora da política) — só a mensagem do servidor (campo `error`)
+  /// distingue os dois, então ela é repassada como está em vez de um texto
+  /// genérico fixo.
+  Exception _mapPasswordResetConfirmException(DioException e) {
+    final serverMessage = _extractErrorMessage(e);
+    switch (e.response?.statusCode) {
+      case 400:
+        return ValidationException(serverMessage ?? 'Token inválido ou expirado, ou senha não atende aos requisitos.');
+      case 409:
+        return ConflictException(serverMessage ?? 'Este código já foi utilizado.');
+      case 429:
+        return const RateLimitedException();
+      case var code when code != null && code >= 500:
+        return const ServerException();
+      default:
+        if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError) {
+          return const NetworkException();
+        }
+        return NetworkException(e.message ?? 'Erro inesperado');
+    }
+  }
+
+  @override
+  Future<PasswordPolicy> getPasswordPolicy() async {
+    try {
+      final response = await _dio.get('/api/auth/password-policy');
+      return PasswordPolicyModel.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _mapDioException(e);
     }
   }
 

@@ -1,0 +1,139 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
+import 'package:google_fonts/google_fonts.dart';
+import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_bloc.dart';
+import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_event.dart';
+import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_state.dart';
+import 'package:moto_driver/widgets/app_button.dart';
+import 'package:moto_driver/widgets/app_text_field.dart';
+import 'package:moto_driver/widgets/gradient_text.dart';
+
+/// Tela 1 do reset de senha: usuário digita o código recebido por e-mail.
+/// Em caso de sucesso, navega para a tela 2 (`/reset-password`) levando o
+/// `resetToken` de uso único.
+class VerifyResetCodePage extends StatefulWidget {
+  final String email;
+
+  const VerifyResetCodePage({super.key, required this.email});
+
+  @override
+  State<VerifyResetCodePage> createState() => _VerifyResetCodePageState();
+}
+
+class _VerifyResetCodePageState extends State<VerifyResetCodePage> {
+  final _codeController = TextEditingController();
+  String? _codeError;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeController.addListener(_onFieldsChanged);
+  }
+
+  void _onFieldsChanged() => setState(() {});
+
+  bool get _isFormComplete => _codeController.text.trim().isNotEmpty;
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  bool _validate() {
+    bool valid = true;
+    setState(() {
+      _codeError = null;
+      if (_codeController.text.trim().isEmpty) {
+        _codeError = 'Código obrigatório';
+        valid = false;
+      }
+    });
+    return valid;
+  }
+
+  void _submit() {
+    if (!_validate()) return;
+    context.read<VerifyResetCodeBloc>().add(VerifyCodeSubmitted(_codeController.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<VerifyResetCodeBloc, VerifyResetCodeState>(
+      listener: (context, state) {
+        if (state is VerifyCodeSuccess) {
+          Modular.to.pushNamed(
+            '/reset-password',
+            arguments: {'resetToken': state.resetToken, 'email': widget.email},
+          );
+        }
+      },
+      builder: (context, state) => _buildForm(state),
+    );
+  }
+
+  Widget _buildForm(VerifyResetCodeState state) {
+    final isLoading = state is VerifyCodeSubmitting;
+    final error = state is VerifyCodeError ? state : null;
+
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 36),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GradientText(
+                'Recupere sua senha',
+                style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 72),
+              Text(
+                'Informe o código de verificação enviado para ${widget.email}',
+                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              AppTextField(
+                label: 'Código de verificação',
+                hint: 'Informe o código de verificação',
+                controller: _codeController,
+                keyboardType: TextInputType.number,
+                errorText: _codeError,
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  error.message,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+                if (error.exhausted) ...[
+                  const SizedBox(height: 4),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pushReplacementNamed('/recovery'),
+                      child: Text(
+                        'Solicitar novo código',
+                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 32),
+              AppButton(
+                label: 'Confirmar',
+                loading: isLoading,
+                onPressed: _isFormComplete ? _submit : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
