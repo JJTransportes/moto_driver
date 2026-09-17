@@ -58,7 +58,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   _AcceptStatus _status = _AcceptStatus.idle;
   String? _errorMessage;
 
-  static const int _rejectTimeoutSeconds = 15;
+  // Alinhado ao prazo de resposta do backend (20s) — passageiro agora vê
+  // esse mesmo prazo via evento DriverContacted, então os dois lados
+  // precisam bater.
+  static const int _rejectTimeoutSeconds = 20;
   int _remainingSeconds = _rejectTimeoutSeconds;
   Timer? _rejectTimer;
 

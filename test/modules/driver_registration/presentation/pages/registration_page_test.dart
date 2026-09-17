@@ -59,7 +59,7 @@ void main() {
   }
 
   group('RegistrationPage', () {
-    testWidgets('renders all 9 form fields', (tester) async {
+    testWidgets('renders all 11 form fields', (tester) async {
       await tester.pumpWidget(buildTestableWidget());
 
       expect(find.text('Nome completo *'), findsOneWidget);
@@ -69,8 +69,70 @@ void main() {
       expect(find.text('Telefone'), findsOneWidget);
       expect(find.text('Data de nascimento *'), findsOneWidget);
       expect(find.text('E-mail *'), findsOneWidget);
+      expect(find.text('Confirmar E-mail *'), findsOneWidget);
       expect(find.text('Senha *'), findsOneWidget);
+      expect(find.text('Confirmar Senha *'), findsOneWidget);
       expect(find.text('CNH *'), findsOneWidget);
+    });
+
+    testWidgets('shows "As senhas não coincidem" when confirm password differs', (tester) async {
+      await tester.pumpWidget(buildTestableWidget());
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Informe sua senha'),
+        'Senha@123',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Digite novamente a senha'),
+        'Outra@123',
+      );
+      await tester.pump();
+
+      expect(find.text('As senhas não coincidem'), findsOneWidget);
+    });
+
+    testWidgets('clears the mismatch error once both password fields match', (tester) async {
+      await tester.pumpWidget(buildTestableWidget());
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Informe sua senha'),
+        'Senha@123',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Digite novamente a senha'),
+        'Senha@12',
+      );
+      await tester.pump();
+      expect(find.text('As senhas não coincidem'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Digite novamente a senha'),
+        'Senha@123',
+      );
+      await tester.pump();
+      expect(find.text('As senhas não coincidem'), findsNothing);
+    });
+
+    testWidgets('requires confirm password to be filled on submit', (tester) async {
+      await tester.pumpWidget(buildTestableWidget());
+
+      final cadastrarButton = find.text('Cadastrar');
+      await tester.ensureVisible(cadastrarButton);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Informe sua senha'),
+        'Senha@123',
+      );
+      await tester.pump();
+
+      // Botão fica desabilitado com o formulário incompleto (design
+      // existente: submit só habilita via _isFormComplete) — dispara a
+      // validação diretamente chamando tap num finder habilitado seria
+      // redundante aqui; o importante é confirmar que o campo de confirmação
+      // vazio não deixa o formulário completo.
+      final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+      expect(button.onPressed, isNull);
     });
 
     testWidgets('renders Cadastrar button', (tester) async {

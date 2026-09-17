@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/server_error_guard.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_event.dart';
@@ -24,6 +25,11 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
   String? _emailError;
   String? _confirmEmailError;
 
+  // Bloqueia o botão "Enviar" depois de um erro do backend (ex.: e-mail não
+  // cadastrado) até o campo de e-mail ser editado — evita spammar o botão
+  // reenviando o mesmo e-mail rejeitado.
+  final _serverErrorGuard = ServerErrorGuard();
+
   @override
   void initState() {
     super.initState();
@@ -31,7 +37,13 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
     _confirmEmailController.addListener(_onFieldsChanged);
   }
 
-  void _onFieldsChanged() => setState(() {});
+  void _onFieldsChanged() {
+    if (_serverErrorGuard.isBlocking) {
+      _serverErrorGuard.clearIfEdited('email', _emailController.text);
+      if (!_serverErrorGuard.isBlocking) _emailError = null;
+    }
+    setState(() {});
+  }
 
   String? get _liveConfirmEmailError {
     if (_confirmEmailController.text.isEmpty) return null;
@@ -45,7 +57,8 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
   bool get _isFormComplete =>
       validators.validateEmailFormat(_emailController.text.trim()) == null &&
       _confirmEmailController.text.trim().toLowerCase() ==
-          _emailController.text.trim().toLowerCase();
+          _emailController.text.trim().toLowerCase() &&
+      !_serverErrorGuard.isBlocking;
 
   @override
   void dispose() {
@@ -75,7 +88,14 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<PasswordRecoveryBloc, PasswordRecoveryState>(
-      listener: (context, state) {},
+      listener: (context, state) {
+        if (state is PasswordRecoveryError) {
+          setState(() {
+            _emailError = state.message;
+            _serverErrorGuard.block('email', _emailController.text);
+          });
+        }
+      },
       builder: (context, state) {
         if (state is PasswordRecoverySent) {
           return _buildSent(state.email);

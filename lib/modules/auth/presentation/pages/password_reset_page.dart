@@ -4,6 +4,7 @@ import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/models/password_policy.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/server_error_guard.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_usecase.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_reset_bloc.dart';
@@ -36,6 +37,12 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
   String? _confirmError;
   bool _passwordFocused = false;
 
+  // Bloqueia o botão "Confirmar" depois de um erro do backend (token
+  // inválido/expirado ou senha fora da política) até a senha ser editada —
+  // evita spammar o botão reenviando os mesmos dados rejeitados.
+  final _serverErrorGuard = ServerErrorGuard();
+  String? _serverError;
+
   // Usa o fallback estático até a política real chegar do backend — a tela
   // nunca fica bloqueada esperando o GET (design D4).
   PasswordPolicy _policy = const PasswordPolicy.fallback();
@@ -63,11 +70,18 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
     );
   }
 
-  void _onFieldsChanged() => setState(() {});
+  void _onFieldsChanged() {
+    if (_serverErrorGuard.isBlocking) {
+      _serverErrorGuard.clearIfEdited('password', _passwordController.text);
+      if (!_serverErrorGuard.isBlocking) _serverError = null;
+    }
+    setState(() {});
+  }
 
   bool get _isFormComplete =>
       validators.isPasswordValid(_passwordController.text, _policy) &&
-      _confirmController.text == _passwordController.text;
+      _confirmController.text == _passwordController.text &&
+      !_serverErrorGuard.isBlocking;
 
   @override
   void dispose() {
@@ -111,7 +125,14 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<PasswordResetBloc, PasswordResetState>(
-      listener: (context, state) {},
+      listener: (context, state) {
+        if (state is PasswordResetError) {
+          setState(() {
+            _serverError = state.message;
+            _serverErrorGuard.block('password', _passwordController.text);
+          });
+        }
+      },
       builder: (context, state) {
         if (state is PasswordResetSuccess) {
           return _buildSuccess();
@@ -178,6 +199,7 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
                 controller: _passwordController,
                 focusNode: _passwordFocusNode,
                 obscureText: true,
+                errorText: _serverError,
               ),
               if (_passwordFocused) ...[
                 const SizedBox(height: 8),
@@ -193,25 +215,19 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
                 obscureText: true,
                 errorText: _confirmError,
               ),
-              if (error != null) ...[
+              // A mensagem de erro já aparece no campo Senha (errorText
+              // acima); aqui só sobra a ação extra pra pedir novo código.
+              if (error != null && error.canRequestNewCode) ...[
                 const SizedBox(height: 12),
-                Text(
-                  error.message,
-                  style: const TextStyle(color: Colors.red, fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-                if (error.canRequestNewCode) ...[
-                  const SizedBox(height: 4),
-                  Center(
-                    child: TextButton(
-                      onPressed: _requestNewCode,
-                      child: Text(
-                        'Solicitar novo código',
-                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
-                      ),
+                Center(
+                  child: TextButton(
+                    onPressed: _requestNewCode,
+                    child: Text(
+                      'Solicitar novo código',
+                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
                     ),
                   ),
-                ],
+                ),
               ],
               const SizedBox(height: 32),
               AppButton(

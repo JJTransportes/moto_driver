@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/server_error_guard.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
 import 'package:moto_driver/widgets/app_button.dart';
@@ -22,6 +23,13 @@ class _LoginPageState extends State<LoginPage> {
   String? _emailError;
   String? _passwordError;
 
+  // Bloqueia o botão "Entrar" depois de um erro do backend (credenciais
+  // inválidas, etc.) até e-mail ou senha serem editados — evita spammar o
+  // botão reenviando as mesmas credenciais rejeitadas.
+  final _serverErrorGuard = ServerErrorGuard();
+
+  String get _credentialsSnapshot => '${_emailController.text}|${_passwordController.text}';
+
   @override
   void initState() {
     super.initState();
@@ -29,11 +37,21 @@ class _LoginPageState extends State<LoginPage> {
     _passwordController.addListener(_onFieldsChanged);
   }
 
-  void _onFieldsChanged() => setState(() {});
+  void _onFieldsChanged() {
+    if (_serverErrorGuard.isBlocking) {
+      _serverErrorGuard.clearIfEdited('credentials', _credentialsSnapshot);
+      if (!_serverErrorGuard.isBlocking) {
+        _emailError = null;
+        _passwordError = null;
+      }
+    }
+    setState(() {});
+  }
 
   bool get _isFormComplete =>
       validators.validateEmailFormat(_emailController.text.trim()) == null &&
-      _passwordController.text.isNotEmpty;
+      _passwordController.text.isNotEmpty &&
+      !_serverErrorGuard.isBlocking;
 
   @override
   void dispose() {
@@ -78,11 +96,19 @@ class _LoginPageState extends State<LoginPage> {
       listener: (context, state) {
         if (state is LoginSuccess) {
           Navigator.of(context).pushReplacementNamed('/terms');
+        } else if (state is LoginFailure) {
+          setState(() {
+            _passwordError = state.message;
+            _serverErrorGuard.block('credentials', _credentialsSnapshot);
+          });
         }
       },
       builder: (context, state) {
         final isLoading = state is LoginLoading;
-        final errorMessage = state is LoginFailure ? state.message : null;
+        // Fallback pro caso do estado já chegar como falha antes do listener
+        // rodar (ex.: BlocConsumer com state pré-populado) — o listener é
+        // quem cuida do bloqueio anti-spam via _serverErrorGuard.
+        final passwordError = _passwordError ?? (state is LoginFailure ? state.message : null);
 
         return Scaffold(
           backgroundColor: AppColors.white,
@@ -120,7 +146,7 @@ class _LoginPageState extends State<LoginPage> {
                         hint: 'Informe sua senha',
                         controller: _passwordController,
                         obscureText: true,
-                        errorText: _passwordError,
+                        errorText: passwordError,
                       ),
                       Align(
                         alignment: Alignment.centerRight,
@@ -129,16 +155,6 @@ class _LoginPageState extends State<LoginPage> {
                           child: Text('Esqueci minha senha', style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary)),
                         ),
                       ),
-                      if (errorMessage != null) ...[
-                        Text(
-                          errorMessage,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 12,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
                       AppButton(
                         label: 'Entrar',
                         loading: isLoading,

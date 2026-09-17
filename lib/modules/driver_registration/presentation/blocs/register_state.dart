@@ -19,5 +19,11 @@ final class RegisterSuccess extends RegisterState {
 final class RegisterFailure extends RegisterState {
   final String message;
 
-  const RegisterFailure(this.message);
+  /// Campo específico rejeitado pelo backend (ex.: 'email', 'cpf', 'cnh'),
+  /// quando aplicável — usado pela tela para destacar o input errado e
+  /// bloquear o botão até ele ser corrigido. Null para erros genéricos
+  /// (rede, servidor, etc.).
+  final String? field;
+
+  const RegisterFailure(this.message, {this.field});
 }

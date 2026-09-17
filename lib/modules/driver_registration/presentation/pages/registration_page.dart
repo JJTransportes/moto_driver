@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:moto_driver/core/models/password_policy.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/core/utils/masks.dart';
+import 'package:moto_driver/core/utils/server_error_guard.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_usecase.dart';
 import 'package:moto_driver/modules/driver_registration/domain/usecases/register_params.dart';
@@ -30,6 +31,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _emailController = TextEditingController();
   final _confirmEmailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _cnhController = TextEditingController();
 
@@ -43,16 +45,30 @@ class _RegistrationPageState extends State<RegistrationPage> {
   String? _emailError;
   String? _confirmEmailError;
   String? _passwordError;
+  String? _confirmPasswordError;
   String? _phoneError;
   String? _cnhError;
 
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   final _passwordFocusNode = FocusNode();
   bool _passwordFocused = false;
 
   // Usa o fallback estático até a política real chegar do backend — o
   // cadastro nunca fica bloqueado esperando o GET (design D4).
   PasswordPolicy _passwordPolicy = const PasswordPolicy.fallback();
+
+  // Bloqueia o botão "Cadastrar" depois de um erro do backend (ex.: e-mail
+  // já cadastrado) até o campo responsável ser editado — evita spammar o
+  // botão reenviando o mesmo dado rejeitado.
+  final _serverErrorGuard = ServerErrorGuard();
+
+  TextEditingController? _controllerFor(String field) => switch (field) {
+        'email' => _emailController,
+        'cpf' => _cpfController,
+        'cnh' => _cnhController,
+        _ => null,
+      };
 
   @override
   void initState() {
@@ -65,6 +81,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       _emailController,
       _confirmEmailController,
       _passwordController,
+      _confirmPasswordController,
       _cnhController,
     ]) {
       controller.addListener(_onFieldsChanged);
@@ -86,13 +103,42 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 
-  void _onFieldsChanged() => setState(() {});
+  void _onFieldsChanged() {
+    final blockedField = _serverErrorGuard.blockedField;
+    if (blockedField != null) {
+      _serverErrorGuard.clearIfEdited(blockedField, _controllerFor(blockedField)!.text);
+      if (!_serverErrorGuard.isBlocking) {
+        switch (blockedField) {
+          case 'email':
+            _emailError = null;
+            break;
+          case 'cpf':
+            _cpfError = null;
+            break;
+          case 'cnh':
+            _cnhError = null;
+            break;
+        }
+      }
+    }
+    setState(() {});
+  }
 
   String? get _liveConfirmEmailError {
     if (_confirmEmailController.text.isEmpty) return null;
     if (_confirmEmailController.text.trim().toLowerCase() !=
         _emailController.text.trim().toLowerCase()) {
       return 'Os e-mails não coincidem';
+    }
+    return null;
+  }
+
+  // Diferente do e-mail, senha não é normalizada (case-sensitive, sem trim) —
+  // "Senha1!" e "senha1!" são senhas diferentes de verdade.
+  String? get _liveConfirmPasswordError {
+    if (_confirmPasswordController.text.isEmpty) return null;
+    if (_confirmPasswordController.text != _passwordController.text) {
+      return 'As senhas não coincidem';
     }
     return null;
   }
@@ -107,7 +153,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
       _confirmEmailController.text.trim().toLowerCase() ==
           _emailController.text.trim().toLowerCase() &&
       validators.isPasswordValid(_passwordController.text, _passwordPolicy) &&
-      _cnhController.text.trim().isNotEmpty;
+      _confirmPasswordController.text == _passwordController.text &&
+      _cnhController.text.trim().isNotEmpty &&
+      !_serverErrorGuard.isBlocking;
 
   @override
   void dispose() {
@@ -118,6 +166,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     _emailController.dispose();
     _confirmEmailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _phoneController.dispose();
     _cnhController.dispose();
     _passwordFocusNode.dispose();
@@ -135,6 +184,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       _emailError = null;
       _confirmEmailError = null;
       _passwordError = null;
+      _confirmPasswordError = null;
       _phoneError = null;
       _cnhError = null;
 
@@ -204,6 +254,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
         valid = false;
       }
 
+      if (_confirmPasswordController.text.isEmpty) {
+        _confirmPasswordError = 'Campo obrigatório';
+        valid = false;
+      } else if (_confirmPasswordController.text != _passwordController.text) {
+        _confirmPasswordError = 'As senhas não coincidem';
+        valid = false;
+      }
+
       if (_phoneController.text.trim().isNotEmpty) {
         _phoneError = validators.validatePhone(_phoneController.text);
         if (_phoneError != null) valid = false;
@@ -266,6 +324,24 @@ class _RegistrationPageState extends State<RegistrationPage> {
           Navigator.of(context).pushReplacementNamed(
             '/driver-register/confirmation',
           );
+        } else if (state is RegisterFailure) {
+          setState(() {
+            final field = state.field;
+            if (field != null) {
+              _serverErrorGuard.block(field, _controllerFor(field)!.text);
+              switch (field) {
+                case 'email':
+                  _emailError = state.message;
+                  break;
+                case 'cpf':
+                  _cpfError = state.message;
+                  break;
+                case 'cnh':
+                  _cnhError = state.message;
+                  break;
+              }
+            }
+          });
         }
       },
       builder: (context, state) {
@@ -357,6 +433,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     maxLength: 100,
                   ),
                   _buildPasswordField(),
+                  _buildConfirmPasswordField(),
                   AppTextField(
                     label: 'CNH *',
                     hint: 'Número da CNH',
@@ -452,8 +529,52 @@ class _RegistrationPageState extends State<RegistrationPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildObscureField(
+          label: 'Senha *',
+          hint: 'Informe sua senha',
+          controller: _passwordController,
+          focusNode: _passwordFocusNode,
+          obscure: _obscurePassword,
+          onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+          errorText: _passwordError,
+        ),
+        if (_passwordFocused) ...[
+          const SizedBox(height: 8),
+          PasswordPolicyChecklist(
+            requirements: validators.evaluatePasswordPolicy(_passwordController.text, _passwordPolicy),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildConfirmPasswordField() {
+    return _buildObscureField(
+      label: 'Confirmar Senha *',
+      hint: 'Digite novamente a senha',
+      controller: _confirmPasswordController,
+      obscure: _obscureConfirmPassword,
+      onToggleObscure: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+      errorText: _confirmPasswordError ?? _liveConfirmPasswordError,
+    );
+  }
+
+  /// Campo de senha com toggle de visibilidade — compartilhado entre "Senha"
+  /// e "Confirmar Senha" pra não duplicar toda a decoração do TextField.
+  Widget _buildObscureField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    required bool obscure,
+    required VoidCallback onToggleObscure,
+    FocusNode? focusNode,
+    String? errorText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Text(
-          'Senha *',
+          label,
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w700,
@@ -464,9 +585,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
         ),
         const SizedBox(height: 8),
         TextField(
-          controller: _passwordController,
-          focusNode: _passwordFocusNode,
-          obscureText: _obscurePassword,
+          controller: controller,
+          focusNode: focusNode,
+          obscureText: obscure,
           maxLength: 72,
           buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           style: GoogleFonts.robotoFlex(
@@ -477,7 +598,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
             height: 1.2,
           ),
           decoration: InputDecoration(
-            hintText: 'Informe sua senha',
+            hintText: hint,
             hintStyle: GoogleFonts.robotoFlex(
               fontSize: 10,
               fontWeight: FontWeight.w300,
@@ -487,15 +608,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
             contentPadding: const EdgeInsets.all(12),
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                obscure ? Icons.visibility_off : Icons.visibility,
                 size: 18,
                 color: AppColors.primary,
               ),
-              onPressed: () {
-                setState(() {
-                  _obscurePassword = !_obscurePassword;
-                });
-              },
+              onPressed: onToggleObscure,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
@@ -517,15 +634,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
               borderRadius: BorderRadius.circular(4),
               borderSide: const BorderSide(color: Colors.red, width: 2),
             ),
-            errorText: _passwordError,
+            errorText: errorText,
           ),
         ),
-        if (_passwordFocused) ...[
-          const SizedBox(height: 8),
-          PasswordPolicyChecklist(
-            requirements: validators.evaluatePasswordPolicy(_passwordController.text, _passwordPolicy),
-          ),
-        ],
       ],
     );
   }

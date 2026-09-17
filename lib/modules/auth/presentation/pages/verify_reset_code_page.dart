@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/server_error_guard.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_event.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_state.dart';
@@ -26,15 +27,27 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage> {
   final _codeController = TextEditingController();
   String? _codeError;
 
+  // Bloqueia o botão "Confirmar" depois de um erro do backend (código
+  // inválido/expirado/já usado) até o código ser editado — evita spammar
+  // o botão reenviando o mesmo código rejeitado.
+  final _serverErrorGuard = ServerErrorGuard();
+
   @override
   void initState() {
     super.initState();
     _codeController.addListener(_onFieldsChanged);
   }
 
-  void _onFieldsChanged() => setState(() {});
+  void _onFieldsChanged() {
+    if (_serverErrorGuard.isBlocking) {
+      _serverErrorGuard.clearIfEdited('code', _codeController.text);
+      if (!_serverErrorGuard.isBlocking) _codeError = null;
+    }
+    setState(() {});
+  }
 
-  bool get _isFormComplete => _codeController.text.trim().isNotEmpty;
+  bool get _isFormComplete =>
+      _codeController.text.trim().isNotEmpty && !_serverErrorGuard.isBlocking;
 
   @override
   void dispose() {
@@ -68,6 +81,11 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage> {
             '/reset-password',
             arguments: {'resetToken': state.resetToken, 'email': widget.email},
           );
+        } else if (state is VerifyCodeError) {
+          setState(() {
+            _codeError = state.message;
+            _serverErrorGuard.block('code', _codeController.text);
+          });
         }
       },
       builder: (context, state) => _buildForm(state),
@@ -104,25 +122,19 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage> {
                 keyboardType: TextInputType.number,
                 errorText: _codeError,
               ),
-              if (error != null) ...[
+              // A mensagem de erro já aparece no campo (errorText acima);
+              // aqui só sobra a ação extra para o caso "esgotou tentativas".
+              if (error != null && error.exhausted) ...[
                 const SizedBox(height: 12),
-                Text(
-                  error.message,
-                  style: const TextStyle(color: Colors.red, fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-                if (error.exhausted) ...[
-                  const SizedBox(height: 4),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pushReplacementNamed('/recovery'),
-                      child: Text(
-                        'Solicitar novo código',
-                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
-                      ),
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pushReplacementNamed('/recovery'),
+                    child: Text(
+                      'Solicitar novo código',
+                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
                     ),
                   ),
-                ],
+                ),
               ],
               const SizedBox(height: 32),
               AppButton(
