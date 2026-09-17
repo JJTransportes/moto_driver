@@ -321,6 +321,19 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
   Future<void> _finishTravel() async {
     if (_isActing) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Finalizar viagem'),
+        content: const Text('Tem certeza que deseja finalizar esta viagem?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Não')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Sim, finalizar')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
     setState(() => _isActing = true);
 
     try {

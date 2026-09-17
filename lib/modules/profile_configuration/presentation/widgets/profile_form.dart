@@ -142,8 +142,12 @@ class ProfileFormState extends State<ProfileForm> {
   /// Valida ao tentar salvar; retorna true se tudo estiver ok.
   bool validate() {
     setState(() {
-      _nameError = _nameController.text.trim().isEmpty ? 'Nome é obrigatório' : null;
-      _emailError = validators.validateEmailFormat(_emailController.text.trim());
+      _nameError = _nameController.text.trim().isEmpty
+          ? 'Nome é obrigatório'
+          : validators.validateMaxLength(_nameController.text, 100, 'Nome') ??
+              validators.validateSafeText(_nameController.text, 'Nome');
+      _emailError = validators.validateEmailFormat(_emailController.text.trim()) ??
+          validators.validateMaxLength(_emailController.text, 100, 'E-mail');
       _confirmEmailError = _confirmEmailController.text.trim().isEmpty
           ? 'Campo obrigatório'
           : _liveConfirmEmailError;
@@ -157,7 +161,10 @@ class ProfileFormState extends State<ProfileForm> {
   bool get isValid {
     if (!widget.isEditing) return false;
     return _nameController.text.trim().isNotEmpty &&
+        validators.validateMaxLength(_nameController.text, 100, 'Nome') == null &&
+        validators.validateSafeText(_nameController.text, 'Nome') == null &&
         validators.validateEmailFormat(_emailController.text.trim()) == null &&
+        validators.validateMaxLength(_emailController.text, 100, 'E-mail') == null &&
         _confirmEmailController.text.trim().toLowerCase() == _emailController.text.trim().toLowerCase() &&
         _phoneErrorIfAny == null;
   }
@@ -178,6 +185,8 @@ class ProfileFormState extends State<ProfileForm> {
         TextField(
           controller: _nameController,
           enabled: editing,
+          maxLength: 100,
+          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           decoration: InputDecoration(
             labelText: 'Nome',
             prefixIcon: const Icon(Icons.person),
@@ -192,6 +201,8 @@ class ProfileFormState extends State<ProfileForm> {
           controller: _emailController,
           enabled: editing,
           keyboardType: TextInputType.emailAddress,
+          maxLength: 100,
+          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           decoration: InputDecoration(
             labelText: 'E-mail',
             prefixIcon: const Icon(Icons.email),
@@ -206,6 +217,8 @@ class ProfileFormState extends State<ProfileForm> {
           TextField(
             controller: _confirmEmailController,
             keyboardType: TextInputType.emailAddress,
+            maxLength: 100,
+            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
             decoration: InputDecoration(
               labelText: 'Confirmar e-mail',
               prefixIcon: const Icon(Icons.email_outlined),
@@ -220,6 +233,8 @@ class ProfileFormState extends State<ProfileForm> {
           enabled: editing,
           keyboardType: TextInputType.phone,
           inputFormatters: [PhoneInputFormatter()],
+          maxLength: 15,
+          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           decoration: InputDecoration(
             labelText: 'Telefone (opcional)',
             prefixIcon: const Icon(Icons.phone),

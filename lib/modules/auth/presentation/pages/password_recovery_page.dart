@@ -56,6 +56,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
 
   bool get _isFormComplete =>
       validators.validateEmailFormat(_emailController.text.trim()) == null &&
+      validators.validateMaxLength(_emailController.text, 100, 'E-mail') == null &&
       _confirmEmailController.text.trim().toLowerCase() ==
           _emailController.text.trim().toLowerCase() &&
       !_serverErrorGuard.isBlocking;
@@ -71,7 +72,10 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
     final email = _emailController.text.trim();
     final confirmEmail = _confirmEmailController.text.trim();
     setState(() {
-      _emailError = email.isEmpty ? 'E-mail obrigatório' : validators.validateEmailFormat(email);
+      _emailError = email.isEmpty
+          ? 'E-mail obrigatório'
+          : validators.validateEmailFormat(email) ??
+              validators.validateMaxLength(email, 100, 'E-mail');
       if (confirmEmail.isEmpty) {
         _confirmEmailError = 'Campo obrigatório';
       } else if (confirmEmail.toLowerCase() != email.toLowerCase()) {
@@ -167,6 +171,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 errorText: _emailError,
+                maxLength: 100,
               ),
               const SizedBox(height: 16),
               AppTextField(
@@ -175,6 +180,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
                 controller: _confirmEmailController,
                 keyboardType: TextInputType.emailAddress,
                 errorText: _confirmEmailError ?? _liveConfirmEmailError,
+                maxLength: 100,
               ),
               if (errorMessage != null) ...[
                 const SizedBox(height: 12),

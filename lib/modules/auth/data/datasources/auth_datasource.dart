@@ -71,10 +71,16 @@ class AuthDatasource implements IAuthDatasource {
   Exception _mapRequestPasswordResetException(DioException e) {
     final serverMessage = _extractErrorMessage(e);
     switch (e.response?.statusCode) {
+      case 403:
+        return UnapprovedAccountException(
+          serverMessage ?? 'Sua conta ainda não foi aprovada. Aguarde a aprovação de um administrador antes de redefinir a senha.',
+        );
       case 404:
         return NotFoundException(serverMessage ?? 'Email não cadastrado.');
       case 429:
-        return const RateLimitedException();
+        return RateLimitedException(
+          serverMessage ?? 'Muitas solicitações de redefinição de senha. Aguarde um pouco antes de tentar novamente.',
+        );
       case var code when code != null && code >= 500:
         return const ServerException();
       default:
@@ -111,7 +117,9 @@ class AuthDatasource implements IAuthDatasource {
       case 409:
         return ConflictException(serverMessage ?? 'Este código já foi utilizado.');
       case 429:
-        return const RateLimitedException();
+        return RateLimitedException(
+          serverMessage ?? 'Muitas tentativas com código incorreto. Aguarde 30 minutos e peça um novo código.',
+        );
       case var code when code != null && code >= 500:
         return const ServerException();
       default:
@@ -184,7 +192,9 @@ class AuthDatasource implements IAuthDatasource {
           'Dados inválidos. Verifique as informações.',
         );
       case 401:
-        return const UnauthorizedException('E-mail ou senha inválidos');
+        // Corpo com mensagem (ex.: conta pendente de aprovação) prevalece
+        // sobre o genérico — senha errada continua vindo sem corpo.
+        return UnauthorizedException(_extractErrorMessage(e) ?? 'E-mail ou senha inválidos');
       case 403:
         if (isSignIn) {
           // Sign-in com `expectedRole` informado e conta sem esse role.
