@@ -1,0 +1,179 @@
+import 'package:moto_driver/core/models/password_policy.dart';
+
+import 'masks.dart';
+
+/// Validates a Brazilian CPF using the standard check-digit algorithm.
+/// Mirrors the same logic used in the admin web panel, the passenger app,
+/// and the backend's PersonValidator, so all layers agree on what counts
+/// as a valid CPF. Returns null for a valid CPF (does NOT check for blank —
+/// callers already handle the "campo obrigatório" case separately).
+String? validateCpf(String cpf) {
+  final digits = unmaskDigits(cpf);
+  if (digits.length != 11) return 'CPF inválido.';
+  if (RegExp(r'^(\d)\1{10}$').hasMatch(digits)) return 'CPF inválido.';
+
+  int calcDigit(String d, int length) {
+    var sum = 0;
+    for (var i = 0; i < length; i++) {
+      sum += int.parse(d[i]) * (length + 1 - i);
+    }
+    final rem = (sum * 10) % 11;
+    return (rem == 10 || rem == 11) ? 0 : rem;
+  }
+
+  if (calcDigit(digits, 9) != int.parse(digits[9])) return 'CPF inválido.';
+  if (calcDigit(digits, 10) != int.parse(digits[10])) return 'CPF inválido.';
+  return null;
+}
+
+/// Enforces alphanumeric-only content (no punctuation/spaces) within
+/// [minLength]..[maxLength] — the shape the backend requires. Does not
+/// check for blank (empty is rejected by the [minLength] check only if
+/// greater than zero; callers handle "campo obrigatório" separately).
+String? validateAlphanumericFormat(
+  String value,
+  String fieldName,
+  int maxLength, {
+  int minLength = 1,
+}) {
+  final trimmed = value.trim();
+  if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(trimmed)) {
+    return '$fieldName deve conter apenas letras e números, sem pontuação.';
+  }
+  if (trimmed.length < minLength) {
+    return '$fieldName deve ter no mínimo $minLength caracteres.';
+  }
+  if (trimmed.length > maxLength) {
+    return '$fieldName deve ter no máximo $maxLength caracteres.';
+  }
+  return null;
+}
+
+/// RGs brasileiros válidos variam de 7 (estados/DF com numeração antiga e
+/// curta) a 12 caracteres (casos raros com 11 dígitos + verificador, ou
+/// legados com dígito verificador alfanumérico). Mesma faixa usada no
+/// backend, já limpo de pontuação: ^[0-9A-Za-z]{7,12}$
+String? validateRg(String rg) => validateAlphanumericFormat(rg, 'RG', 12, minLength: 7);
+
+/// Telefone é opcional. Quando preenchido, precisa ter DDD + número (fixo
+/// de 8 dígitos ou celular de 9) — 10 ou 11 dígitos ao todo. O backend não
+/// valida formato de telefone; esta é só uma checagem de conveniência do
+/// cliente para pegar número obviamente incompleto antes de enviar.
+String? validatePhone(String phone) {
+  final digits = unmaskDigits(phone);
+  if (digits.length < 10 || digits.length > 11) {
+    return 'Telefone inválido.';
+  }
+  return null;
+}
+
+/// CNH must be exactly 11 digits, matching the backend's CnhRegex.
+String? validateCnh(String cnh) {
+  final digits = unmaskDigits(cnh);
+  if (digits.length != 11) return 'CNH deve conter exatamente 11 dígitos.';
+  return null;
+}
+
+/// Local part: one or more dot-separated segments (no leading/trailing dot,
+/// no `..`). Domain: one or more dot-separated labels, each not starting or
+/// ending with `-`, requiring at least one label after the last dot (TLD).
+/// Rejects things the old permissive regex let through, e.g. `a@b...com`.
+final RegExp _emailPattern = RegExp(
+  r"^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*"
+  r'@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?'
+  r'(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+$',
+);
+
+String? validateEmailFormat(String email) {
+  if (!_emailPattern.hasMatch(email)) {
+    return 'E-mail inválido.';
+  }
+  final safeTextError = validateSafeText(email, 'E-mail');
+  if (safeTextError != null) return safeTextError;
+  return null;
+}
+
+/// Matches the backend's InitialPasswordPolicy (min 8, max 72).
+String? validatePasswordLength(String password) {
+  if (password.length < 8) return 'Senha deve ter no mínimo 8 caracteres.';
+  if (password.length > 72) return 'Senha deve ter no máximo 72 caracteres.';
+  return null;
+}
+
+/// Um requisito de política de senha já avaliado contra o texto digitado —
+/// consumido pelo widget `PasswordPolicyChecklist` (dumb, só desenha).
+class PasswordRequirement {
+  final String label;
+  final bool satisfied;
+
+  const PasswordRequirement({required this.label, required this.satisfied});
+}
+
+final RegExp _uppercasePattern = RegExp(r'[A-Z]');
+final RegExp _lowercasePattern = RegExp(r'[a-z]');
+final RegExp _digitPattern = RegExp(r'\d');
+final RegExp _specialCharPattern = RegExp(r'[^A-Za-z0-9\s]');
+
+/// Avalia [password] contra [policy], derivando dinamicamente os requisitos
+/// habilitados — mesmas 5 regras e labels do checklist "estilo gov.br" do
+/// painel web. Se um requisito vier desabilitado na policy (ex.: backend
+/// desliga `requireSpecialChar`), ele simplesmente não aparece na lista.
+List<PasswordRequirement> evaluatePasswordPolicy(String password, PasswordPolicy policy) {
+  return [
+    PasswordRequirement(
+      label: 'Mínimo ${policy.minLength} e máximo ${policy.maxLength} caracteres',
+      satisfied: password.length >= policy.minLength && password.length <= policy.maxLength,
+    ),
+    if (policy.requireUppercase)
+      PasswordRequirement(
+        label: 'Pelo menos 1 letra maiúscula',
+        satisfied: _uppercasePattern.hasMatch(password),
+      ),
+    if (policy.requireLowercase)
+      PasswordRequirement(
+        label: 'Pelo menos 1 letra minúscula',
+        satisfied: _lowercasePattern.hasMatch(password),
+      ),
+    if (policy.requireDigit)
+      PasswordRequirement(
+        label: 'Pelo menos 1 número',
+        satisfied: _digitPattern.hasMatch(password),
+      ),
+    if (policy.requireSpecialChar)
+      PasswordRequirement(
+        label: 'Pelo menos 1 caractere especial (ex: ! @ # \$ % &)',
+        satisfied: _specialCharPattern.hasMatch(password),
+      ),
+  ];
+}
+
+/// True somente quando todos os requisitos aplicáveis de [policy] são
+/// cumpridos por [password]. Usada para habilitar o botão de
+/// confirmar/criar, evitando round-trip desnecessário ao backend.
+bool isPasswordValid(String password, PasswordPolicy policy) {
+  return evaluatePasswordPolicy(password, policy).every((r) => r.satisfied);
+}
+
+String? validateMaxLength(String value, int max, String fieldName) {
+  if (value.trim().length > max) {
+    return '$fieldName deve ter no máximo $max caracteres.';
+  }
+  return null;
+}
+
+/// Defense-in-depth for free-text inputs: blocks characters/patterns with no
+/// legitimate use in names, addresses, etc. (HTML/script tags, SQL
+/// meta-characters, event handler injection). Not the primary defense — the
+/// backend must always use parameterized queries — but stops obviously
+/// malicious input at the door, mirroring the same check in the web panel.
+final RegExp _unsafeTextPattern = RegExp(
+  r'<|>|javascript:|on\w+\s*=|--|/\*|\*/|;\s*(drop|delete|insert|update|select|exec)\b|\bunion\s+select\b|\bdrop\s+table\b|\bxp_\w+',
+  caseSensitive: false,
+);
+
+String? validateSafeText(String value, String fieldName) {
+  if (_unsafeTextPattern.hasMatch(value)) {
+    return '$fieldName contém caracteres ou padrões não permitidos.';
+  }
+  return null;
+}

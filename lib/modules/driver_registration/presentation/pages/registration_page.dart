@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:moto_driver/core/models/password_policy.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/masks.dart';
+import 'package:moto_driver/core/utils/server_error_guard.dart';
+import 'package:moto_driver/core/utils/validators.dart' as validators;
+import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_usecase.dart';
 import 'package:moto_driver/modules/driver_registration/domain/usecases/register_params.dart';
 import 'package:moto_driver/modules/driver_registration/presentation/blocs/register_bloc.dart';
 import 'package:moto_driver/widgets/app_button.dart';
 import 'package:moto_driver/widgets/app_text_field.dart';
+import 'package:moto_driver/widgets/password_policy_checklist.dart';
 
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key});
@@ -22,7 +29,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _rgController = TextEditingController();
   final _registrationController = TextEditingController();
   final _emailController = TextEditingController();
+  final _confirmEmailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _cnhController = TextEditingController();
 
@@ -31,13 +40,122 @@ class _RegistrationPageState extends State<RegistrationPage> {
   String? _fullNameError;
   String? _cpfError;
   String? _rgError;
+  String? _registrationError;
   String? _birthdateError;
   String? _emailError;
+  String? _confirmEmailError;
   String? _passwordError;
+  String? _confirmPasswordError;
   String? _phoneError;
   String? _cnhError;
 
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  final _passwordFocusNode = FocusNode();
+  bool _passwordFocused = false;
+
+  // Usa o fallback estático até a política real chegar do backend — o
+  // cadastro nunca fica bloqueado esperando o GET (design D4).
+  PasswordPolicy _passwordPolicy = const PasswordPolicy.fallback();
+
+  // Bloqueia o botão "Cadastrar" depois de um erro do backend (ex.: e-mail
+  // já cadastrado) até o campo responsável ser editado — evita spammar o
+  // botão reenviando o mesmo dado rejeitado.
+  final _serverErrorGuard = ServerErrorGuard();
+
+  TextEditingController? _controllerFor(String field) => switch (field) {
+        'email' => _emailController,
+        'cpf' => _cpfController,
+        'cnh' => _cnhController,
+        _ => null,
+      };
+
+  @override
+  void initState() {
+    super.initState();
+    for (final controller in [
+      _fullNameController,
+      _cpfController,
+      _rgController,
+      _registrationController,
+      _emailController,
+      _confirmEmailController,
+      _passwordController,
+      _confirmPasswordController,
+      _cnhController,
+    ]) {
+      controller.addListener(_onFieldsChanged);
+    }
+    _passwordFocusNode.addListener(() {
+      setState(() => _passwordFocused = _passwordFocusNode.hasFocus);
+    });
+    _loadPasswordPolicy();
+  }
+
+  Future<void> _loadPasswordPolicy() async {
+    final usecase = Modular.get<IGetPasswordPolicyUsecase>();
+    final result = await usecase.call();
+    if (!mounted) return;
+    result.fold(
+      (policy) => setState(() => _passwordPolicy = policy),
+      // Usecase é sempre-sucesso (fallback interno); nada a fazer aqui.
+      (_) {},
+    );
+  }
+
+  void _onFieldsChanged() {
+    final blockedField = _serverErrorGuard.blockedField;
+    if (blockedField != null) {
+      _serverErrorGuard.clearIfEdited(blockedField, _controllerFor(blockedField)!.text);
+      if (!_serverErrorGuard.isBlocking) {
+        switch (blockedField) {
+          case 'email':
+            _emailError = null;
+            break;
+          case 'cpf':
+            _cpfError = null;
+            break;
+          case 'cnh':
+            _cnhError = null;
+            break;
+        }
+      }
+    }
+    setState(() {});
+  }
+
+  String? get _liveConfirmEmailError {
+    if (_confirmEmailController.text.isEmpty) return null;
+    if (_confirmEmailController.text.trim().toLowerCase() !=
+        _emailController.text.trim().toLowerCase()) {
+      return 'Os e-mails não coincidem';
+    }
+    return null;
+  }
+
+  // Diferente do e-mail, senha não é normalizada (case-sensitive, sem trim) —
+  // "Senha1!" e "senha1!" são senhas diferentes de verdade.
+  String? get _liveConfirmPasswordError {
+    if (_confirmPasswordController.text.isEmpty) return null;
+    if (_confirmPasswordController.text != _passwordController.text) {
+      return 'As senhas não coincidem';
+    }
+    return null;
+  }
+
+  bool get _isFormComplete =>
+      _fullNameController.text.trim().isNotEmpty &&
+      _cpfController.text.trim().isNotEmpty &&
+      _rgController.text.trim().isNotEmpty &&
+      _registrationController.text.trim().isNotEmpty &&
+      _birthdate != null &&
+      validators.validateEmailFormat(_emailController.text.trim()) == null &&
+      _confirmEmailController.text.trim().toLowerCase() ==
+          _emailController.text.trim().toLowerCase() &&
+      validators.isPasswordValid(_passwordController.text, _passwordPolicy) &&
+      _confirmPasswordController.text == _passwordController.text &&
+      _cnhController.text.trim().isNotEmpty &&
+      !_serverErrorGuard.isBlocking;
 
   @override
   void dispose() {
@@ -46,9 +164,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
     _rgController.dispose();
     _registrationController.dispose();
     _emailController.dispose();
+    _confirmEmailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _phoneController.dispose();
     _cnhController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -58,47 +179,100 @@ class _RegistrationPageState extends State<RegistrationPage> {
       _fullNameError = null;
       _cpfError = null;
       _rgError = null;
+      _registrationError = null;
       _birthdateError = null;
       _emailError = null;
+      _confirmEmailError = null;
       _passwordError = null;
+      _confirmPasswordError = null;
       _phoneError = null;
       _cnhError = null;
 
       if (_fullNameController.text.trim().isEmpty) {
         _fullNameError = 'Campo obrigatório';
         valid = false;
+      } else {
+        _fullNameError = validators.validateMaxLength(
+                _fullNameController.text, 100, 'Nome completo') ??
+            validators.validateSafeText(_fullNameController.text, 'Nome completo');
+        if (_fullNameError != null) valid = false;
       }
+
       if (_cpfController.text.trim().isEmpty) {
         _cpfError = 'Campo obrigatório';
         valid = false;
+      } else {
+        _cpfError = validators.validateCpf(_cpfController.text);
+        if (_cpfError != null) valid = false;
       }
+
       if (_rgController.text.trim().isEmpty) {
         _rgError = 'Campo obrigatório';
         valid = false;
+      } else {
+        _rgError = validators.validateRg(_rgController.text);
+        if (_rgError != null) valid = false;
       }
+
+      if (_registrationController.text.trim().isEmpty) {
+        _registrationError = 'Campo obrigatório';
+        valid = false;
+      } else {
+        _registrationError = validators.validateAlphanumericFormat(
+            _registrationController.text, 'Matrícula', 30);
+        if (_registrationError != null) valid = false;
+      }
+
       if (_birthdate == null) {
         _birthdateError = 'Campo obrigatório';
         valid = false;
       }
+
       if (_emailController.text.trim().isEmpty) {
         _emailError = 'Campo obrigatório';
         valid = false;
-      } else if (!_emailController.text.trim().contains('@')) {
-        _emailError = 'E-mail inválido';
+      } else {
+        _emailError = validators.validateEmailFormat(_emailController.text.trim()) ??
+            validators.validateMaxLength(_emailController.text, 100, 'E-mail');
+        if (_emailError != null) valid = false;
+      }
+
+      if (_confirmEmailController.text.trim().isEmpty) {
+        _confirmEmailError = 'Campo obrigatório';
+        valid = false;
+      } else if (_confirmEmailController.text.trim().toLowerCase() !=
+          _emailController.text.trim().toLowerCase()) {
+        _confirmEmailError = 'Os e-mails não coincidem';
         valid = false;
       }
+
       if (_passwordController.text.isEmpty) {
         _passwordError = 'Campo obrigatório';
         valid = false;
-      }
-      final phoneDigits = _phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
-      if (phoneDigits.isNotEmpty && phoneDigits.length < 10) {
-        _phoneError = 'Telefone inválido';
+      } else if (!validators.isPasswordValid(_passwordController.text, _passwordPolicy)) {
+        _passwordError = 'Senha não atende aos requisitos da política.';
         valid = false;
       }
+
+      if (_confirmPasswordController.text.isEmpty) {
+        _confirmPasswordError = 'Campo obrigatório';
+        valid = false;
+      } else if (_confirmPasswordController.text != _passwordController.text) {
+        _confirmPasswordError = 'As senhas não coincidem';
+        valid = false;
+      }
+
+      if (_phoneController.text.trim().isNotEmpty) {
+        _phoneError = validators.validatePhone(_phoneController.text);
+        if (_phoneError != null) valid = false;
+      }
+
       if (_cnhController.text.trim().isEmpty) {
         _cnhError = 'Campo obrigatório';
         valid = false;
+      } else {
+        _cnhError = validators.validateCnh(_cnhController.text);
+        if (_cnhError != null) valid = false;
       }
     });
     return valid;
@@ -111,7 +285,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       fullName: _fullNameController.text.trim(),
       cpf: _cpfController.text.trim(),
       rg: _rgController.text.trim(),
-      registration: _registrationController.text.trim().isEmpty ? null : _registrationController.text.trim(),
+      registration: _registrationController.text.trim(),
       birthdate: _birthdate!,
       email: _emailController.text.trim(),
       initialPassword: _passwordController.text,
@@ -132,6 +306,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       helpText: 'Selecione a data de nascimento',
       cancelText: 'Cancelar',
       confirmText: 'Confirmar',
+      locale: const Locale('pt', 'BR'),
     );
     if (picked != null) {
       setState(() {
@@ -149,6 +324,24 @@ class _RegistrationPageState extends State<RegistrationPage> {
           Navigator.of(context).pushReplacementNamed(
             '/driver-register/confirmation',
           );
+        } else if (state is RegisterFailure) {
+          setState(() {
+            final field = state.field;
+            if (field != null) {
+              _serverErrorGuard.block(field, _controllerFor(field)!.text);
+              switch (field) {
+                case 'email':
+                  _emailError = state.message;
+                  break;
+                case 'cpf':
+                  _cpfError = state.message;
+                  break;
+                case 'cnh':
+                  _cnhError = state.message;
+                  break;
+              }
+            }
+          });
         }
       },
       builder: (context, state) {
@@ -180,29 +373,38 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 spacing: 16,
                 children: [
                   AppTextField(
-                    label: 'Nome completo',
+                    label: 'Nome completo *',
                     hint: 'Informe seu nome completo',
                     controller: _fullNameController,
                     errorText: _fullNameError,
+                    maxLength: 100,
                   ),
                   AppTextField(
-                    label: 'CPF',
+                    label: 'CPF *',
                     hint: '000.000.000-00',
                     controller: _cpfController,
                     keyboardType: TextInputType.number,
                     errorText: _cpfError,
+                    inputFormatters: [CpfInputFormatter()],
+                    maxLength: 14,
                   ),
                   AppTextField(
-                    label: 'RG',
-                    hint: '00.000.000-0',
+                    label: 'RG *',
+                    hint: 'Somente letras e números (7 a 12 caracteres)',
                     controller: _rgController,
+                    keyboardType: TextInputType.text,
                     errorText: _rgError,
+                    inputFormatters: [AlphanumericInputFormatter(maxLength: 12)],
+                    maxLength: 12,
                   ),
                   AppTextField(
-                    label: 'Matrícula',
-                    hint: 'N° de matrícula',
+                    label: 'Matrícula *',
+                    hint: 'N° de matrícula (letras e números)',
                     controller: _registrationController,
-                    keyboardType: TextInputType.number,
+                    keyboardType: TextInputType.text,
+                    errorText: _registrationError,
+                    inputFormatters: [AlphanumericInputFormatter(maxLength: 30)],
+                    maxLength: 30,
                   ),
                   AppTextField(
                     label: 'Telefone',
@@ -210,22 +412,36 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     errorText: _phoneError,
+                    inputFormatters: [PhoneInputFormatter()],
+                    maxLength: 15,
                   ),
                   _buildDateField(),
                   AppTextField(
-                    label: 'E-mail',
+                    label: 'E-mail *',
                     hint: 'Informe seu e-mail',
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     errorText: _emailError,
+                    maxLength: 100,
+                  ),
+                  AppTextField(
+                    label: 'Confirmar E-mail *',
+                    hint: 'Digite novamente seu e-mail',
+                    controller: _confirmEmailController,
+                    keyboardType: TextInputType.emailAddress,
+                    errorText: _confirmEmailError ?? _liveConfirmEmailError,
+                    maxLength: 100,
                   ),
                   _buildPasswordField(),
+                  _buildConfirmPasswordField(),
                   AppTextField(
-                    label: 'CNH',
+                    label: 'CNH *',
                     hint: 'Número da CNH',
                     controller: _cnhController,
                     errorText: _cnhError,
                     keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    maxLength: 11,
                   ),
                   if (errorMessage != null)
                     Text(
@@ -239,7 +455,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   AppButton(
                     label: 'Cadastrar',
                     loading: isLoading,
-                    onPressed: _submit,
+                    onPressed: _isFormComplete ? _submit : null,
                   ),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -265,7 +481,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Data de nascimento',
+          'Data de nascimento *',
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w700,
@@ -313,8 +529,52 @@ class _RegistrationPageState extends State<RegistrationPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _buildObscureField(
+          label: 'Senha *',
+          hint: 'Informe sua senha',
+          controller: _passwordController,
+          focusNode: _passwordFocusNode,
+          obscure: _obscurePassword,
+          onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+          errorText: _passwordError,
+        ),
+        if (_passwordFocused) ...[
+          const SizedBox(height: 8),
+          PasswordPolicyChecklist(
+            requirements: validators.evaluatePasswordPolicy(_passwordController.text, _passwordPolicy),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildConfirmPasswordField() {
+    return _buildObscureField(
+      label: 'Confirmar Senha *',
+      hint: 'Digite novamente a senha',
+      controller: _confirmPasswordController,
+      obscure: _obscureConfirmPassword,
+      onToggleObscure: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+      errorText: _confirmPasswordError ?? _liveConfirmPasswordError,
+    );
+  }
+
+  /// Campo de senha com toggle de visibilidade — compartilhado entre "Senha"
+  /// e "Confirmar Senha" pra não duplicar toda a decoração do TextField.
+  Widget _buildObscureField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    required bool obscure,
+    required VoidCallback onToggleObscure,
+    FocusNode? focusNode,
+    String? errorText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Text(
-          'Senha',
+          label,
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w700,
@@ -325,8 +585,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
         ),
         const SizedBox(height: 8),
         TextField(
-          controller: _passwordController,
-          obscureText: _obscurePassword,
+          controller: controller,
+          focusNode: focusNode,
+          obscureText: obscure,
+          maxLength: 72,
+          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w300,
@@ -335,7 +598,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
             height: 1.2,
           ),
           decoration: InputDecoration(
-            hintText: 'Informe sua senha',
+            hintText: hint,
             hintStyle: GoogleFonts.robotoFlex(
               fontSize: 10,
               fontWeight: FontWeight.w300,
@@ -345,15 +608,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
             contentPadding: const EdgeInsets.all(12),
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                obscure ? Icons.visibility_off : Icons.visibility,
                 size: 18,
                 color: AppColors.primary,
               ),
-              onPressed: () {
-                setState(() {
-                  _obscurePassword = !_obscurePassword;
-                });
-              },
+              onPressed: onToggleObscure,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
@@ -375,7 +634,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
               borderRadius: BorderRadius.circular(4),
               borderSide: const BorderSide(color: Colors.red, width: 2),
             ),
-            errorText: _passwordError,
+            errorText: errorText,
           ),
         ),
       ],

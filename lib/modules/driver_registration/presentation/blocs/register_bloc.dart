@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:moto_driver/core/errors/exceptions.dart';
 import 'package:moto_driver/modules/driver_registration/domain/usecases/i_register_usecase.dart';
 import 'package:moto_driver/modules/driver_registration/domain/usecases/register_params.dart';
 
@@ -23,7 +24,9 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
     if (result.isSuccess()) {
       emit(const RegisterSuccess());
     } else {
-      emit(RegisterFailure(result.exceptionOrNull()!.toString()));
+      final exception = result.exceptionOrNull()!;
+      final field = exception is DuplicateException ? exception.field : null;
+      emit(RegisterFailure(exception.toString(), field: field));
     }
   }
 }

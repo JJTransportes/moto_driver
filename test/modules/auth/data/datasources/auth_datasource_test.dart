@@ -46,7 +46,7 @@ void main() {
         ),
       );
 
-      final result = await datasource.signIn('joao@moto.com', '123456');
+      final result = await datasource.signIn('joao@moto.com', '123456', 'android');
 
       expect(result, isA<SignInResponseModel>());
       expect(result.accessToken, 'tok_123');
@@ -56,7 +56,11 @@ void main() {
 
       verify(() => mockDio.post(
             '/api/auth/sign-in',
-            data: {'email': 'joao@moto.com', 'password': '123456'},
+            data: {
+              'email': 'joao@moto.com',
+              'password': '123456',
+              'device': 'android',
+            },
           )).called(1);
     });
 
@@ -72,7 +76,7 @@ void main() {
       );
 
       expect(
-        () => datasource.signIn('joao@moto.com', 'wrong'),
+        () => datasource.signIn('joao@moto.com', 'wrong', 'android'),
         throwsA(isA<UnauthorizedException>()),
       );
     });
@@ -89,7 +93,7 @@ void main() {
       );
 
       expect(
-        () => datasource.signIn('unknown@moto.com', '123'),
+        () => datasource.signIn('unknown@moto.com', '123', 'android'),
         throwsA(isA<NotFoundException>()),
       );
     });
@@ -106,7 +110,7 @@ void main() {
       );
 
       expect(
-        () => datasource.signIn('', ''),
+        () => datasource.signIn('', '', 'android'),
         throwsA(isA<ValidationException>()),
       );
     });
@@ -123,7 +127,7 @@ void main() {
       );
 
       expect(
-        () => datasource.signIn('joao@moto.com', '123'),
+        () => datasource.signIn('joao@moto.com', '123', 'android'),
         throwsA(isA<RateLimitedException>()),
       );
     });
@@ -140,7 +144,7 @@ void main() {
       );
 
       expect(
-        () => datasource.signIn('joao@moto.com', '123'),
+        () => datasource.signIn('joao@moto.com', '123', 'android'),
         throwsA(isA<ServerException>()),
       );
     });
@@ -154,8 +158,71 @@ void main() {
       );
 
       expect(
-        () => datasource.signIn('joao@moto.com', '123'),
+        () => datasource.signIn('joao@moto.com', '123', 'android'),
         throwsA(isA<NetworkException>()),
+      );
+    });
+
+    test('throws DeviceConflictException on 409 (device binding)', () async {
+      when(() => mockDio.post(any(), data: any(named: 'data'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: ''),
+          response: Response(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 409,
+            data: {
+              'message': 'A session is already active on a different device type. Sign out there first.',
+            },
+          ),
+        ),
+      );
+
+      expect(
+        () => datasource.signIn('joao@moto.com', '123', 'ios'),
+        throwsA(isA<DeviceConflictException>()),
+      );
+    });
+
+    test('sends expectedRole when provided', () async {
+      when(() => mockDio.post(
+            any(),
+            data: any(named: 'data'),
+          )).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: ''),
+          data: validResponse,
+          statusCode: 200,
+        ),
+      );
+
+      await datasource.signIn('joao@moto.com', '123456', 'android', expectedRole: 'Driver');
+
+      verify(() => mockDio.post(
+            '/api/auth/sign-in',
+            data: {
+              'email': 'joao@moto.com',
+              'password': '123456',
+              'device': 'android',
+              'expectedRole': 'Driver',
+            },
+          )).called(1);
+    });
+
+    test('throws RoleMismatchException on 403 (wrong role)', () async {
+      when(() => mockDio.post(any(), data: any(named: 'data'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: ''),
+          response: Response(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 403,
+            data: {'error': 'This account is not authorized for this app.'},
+          ),
+        ),
+      );
+
+      expect(
+        () => datasource.signIn('joao@moto.com', '123456', 'android', expectedRole: 'Driver'),
+        throwsA(isA<RoleMismatchException>()),
       );
     });
   });
@@ -173,7 +240,7 @@ void main() {
         ),
       );
 
-      final result = await datasource.refreshToken('old_refresh_token');
+      final result = await datasource.refreshToken('old_refresh_token', 'android');
 
       expect(result, isA<RefreshTokenResponseModel>());
       expect(result.accessToken, 'new_access_123');
@@ -185,7 +252,7 @@ void main() {
 
       verify(() => mockDio.post(
             '/api/auth/refresh',
-            data: {'refreshToken': 'old_refresh_token'},
+            data: {'refreshToken': 'old_refresh_token', 'device': 'android'},
           )).called(1);
     });
 
@@ -201,7 +268,7 @@ void main() {
       );
 
       expect(
-        () => datasource.refreshToken('expired_refresh'),
+        () => datasource.refreshToken('expired_refresh', 'android'),
         throwsA(isA<UnauthorizedException>()),
       );
     });
@@ -218,7 +285,7 @@ void main() {
       );
 
       expect(
-        () => datasource.refreshToken(''),
+        () => datasource.refreshToken('', 'android'),
         throwsA(isA<ValidationException>()),
       );
     });
@@ -235,7 +302,7 @@ void main() {
       );
 
       expect(
-        () => datasource.refreshToken('some_token'),
+        () => datasource.refreshToken('some_token', 'android'),
         throwsA(isA<ServerException>()),
       );
     });
@@ -249,9 +316,69 @@ void main() {
       );
 
       expect(
-        () => datasource.refreshToken('some_token'),
+        () => datasource.refreshToken('some_token', 'android'),
         throwsA(isA<NetworkException>()),
       );
+    });
+
+    test('throws DeviceMismatchException on 403 (device binding)', () async {
+      when(() => mockDio.post(any(), data: any(named: 'data'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: ''),
+          response: Response(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 403,
+          ),
+        ),
+      );
+
+      expect(
+        () => datasource.refreshToken('some_token', 'ios'),
+        throwsA(isA<DeviceMismatchException>()),
+      );
+    });
+  });
+
+  group('getPasswordPolicy', () {
+    test('parses the 6 fields on 200', () async {
+      when(() => mockDio.get(any())).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: ''),
+          statusCode: 200,
+          data: {
+            'minLength': 8,
+            'maxLength': 72,
+            'requireUppercase': true,
+            'requireLowercase': true,
+            'requireDigit': true,
+            'requireSpecialChar': true,
+          },
+        ),
+      );
+
+      final policy = await datasource.getPasswordPolicy();
+
+      expect(policy.minLength, 8);
+      expect(policy.maxLength, 72);
+      expect(policy.requireUppercase, isTrue);
+      expect(policy.requireLowercase, isTrue);
+      expect(policy.requireDigit, isTrue);
+      expect(policy.requireSpecialChar, isTrue);
+      verify(() => mockDio.get('/api/auth/password-policy')).called(1);
+    });
+
+    test('throws ServerException on 500', () async {
+      when(() => mockDio.get(any())).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: ''),
+          response: Response(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 500,
+          ),
+        ),
+      );
+
+      expect(() => datasource.getPasswordPolicy(), throwsA(isA<ServerException>()));
     });
   });
 }
