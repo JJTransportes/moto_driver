@@ -16,7 +16,7 @@ workflows:
       cancel_previous_builds: true
 
     environment:
-      flutter: 3.32.2
+      flutter: 3.44.8
       groups:
       - moto_staging
       ios_signing:
