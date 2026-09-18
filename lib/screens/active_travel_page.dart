@@ -45,6 +45,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   bool _isActing = false;
   bool _hubConnected = false;
   Timer? _locationTimer;
+  StreamSubscription<Map<String, dynamic>>? _travelCancelledSub;
 
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
@@ -64,6 +65,25 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
     // Extract route arguments only after the widget is in the tree
     WidgetsBinding.instance.addPostFrameCallback((_) => _extractRouteArgs());
     _loadTravel();
+
+    // RF: cancelamento pelo passageiro precisa refletir aqui em tempo real —
+    // antes só a home escutava esse evento, então esta tela (aberta por cima
+    // da home) continuava mostrando a viagem como ativa até o motorista
+    // tentar finalizar/cancelar e tomar erro do backend.
+    _travelCancelledSub = Modular.get<SignalRService>().onTravelCancelled.listen((data) {
+      if (!mounted) return;
+      final travelId = data['travelId'] as String?;
+      if (travelId != null && travelId != widget.travelId) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Viagem cancelada pelo passageiro.'),
+          duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _goHome();
+    });
   }
 
   void _extractRouteArgs() {
@@ -82,6 +102,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   @override
   void dispose() {
     _locationTimer?.cancel();
+    _travelCancelledSub?.cancel();
     if (_hubConnected) {
       Modular.get<SignalRService>().disconnect('travel-management');
     }

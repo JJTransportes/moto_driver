@@ -390,9 +390,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     _signalRListenersRegistered = true;
 
-    _newOrderSub = signalR.onNewOrder.listen((data) {
+    _newOrderSub = signalR.onNewOrder.listen((data) async {
       if (NotificationService.orderAlertOpen) return;
       if (_currentTravelId != null) return;
+
+      // `_currentTravelId` só é atualizado por fluxos que passam pela home —
+      // um aceite via notificação push (OrderAlertPage → /active-travel)
+      // nunca toca essa variável, então sob nenhuma hipótese basta confiar
+      // só nela: confere a fonte persistida antes de exibir qualquer oferta.
+      final travelRepo = Modular.get<TravelLocalRepository>();
+      final active = await travelRepo.getActiveTravel();
+      if (active != null || !mounted) return;
 
       final orderId = data['orderId'] as String?;
       if (orderId == null) return;

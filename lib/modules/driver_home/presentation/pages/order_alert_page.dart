@@ -7,6 +7,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/modules/driver_home/domain/entities/travel_order_entity.dart';
@@ -50,6 +51,25 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
     });
 
     _connectHub(); // fire-and-forget — falha não bloqueia a página
+    _guardActiveTravelThenFetch();
+  }
+
+  /// Entrada única obrigatória antes de exibir qualquer oferta: se o
+  /// motorista já tem viagem em andamento, a oferta nunca deve aparecer —
+  /// sob nenhuma hipótese. A checagem em memória do home_screen
+  /// (`_currentTravelId`) só cobre o caminho in-app (SignalR com o app
+  /// aberto); notificação push abre esta página direto (via
+  /// OrderRefreshPage), sem passar por ali, então essa é a última linha de
+  /// defesa antes de renderizar o card.
+  Future<void> _guardActiveTravelThenFetch() async {
+    final travelRepo = Modular.get<TravelLocalRepository>();
+    final active = await travelRepo.getActiveTravel();
+    if (!mounted) return;
+    if (active != null) {
+      NotificationService.clearPendingOrder();
+      _exitToHome();
+      return;
+    }
     _fetchOrder();
   }
 
