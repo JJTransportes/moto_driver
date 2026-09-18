@@ -27,6 +27,13 @@ class DuplicateException implements Exception {
   String toString() => message;
 }
 
+class ConflictException implements Exception {
+  final String message;
+  const ConflictException([this.message = 'Operação em conflito com o estado atual']);
+  @override
+  String toString() => message;
+}
+
 class RateLimitedException implements Exception {
   final String message;
   const RateLimitedException([this.message = 'Muitas tentativas. Tente novamente mais tarde.']);
@@ -44,6 +51,47 @@ class NetworkException implements Exception {
 class ServerException implements Exception {
   final String message;
   const ServerException([this.message = 'Erro interno do servidor. Tente novamente.']);
+  @override
+  String toString() => message;
+}
+
+/// 409 no sign-in: já existe sessão ativa vinculada a outro tipo de dispositivo.
+class DeviceConflictException implements Exception {
+  final String message;
+  const DeviceConflictException([
+    this.message = 'Já existe uma sessão ativa em outro tipo de dispositivo. Faça logout lá primeiro.',
+  ]);
+  @override
+  String toString() => message;
+}
+
+/// 403 no refresh: o refresh token está vinculado a outro tipo de dispositivo.
+class DeviceMismatchException implements Exception {
+  final String message;
+  const DeviceMismatchException([
+    this.message = 'Sessão vinculada a outro tipo de dispositivo. Faça logout no dispositivo original.',
+  ]);
+  @override
+  String toString() => message;
+}
+
+/// 403 no sign-in: a conta autenticada não tem o role esperado (`expectedRole`).
+class RoleMismatchException implements Exception {
+  final String message;
+  const RoleMismatchException([
+    this.message = 'Esta conta não é de motorista.',
+  ]);
+  @override
+  String toString() => message;
+}
+
+/// 403 no password-reset/request: a conta ainda não foi aprovada por um
+/// GlobalAdmin, então não pode redefinir senha.
+class UnapprovedAccountException implements Exception {
+  final String message;
+  const UnapprovedAccountException([
+    this.message = 'Sua conta ainda não foi aprovada. Aguarde a aprovação de um administrador.',
+  ]);
   @override
   String toString() => message;
 }

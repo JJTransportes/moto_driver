@@ -15,6 +15,7 @@ void main() {
     fullName: 'João Santos',
     cpf: '987.654.321-00',
     rg: '98.765.432-1',
+    registration: '12345',
     birthdate: DateTime(1985, 6, 20),
     email: 'joao@example.com',
     initialPassword: 'securePassword456',

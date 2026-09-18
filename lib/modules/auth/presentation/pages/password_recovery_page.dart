@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/server_error_guard.dart';
+import 'package:moto_driver/core/utils/validators.dart' as validators;
+import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_bloc.dart';
+import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_event.dart';
+import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_state.dart';
 import 'package:moto_driver/widgets/app_button.dart';
 import 'package:moto_driver/widgets/app_text_field.dart';
 import 'package:moto_driver/widgets/gradient_text.dart';
 
-/// Temporary placeholder until password recovery feature is implemented.
 class PasswordRecoveryPage extends StatefulWidget {
   const PasswordRecoveryPage({super.key});
 
@@ -15,104 +21,180 @@ class PasswordRecoveryPage extends StatefulWidget {
 
 class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
   final _emailController = TextEditingController();
-  bool _loading = false;
-  bool _sent = false;
+  final _confirmEmailController = TextEditingController();
+  String? _emailError;
+  String? _confirmEmailError;
+
+  // Bloqueia o botão "Enviar" depois de um erro do backend (ex.: e-mail não
+  // cadastrado) até o campo de e-mail ser editado — evita spammar o botão
+  // reenviando o mesmo e-mail rejeitado.
+  final _serverErrorGuard = ServerErrorGuard();
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_onFieldsChanged);
+    _confirmEmailController.addListener(_onFieldsChanged);
+  }
+
+  void _onFieldsChanged() {
+    if (_serverErrorGuard.isBlocking) {
+      _serverErrorGuard.clearIfEdited('email', _emailController.text);
+      if (!_serverErrorGuard.isBlocking) _emailError = null;
+    }
+    setState(() {});
+  }
+
+  String? get _liveConfirmEmailError {
+    if (_confirmEmailController.text.isEmpty) return null;
+    if (_confirmEmailController.text.trim().toLowerCase() !=
+        _emailController.text.trim().toLowerCase()) {
+      return 'Os e-mails não coincidem';
+    }
+    return null;
+  }
+
+  bool get _isFormComplete =>
+      validators.validateEmailFormat(_emailController.text.trim()) == null &&
+      validators.validateMaxLength(_emailController.text, 100, 'E-mail') == null &&
+      _confirmEmailController.text.trim().toLowerCase() ==
+          _emailController.text.trim().toLowerCase() &&
+      !_serverErrorGuard.isBlocking;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _confirmEmailController.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (_emailController.text.trim().isEmpty) return;
-    setState(() => _loading = true);
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
-    if (mounted) {
-      setState(() {
-        _loading = false;
-        _sent = true;
-      });
-    }
+  void _submit() {
+    final email = _emailController.text.trim();
+    final confirmEmail = _confirmEmailController.text.trim();
+    setState(() {
+      _emailError = email.isEmpty
+          ? 'E-mail obrigatório'
+          : validators.validateEmailFormat(email) ??
+              validators.validateMaxLength(email, 100, 'E-mail');
+      if (confirmEmail.isEmpty) {
+        _confirmEmailError = 'Campo obrigatório';
+      } else if (confirmEmail.toLowerCase() != email.toLowerCase()) {
+        _confirmEmailError = 'Os e-mails não coincidem';
+      } else {
+        _confirmEmailError = null;
+      }
+    });
+    if (_emailError != null || _confirmEmailError != null) return;
+
+    context.read<PasswordRecoveryBloc>().add(RequestCodeSubmitted(email));
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_sent) {
-      return Scaffold(
-        backgroundColor: AppColors.white,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 36),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.email_outlined, color: AppColors.primary, size: 64),
-                const SizedBox(height: 24),
-                Text(
-                  'Se o e-mail estiver cadastrado, você receberá um código de verificação.',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                AppButton(
-                  label: 'Voltar ao login',
-                  onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    return BlocConsumer<PasswordRecoveryBloc, PasswordRecoveryState>(
+      listener: (context, state) {
+        if (state is PasswordRecoveryError) {
+          setState(() {
+            _emailError = state.message;
+            _serverErrorGuard.block('email', _emailController.text);
+          });
+        }
+      },
+      builder: (context, state) {
+        if (state is PasswordRecoverySent) {
+          return _buildSent(state.email);
+        }
+        return _buildForm(state);
+      },
+    );
+  }
 
+  Widget _buildSent(String email) {
     return Scaffold(
       backgroundColor: AppColors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 36),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GradientText(
-                    'Recupere sua senha',
-                    style: GoogleFonts.inter(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 72),
-                  Text(
-                    'Informe o e-mail da sua conta. Enviaremos um código de verificação para que você redefina sua senha.',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.black,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+              const Icon(Icons.email_outlined, color: AppColors.primary, size: 64),
+              const SizedBox(height: 24),
+              Text(
+                'Se o e-mail estiver cadastrado, você receberá um código de verificação em instantes.',
+                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black),
+                textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 32),
+              AppButton(
+                label: 'Já tenho o código',
+                onPressed: () => Modular.to.pushNamed('/verify-reset-code', arguments: {'email': email}),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
+                child: Text('Voltar ao login', style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForm(PasswordRecoveryState state) {
+    final isLoading = state is PasswordRecoveryLoading;
+    final errorMessage = state is PasswordRecoveryError ? state.message : null;
+
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 36),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GradientText(
+                'Recupere sua senha',
+                style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 72),
+              Text(
+                'Informe o e-mail da sua conta. Enviaremos um código de verificação para que você redefina sua senha.',
+                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
               AppTextField(
                 label: 'E-mail',
                 hint: 'Informe seu e-mail',
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
+                errorText: _emailError,
+                maxLength: 100,
               ),
+              const SizedBox(height: 16),
+              AppTextField(
+                label: 'Confirmar E-mail',
+                hint: 'Digite novamente seu e-mail',
+                controller: _confirmEmailController,
+                keyboardType: TextInputType.emailAddress,
+                errorText: _confirmEmailError ?? _liveConfirmEmailError,
+                maxLength: 100,
+              ),
+              if (errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  errorMessage,
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               const SizedBox(height: 32),
               AppButton(
                 label: 'Enviar',
-                loading: _loading,
-                onPressed: _submit,
+                loading: isLoading,
+                onPressed: _isFormComplete ? _submit : null,
               ),
             ],
           ),

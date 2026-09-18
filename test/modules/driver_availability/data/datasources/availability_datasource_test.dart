@@ -114,8 +114,9 @@ void main() {
   });
 
   group('activate', () {
-    test('returns entity on success and posts without body', () async {
-      when(() => mockDio.post(any())).thenAnswer(
+    test('envia POST no endpoint de intenção com body action=activate',
+        () async {
+      when(() => mockDio.post(any(), data: any(named: 'data'))).thenAnswer(
         (_) async => Response(
           requestOptions: RequestOptions(path: ''),
           data: activeResponse,
@@ -129,11 +130,16 @@ void main() {
       expect(result.status, 'active');
       expect(result.isActive, isTrue);
 
-      verify(() => mockDio.post('/api/drivers/availability/activate')).called(1);
+      verify(
+        () => mockDio.post(
+          '/api/drivers/availability/update',
+          data: {'action': 'activate'},
+        ),
+      ).called(1);
     });
 
     test('throws ServerException on 500', () async {
-      when(() => mockDio.post(any())).thenThrow(
+      when(() => mockDio.post(any(), data: any(named: 'data'))).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: ''),
           response: Response(
@@ -150,7 +156,7 @@ void main() {
     });
 
     test('throws NetworkException on connection error', () async {
-      when(() => mockDio.post(any())).thenThrow(
+      when(() => mockDio.post(any(), data: any(named: 'data'))).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: ''),
           type: DioExceptionType.connectionError,
@@ -160,6 +166,49 @@ void main() {
       expect(
         () => datasource.activate(),
         throwsA(isA<NetworkException>()),
+      );
+    });
+  });
+
+  group('deactivate', () {
+    test('envia POST no endpoint de intenção com body action=deactivate',
+        () async {
+      when(() => mockDio.post(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: ''),
+          data: inactiveResponse,
+          statusCode: 200,
+        ),
+      );
+
+      final result = await datasource.deactivate();
+
+      expect(result.isActive, isFalse);
+      expect(result.activatedAt, isNull);
+      expect(result.expiresAt, isNull);
+
+      verify(
+        () => mockDio.post(
+          '/api/drivers/availability/update',
+          data: {'action': 'deactivate'},
+        ),
+      ).called(1);
+    });
+
+    test('mapeia 401 para UnauthorizedException', () async {
+      when(() => mockDio.post(any(), data: any(named: 'data'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: ''),
+          response: Response(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 401,
+          ),
+        ),
+      );
+
+      expect(
+        () => datasource.deactivate(),
+        throwsA(isA<UnauthorizedException>()),
       );
     });
   });

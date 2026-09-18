@@ -9,6 +9,7 @@ import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
+import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
@@ -30,29 +31,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _orderCancelledSub;
   StreamSubscription? _reconnectingSub;
   StreamSubscription? _reconnectedSub;
+  StreamSubscription? _closedSub;
   StreamSubscription? _travelCancelledSub;
+  StreamSubscription? _travelStartedSub;
+  StreamSubscription? _travelCompletedSub;
   bool _isReconnecting = false;
+  bool _reconnectLoopActive = false;
+  bool _signalRListenersRegistered = false;
+  bool _checkingActiveTravel = false;
   String? _currentTravelStatus;
   String? _currentTravelId;
   String? _currentPassengerName;
   Timer? _locationTimer;
+  Timer? _activeTravelPollTimer;
   String? _userId;
   String? _userPhotoUrl;
   String? _userName;
 
   final Set<String> _deniedOrderIds = {};
-  String? _processedOrderId; // Evita processar mesmo pushOrderId duas vezes
-  bool _permissionDenied = false;
 
   // ── Disponibilidade (modo de atendimento) ──
   DriverAvailabilityEntity? _availability;
   Timer? _availabilityTimer;
+  Timer? _driverPositionTimer;
 
   @override
   Widget build(BuildContext context) {
-    // RF04: Capturar pushOrderId em warm start (app já está em /home)
-    _checkPushOrderInArgs();
-
     return Scaffold(
       backgroundColor: AppColors.white,
       body: SafeArea(
@@ -77,8 +81,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-              // RF06: Banner de permissão de notificação negada
-              if (_permissionDenied) _buildPermissionBanner(),
               ProfileHeader(
                 fullName: _userName ?? 'Motorista',
                 photoUrl: _userPhotoUrl,
@@ -90,9 +92,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 },
               ),
               const SizedBox(height: 24),
-              // Active travel card
-              if (_currentTravelId != null && _currentTravelStatus != 'Cancelled' && _currentTravelStatus != 'Completed') _buildActiveTravelCard(),
-              if (_currentTravelId == null || _currentTravelStatus == 'Cancelled' || _currentTravelStatus == 'Completed')
+              // Active travel card — exibido quando existe viagem ativa (Accepted/InProgress)
+              if (_currentTravelId != null) _buildActiveTravelCard(),
+              if (_currentTravelId == null)
                 const Expanded(
                   child: Center(
                     child: Text('Aguardando novas viagens...', style: TextStyle(color: Color(0xFF4E4E4E), fontSize: 16)),
@@ -124,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final isInProgress = _currentTravelStatus == 'InProgress';
 
     return GestureDetector(
-      onTap: () => Modular.to.pushNamed('/active-travel', arguments: {'travelId': _currentTravelId}),
+      onTap: _openActiveTravel,
       child: Card(
         elevation: 4,
         shape: RoundedRectangleBorder(
@@ -193,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  onPressed: () => Modular.to.pushNamed('/active-travel', arguments: {'travelId': _currentTravelId}),
+                  onPressed: _openActiveTravel,
                   child: const Text('Abrir Viagem', style: TextStyle(color: Colors.white, fontSize: 14)),
                 ),
               ),
@@ -209,11 +211,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _locationTimer?.cancel();
     _availabilityTimer?.cancel();
+    _driverPositionTimer?.cancel();
+    _activeTravelPollTimer?.cancel();
     _newOrderSub?.cancel();
     _orderCancelledSub?.cancel();
     _travelCancelledSub?.cancel();
+    _travelStartedSub?.cancel();
+    _travelCompletedSub?.cancel();
     _reconnectingSub?.cancel();
     _reconnectedSub?.cancel();
+    _closedSub?.cancel();
     super.dispose();
   }
 
@@ -225,28 +232,63 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _checkActiveTravelHttp();
     _connectSignalR();
 
-    // RF04: Verificar se abriu via push notification (cold start)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _handlePushOrder();
-    });
-
-    // RF06: Verificar permissão de notificação
-    _checkNotificationPermission();
-
-    // RF02: Tentar late login se falhou antes
-    _tryLateLogin();
-
-    // Disponibilidade: verificar status ao entrar no app (concorrente)
     _checkAvailability();
+
+    // Rede de segurança: re-consulta o estado canônico periodicamente,
+    // cobrindo eventos SignalR perdidos (não há replay para o motorista).
+    _activeTravelPollTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _checkActiveTravelHttp(),
+    );
+
+    _driverPositionTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _updateDriverPosition(),
+    );
+  }
+
+  Future<void> _updateDriverPosition() async {
+    try {
+      final dio = Modular.get<Dio>();
+      final localtionService = Modular.get<LocationService>();
+      final position = await localtionService.getCurrentPosition();
+
+      final response = await dio.post(
+        '/api/positions/drivers/$_userId',
+        data: {
+          "latitude": position.position?.latitude,
+          "longitude": position.position?.longitude,
+        },
+      );
+
+      developer.log('${response.statusCode}');
+    } on DioException catch (e) {
+      developer.log(e.message ?? "");
+      return;
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Ao voltar de background, re-consulta a viagem ativa para refletir
+    // mudanças de status ocorridas enquanto o app não estava visível.
     if (state == AppLifecycleState.resumed) {
-      // RF06: Reavaliar permissão ao voltar ao foreground
-      // (usuário pode ter ido às Configurações e concedido permissão)
-      _checkNotificationPermission();
+      _checkActiveTravelHttp();
+      _reconnectSignalRIfNeeded();
     }
+  }
+
+  /// O SO pode ter suspendido a conexão de rede com o app em background sem
+  /// avisar; o retry automático do SignalR pode já ter desistido (backoff
+  /// esgotado) nesse meio-tempo. Em vez de esperar o próximo ciclo de retry
+  /// (ou nenhum, se já desistiu), força uma reconexão na hora que o app volta
+  /// ao primeiro plano.
+  Future<void> _reconnectSignalRIfNeeded() async {
+    final signalR = Modular.get<SignalRService>();
+    if (signalR.isConnected('travel-orders') && signalR.isConnected('travel-management')) {
+      return;
+    }
+    await _connectSignalR();
   }
 
   Future<void> _loadUserId() async {
@@ -266,8 +308,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (response.statusCode == 200 && response.data != null) {
         final name = response.data['name'] as String?;
         var photoUrl = response.data['photoUrl'] as String?;
-        if (photoUrl != null && photoUrl.isNotEmpty
-            && !photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+        if (photoUrl != null && photoUrl.isNotEmpty && !photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
           photoUrl = '${AppConfig.getBaseUrl()}$photoUrl';
         }
         setState(() {
@@ -281,34 +322,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _checkActiveTravelHttp() async {
+    if (_checkingActiveTravel) return;
+    _checkingActiveTravel = true;
     try {
       final dio = Modular.get<Dio>();
       final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/active');
       if (!mounted) return;
 
+      // Contrato do endpoint GET /api/travels/active:
+      // 200 com objeto {travelId, status, passengerName, ...} = viagem ativa;
+      // 204 No Content = sem viagem ativa.
+      // Viagens só nascem em Accepted/InProgress (o enum Pending é vestigial),
+      // então a existência da resposta já garante o estado — sem filtro de status.
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data as Map<String, dynamic>?;
         if (data != null && data['travelId'] != null) {
-          final status = data['status'] as String?;
-          if (status == 'Accepted' || status == 'InProgress') {
-            setState(() {
-              _currentTravelId = data['travelId'] as String;
-              _currentTravelStatus = status;
-              _currentPassengerName = data['passengerName'] as String?;
-            });
-            return;
-          }
+          setState(() {
+            _currentTravelId = data['travelId'] as String;
+            _currentTravelStatus = data['status'] as String?;
+            _currentPassengerName = data['passengerName'] as String?;
+          });
+          return;
         }
       }
-      // Sem viagem ativa via REST — limpa estado
+      // 204 (ou resposta sem travelId) = sem viagem ativa — limpa estado
       setState(() {
         _currentTravelId = null;
         _currentTravelStatus = null;
         _currentPassengerName = null;
       });
     } catch (_) {
-      // Fallback silencioso para cache local
+      // Falha de rede/erro de servidor — fallback silencioso para cache local
       await _loadActiveTravelFromLocal();
+    } finally {
+      _checkingActiveTravel = false;
     }
   }
 
@@ -319,8 +366,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {
         _currentTravelId = active.travelId;
         _currentTravelStatus = active.status;
+        _currentPassengerName = active.passengerName;
       });
     }
+  }
+
+  /// Abre a página da viagem ativa e, ao voltar, re-consulta o estado canônico
+  /// para que mudanças de status feitas na página reflitam na home na hora.
+  Future<void> _openActiveTravel() async {
+    await Modular.to.pushNamed('/active-travel', arguments: {'travelId': _currentTravelId});
+    if (mounted) _checkActiveTravelHttp();
   }
 
   Future<void> _connectSignalR() async {
@@ -329,11 +384,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final token = await authStorage.getToken();
     if (token == null) return;
 
-    // ── Subscribe to events BEFORE connecting ──
-    // The backend sends NewOrder during OnConnectedAsync (re-dispatch).
-    // If we subscribe after connect(), the event is lost.
-    _newOrderSub = signalR.onNewOrder.listen((data) {
-      if (_currentTravelId != null) return; // Already in a travel
+    if (_signalRListenersRegistered) {
+      await _connectHubs(signalR, token);
+      return;
+    }
+    _signalRListenersRegistered = true;
+
+    _newOrderSub = signalR.onNewOrder.listen((data) async {
+      if (NotificationService.orderAlertOpen) return;
+      if (_currentTravelId != null) return;
+
+      // `_currentTravelId` só é atualizado por fluxos que passam pela home —
+      // um aceite via notificação push (OrderAlertPage → /active-travel)
+      // nunca toca essa variável, então sob nenhuma hipótese basta confiar
+      // só nela: confere a fonte persistida antes de exibir qualquer oferta.
+      final travelRepo = Modular.get<TravelLocalRepository>();
+      final active = await travelRepo.getActiveTravel();
+      if (active != null || !mounted) return;
 
       final orderId = data['orderId'] as String?;
       if (orderId == null) return;
@@ -377,6 +444,46 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             behavior: SnackBarBehavior.floating,
           ),
         );
+        _checkActiveTravelHttp();
+      }
+    });
+
+    // Accepted → InProgress: o card passa a "Em andamento" imediatamente e o
+    // estado canônico é re-consultado (payload só traz travelId/startedAt).
+    // Se a home ainda não conhece a viagem (aceite via /order-alert), adota.
+    _travelStartedSub = signalR.onTravelStarted.listen((data) {
+      if (!mounted) return;
+      final travelId = data['travelId'] as String?;
+      if (travelId == null) return;
+      if (travelId == _currentTravelId || _currentTravelId == null) {
+        setState(() {
+          _currentTravelId = travelId;
+          _currentTravelStatus = 'InProgress';
+        });
+        _checkActiveTravelHttp();
+      }
+    });
+
+    // InProgress → Completed: encerra a viagem ativa na home (limpa card,
+    // cache local e informa o motorista).
+    _travelCompletedSub = signalR.onTravelCompleted.listen((data) {
+      if (!mounted) return;
+      final travelId = data['travelId'] as String?;
+      if (travelId != null && travelId == _currentTravelId) {
+        setState(() {
+          _currentTravelId = null;
+          _currentTravelStatus = null;
+          _currentPassengerName = null;
+        });
+        Modular.get<TravelLocalRepository>().clearTravels();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Viagem concluída'),
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _checkActiveTravelHttp();
       }
     });
 
@@ -386,10 +493,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     _reconnectedSub = signalR.onReconnected.listen((_) {
       setState(() => _isReconnecting = false);
+      // Sem replay de eventos para o motorista: ao reconectar, re-consulta
+      // o estado canônico para refletir transições perdidas.
+      _checkActiveTravelHttp();
+    });
+
+    // Dispara quando o backoff automático se esgota e a conexão cai de vez
+    // (não é mais um "onReconnecting" — o client desistiu). Sem este
+    // listener a badge "Reconectando" ficava travada indefinidamente, já
+    // que nada tirava _isReconnecting de true nesse caso.
+    _closedSub = signalR.onClosed.listen((_) {
+      if (!mounted) return;
+      setState(() => _isReconnecting = true);
+      _reconnectSignalRWithRetry();
     });
 
     _orderCancelledSub = signalR.onOrderCancelled.listen((data) {
       if (!mounted) return;
+      // Página de pedido aberta: quem trata o cancelamento é a própria página
+      // (RF10) — o popUntil abaixo arrancaria a /order-alert da pilha.
+      if (NotificationService.orderAlertOpen) return;
       // Dismiss any open bottom sheet and notify the driver
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -404,6 +527,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
 
     // ── Now connect to hubs (listeners are already registered) ──
+    await _connectHubs(signalR, token);
+  }
+
+  /// Reconecta após um onClosed, com retry em loop até dar certo.
+  ///
+  /// `connect()` pode falhar (ex.: handshake do protocolo SignalR cancelado
+  /// por uma race entre stop()/start(), hiccup de rede) — sem tratamento,
+  /// essa exceção subia sem catch pelo listener do stream ("Unhandled
+  /// Exception") e nenhuma nova tentativa era agendada, travando a badge
+  /// "Reconectando" pra sempre. Também garante que _isReconnecting volte a
+  /// false no sucesso: onReconnected só dispara para o auto-reconnect
+  /// interno do client, não para esse reconnect manual pós-close.
+  Future<void> _reconnectSignalRWithRetry() async {
+    if (_reconnectLoopActive) return;
+    _reconnectLoopActive = true;
+    try {
+      const retryDelay = Duration(seconds: 3);
+      while (mounted) {
+        try {
+          await _connectSignalR();
+          if (mounted) setState(() => _isReconnecting = false);
+          return;
+        } catch (e) {
+          developer.log('Falha ao reconectar SignalR, tentando novamente', error: e);
+          await Future.delayed(retryDelay);
+        }
+      }
+    } finally {
+      _reconnectLoopActive = false;
+    }
+  }
+
+  /// Conecta (ou reconecta) apenas os hubs, sem re-registrar os listeners —
+  /// esses são inscritos uma única vez nos streams persistentes do
+  /// [SignalRService]. Usado tanto no primeiro connect quanto na reconexão
+  /// forçada (resume do app / onClosed).
+  Future<void> _connectHubs(SignalRService signalR, String token) async {
     await signalR.connect(
       'travel-orders',
       '${AppConfig.getBaseUrl()}/hubs/travel-orders',
@@ -516,111 +676,5 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
       },
     );
-  }
-
-  // ── Push Notification Methods (RF04, RF05, RF06) ──
-
-  /// Verifica se há pushOrderId nos argumentos da rota (warm start).
-  void _checkPushOrderInArgs() {
-    final args = Modular.args.data;
-    if (args is Map) {
-      final orderId = args['pushOrderId'] as String?;
-      if (orderId != null && _processedOrderId != orderId) {
-        _processedOrderId = orderId;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _fetchAndShowOrder(orderId);
-        });
-      }
-    }
-  }
-
-  /// RF04: Processa pushOrderId recebido via argumentos de rota.
-  void _handlePushOrder() {
-    final args = Modular.args.data;
-    final pushOrderId = args is Map ? args['pushOrderId'] as String? : null;
-    if (pushOrderId == null) return;
-
-    _processedOrderId = pushOrderId;
-    _fetchAndShowOrder(pushOrderId);
-  }
-
-  /// RF04: Busca dados completos do pedido e exibe IncomingOrderSheet.
-  Future<void> _fetchAndShowOrder(String orderId) async {
-    try {
-      final dio = Modular.get<Dio>();
-      final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId');
-      if (!mounted) return;
-
-      final data = response.data as Map<String, dynamic>;
-      final status = data['status'] as String?;
-
-      // RF04: Tratamento de erros de negócio
-      if (status == 'cancelled' || status == 'accepted') {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Pedido não está mais disponível')),
-          );
-        }
-        return;
-      }
-
-      // RF05: Marcar sheet como visível (suprime foreground dup)
-      NotificationService.setSheetVisible(true);
-
-      if (mounted) {
-        IncomingOrderSheet.show(
-          context,
-          data,
-          onDenied: () {
-            _deniedOrderIds.add(orderId);
-            NotificationService.setSheetVisible(false);
-          },
-        );
-      }
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 403) {
-        // RF04: Não pertence ao motorista — ignorar silenciosamente
-        developer.log('[PUSH] Order $orderId does not belong to current driver',
-            name: 'push');
-      } else {
-        developer.log('[PUSH] Failed to fetch order $orderId: $e', name: 'push', level: 900);
-      }
-    }
-  }
-
-  /// RF06: Banner informativo quando permissão de notificação está negada.
-  Widget _buildPermissionBanner() {
-    return Container(
-      color: Colors.orange.shade50,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.notifications_off, color: Colors.orange, size: 18),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'Notificações desativadas — você pode perder novas corridas. Ative nas Configurações do app.',
-              style: TextStyle(color: Colors.orange, fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// RF06: Verifica status da permissão de notificação.
-  Future<void> _checkNotificationPermission() async {
-    final granted = await NotificationService.permissionGranted;
-    if (mounted) {
-      setState(() => _permissionDenied = !granted);
-    }
-  }
-
-  /// RF02: Tenta recuperar OneSignal.login se o primeiro fluxo falhou.
-  Future<void> _tryLateLogin() async {
-    final userId = _userId;
-    if (userId != null) {
-      NotificationService.tryLateLogin(userId);
-    }
   }
 }
