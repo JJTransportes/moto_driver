@@ -7,8 +7,10 @@ workflows:
       app_store_connect: Moto Driver
 
     triggering:
-      events:
-      - push
+      events: []
+      # push trigger temporarily disabled while the release/pre-release pipelines
+      # are being reconstructed — re-add "- push" under events when ready to
+      # resume automatic builds/publishing on this branch.
       branch_patterns:
       - pattern: "ios_pre_release"
       - include: true
