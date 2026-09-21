@@ -47,7 +47,7 @@ workflows:
     - name: Determine next build number
       script: |
         LATEST_BUILD_NUMBER=$(google-play get-latest-build-number \
-          --package-name "$BUNDLE_ID" \
+          --package-name "br.com.rockservicos.moto_driver" \
           --credentials "@env:GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS")
         NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
         echo "Latest build number across all tracks: $LATEST_BUILD_NUMBER"
