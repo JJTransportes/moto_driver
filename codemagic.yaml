@@ -43,12 +43,12 @@ workflows:
     publishing:
       email:
         recipients:
-        - dev.jr.s.engineer@gmail.com
+        - comercialpepiviagens@gmail.com
         notify:
-          success: false
+          success: true
           failure: true
 
       google_play:
         credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
-        track: "alpha"
+        track: "internal"
         submit_as_draft: false
