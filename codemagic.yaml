@@ -62,9 +62,9 @@ workflows:
     publishing:
       email:
         recipients:
-        - comercialpepiviagens@gmail.com
-        - igoralmeidarossi@gmail.com
-        - marcospl.nascimento12@gmail.com
+        #- comercialpepiviagens@gmail.com
+        #- igoralmeidarossi@gmail.com
+        #- marcospl.nascimento12@gmail.com
         notify:
           success: true
           failure: true
