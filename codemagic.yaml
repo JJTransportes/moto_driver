@@ -31,15 +31,15 @@ workflows:
     - name: Get Flutter packages
       script: flutter pub get
 
-    - name: Run tests
-      script: flutter test
-
     - name: Config definitions
       script: |
         cat > .env << EOF
         API_BASE_URL=$API_BASE_URL
         ONE_SIGNAL_ID=$ONE_SIGNAL_ID
         EOF
+
+    - name: Run tests
+      script: flutter test
 
     - name: Determine next build number
       script: |
