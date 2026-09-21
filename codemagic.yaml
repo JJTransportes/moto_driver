@@ -11,6 +11,7 @@ workflows:
       - pattern: "android_staging"
       - include: false
       - source: false
+      cancel_previous_builds: true
 
     environment:
       flutter: 3.44.8
@@ -19,12 +20,19 @@ workflows:
       android_signing:
       - moto_keystore
 
+    cache:
+      cache_paths:
+      - $HOME/.pub-cache
+
     scripts:
     - name: Set up local.properties
       script: echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
 
     - name: Get Flutter packages
       script: flutter pub get
+
+    - name: Run tests
+      script: flutter test
 
     - name: Config definitions
       script: |
