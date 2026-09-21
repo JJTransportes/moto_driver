@@ -69,10 +69,8 @@ workflows:
         - igoralmeidarossi@gmail.com
         - marcospl.nascimento12@gmail.com
         notify:
-          # temporarily disabled while testing this pipeline rebuild — re-enable
-          # (success: true, failure: true) before merging into android_staging
-          success: false
-          failure: false
+          success: true
+          failure: true
 
       google_play:
         credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
