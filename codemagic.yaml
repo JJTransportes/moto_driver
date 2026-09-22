@@ -49,11 +49,19 @@ workflows:
         ONE_SIGNAL_ID=$ONE_SIGNAL_ID
         EOF
 
+    - name: Determine next build number
+      script: |
+        LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$BUNDLE_ID")
+        NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+        echo "Latest build number: $LATEST_BUILD_NUMBER"
+        echo "Next build number: $NEW_BUILD_NUMBER"
+        echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
+
     - name: Flutter build ipa
       script: |+
         flutter build ipa --release \
           --build-name=1.0.0 \
-          --build-number=24 \
+          --build-number=$NEW_BUILD_NUMBER \
           --export-options-plist=/Users/builder/export_options.plist
           
     artifacts:
