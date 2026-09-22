@@ -1,5 +1,5 @@
 workflows:
-  android_staging:
+  android_release:
     name: Moto Android Release
     instance_type: mac_mini_m2
     max_build_duration: 30
@@ -13,6 +13,7 @@ workflows:
       - pattern: "android_release"
       - include: false
       - source: false
+      cancel_previous_builds: true
 
     environment:
       flutter: 3.44.0
@@ -20,6 +21,10 @@ workflows:
       - release
       android_signing:
       - moto_keystore
+
+    cache:
+      cache_paths:
+      - $HOME/.pub-cache
 
     scripts:
     - name: Set up local.properties
@@ -34,8 +39,19 @@ workflows:
         API_BASE_URL=$API_BASE_URL
         ONE_SIGNAL_ID=$ONE_SIGNAL_ID
         EOF
+
+    - name: Determine next build number
+      script: |
+        LATEST_BUILD_NUMBER=$(google-play get-latest-build-number \
+          --package-name "br.com.rockservicos.moto_driver" \
+          --credentials "@env:GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS")
+        NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+        echo "Latest build number across all tracks: $LATEST_BUILD_NUMBER"
+        echo "Next build number: $NEW_BUILD_NUMBER"
+        echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
+
     - name: Build App Bundle
-      script: flutter build appbundle --release
+      script: flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER
 
     artifacts:
     - build/**/outputs/**/*.aab
