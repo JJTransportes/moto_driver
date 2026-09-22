@@ -51,7 +51,7 @@ workflows:
 
     - name: Determine next build number
       script: |
-        LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$BUNDLE_ID")
+        LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
         NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
         echo "Latest build number: $LATEST_BUILD_NUMBER"
         echo "Next build number: $NEW_BUILD_NUMBER"
@@ -74,10 +74,8 @@ workflows:
         recipients:
         - comercialpepiviagens@gmail.com
         notify:
-          # temporarily disabled while testing this pipeline rebuild — re-enable
-          # (success: true, failure: true) before merging into ios_staging
-          success: false
-          failure: false
+          success: true
+          failure: true
 
       app_store_connect:
         auth: integration
