@@ -9,8 +9,8 @@ workflows:
       - push
       branch_patterns:
       - pattern: "android_staging"
-      - include: false
-      - source: false
+      - include: true
+      - source: true
       cancel_previous_builds: true
 
     environment:

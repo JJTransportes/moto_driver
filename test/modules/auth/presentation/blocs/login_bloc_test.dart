@@ -59,8 +59,7 @@ void main() {
       verify: (_) {
         verify(() => mockAuthStorage.saveToken('tok_123', 'user_1'))
             .called(1);
-        verify(() => mockAuthStorage.saveRefreshToken(any()))
-            .called(1);
+        verifyNever(() => mockAuthStorage.saveRefreshToken(any()));
         verify(() => mockAuthLocal.saveAuth(
               userId: 'user_1',
               accessToken: 'tok_123',
@@ -118,7 +117,7 @@ void main() {
       ),
       expect: () => [
         const LoginLoading(),
-        const LoginFailure('E-mail ou senha inválidos'),
+        const LoginFailure('Exception: E-mail ou senha inválidos'),
       ],
       verify: (_) {
         verifyNever(() => mockAuthStorage.saveToken(any(), any()));
