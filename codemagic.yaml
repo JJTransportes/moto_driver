@@ -11,8 +11,8 @@ workflows:
       # automatic builds/publishing on android_release.
       branch_patterns:
       - pattern: "android_release"
-      - include: false
-      - source: false
+      - include: true
+      - source: true
       cancel_previous_builds: true
 
     environment:
