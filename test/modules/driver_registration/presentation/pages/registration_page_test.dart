@@ -8,6 +8,7 @@ import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_u
 import 'package:moto_driver/modules/driver_registration/domain/usecases/i_register_usecase.dart';
 import 'package:moto_driver/modules/driver_registration/presentation/blocs/register_bloc.dart';
 import 'package:moto_driver/modules/driver_registration/presentation/pages/registration_page.dart';
+import 'package:moto_driver/widgets/app_button.dart';
 import 'package:result_dart/result_dart.dart';
 
 class MockRegisterUsecase extends Mock implements IRegisterUsecase {}
@@ -148,20 +149,17 @@ void main() {
     });
 
     testWidgets(
-        'shows validation errors when required fields are empty and submit is tapped',
+        // Regra de negócio: o botão "Cadastrar" fica desabilitado enquanto o
+        // formulário não estiver completo (ver _isFormComplete em
+        // registration_page.dart) — por isso não dá pra "tocar no botão
+        // vazio" para revelar "Campo obrigatório"; o teste correto é
+        // verificar que o botão continua desabilitado com campos vazios.
+        'Cadastrar button stays disabled with required fields empty',
         (tester) async {
       await tester.pumpWidget(buildTestableWidget());
 
-      // Scroll down to make the Cadastrar button visible
-      final cadastrarButton = find.text('Cadastrar');
-      await tester.ensureVisible(cadastrarButton);
-      await tester.pumpAndSettle();
-
-      await tester.tap(cadastrarButton);
-      await tester.pumpAndSettle();
-
-      // Should show multiple "Campo obrigatório" errors
-      expect(find.text('Campo obrigatório'), findsWidgets);
+      final button = tester.widget<AppButton>(find.byType(AppButton));
+      expect(button.onPressed, isNull);
     });
 
     testWidgets('shows loading indicator when state is RegisterLoading',
