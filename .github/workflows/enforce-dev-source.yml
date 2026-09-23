@@ -1,0 +1,24 @@
+name: Enforce PR source branch on pipeline branches
+
+# android_staging and android_release are pipeline-only branches: they exist
+# to trigger Codemagic, not to hold independent development. The only
+# allowed way in is a merge from dev — never a random feature/hotfix branch
+# directly, which could skip review on dev or drift the pipeline branches
+# out of sync with the source of truth.
+
+on:
+  pull_request:
+    branches:
+      - android_staging
+      - android_release
+
+jobs:
+  check-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if source branch is not dev
+        run: |
+          if [ "${{ github.head_ref }}" != "dev" ]; then
+            echo "PRs into ${{ github.base_ref }} must come from 'dev'. Got: ${{ github.head_ref }}"
+            exit 1
+          fi
