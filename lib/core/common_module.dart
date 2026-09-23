@@ -17,6 +17,8 @@ import 'package:moto_driver/modules/auth/data/datasources/auth_datasource.dart';
 import 'package:moto_driver/modules/auth/data/datasources/i_auth_datasource.dart';
 import 'package:moto_driver/modules/auth/data/repositories/auth_repository.dart';
 import 'package:moto_driver/modules/auth/domain/repositories/i_auth_repository.dart';
+import 'package:moto_driver/modules/auth/domain/usecases/get_password_policy_usecase.dart';
+import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_usecase.dart';
 import 'package:moto_driver/modules/driver_availability/data/datasources/availability_datasource.dart';
 import 'package:moto_driver/modules/usage_terms/data/datasources/usage_terms_datasource.dart';
 
@@ -36,6 +38,9 @@ class CommonModule extends Module {
     i.addSingleton<INotificationService>(OneSignalNotificationService.new);
     i.add<IAuthDatasource>(AuthDatasource.new);
     i.add<IAuthRepository>(AuthRepository.new);
+    // Compartilhado com o cadastro de motorista (design D4) — CommonModule é
+    // importado tanto por AppModule quanto por DriverRegistrationModule.
+    i.add<IGetPasswordPolicyUsecase>(GetPasswordPolicyUsecase.new);
     i.addSingleton<TermsStorage>(TermsStorage.new);
     i.addSingleton<UsageTermsDatasource>(UsageTermsDatasource.new);
     i.addSingleton<AvailabilityDatasource>(AvailabilityDatasource.new);

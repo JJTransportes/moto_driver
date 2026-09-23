@@ -37,7 +37,11 @@ class SignalRService {
             accessTokenFactory: () async => accessToken,
           ),
         )
-        .withAutomaticReconnect()
+        // Backoff curto — reconectar rápido importa mais aqui do que
+        // economizar tentativas. Depois da última entrada o client desiste
+        // e emite onclose (ver _registerLifecycleHandlers/onClosed), que é
+        // tratado pela tela para forçar um connect() novo.
+        .withAutomaticReconnect(retryDelays: [0, 1000, 2000, 5000, 5000])
         .build();
 
     _registerHubHandlers(connection, hubName);
@@ -51,7 +55,13 @@ class SignalRService {
   /// Necessário porque [connect] para e recria a conexão com o mesmo nome —
   /// a OrderAlertPage usa este check para não derrubar a conexão da home
   /// (warm start) ao abrir.
-  bool isConnected(String hubName) => _connections.containsKey(hubName);
+  ///
+  /// Checa o estado real da [HubConnection], não só a presença no map: uma
+  /// vez que o backoff automático se esgota (onclose), a entrada continua no
+  /// map mas a conexão já está `Disconnected` — só olhar o map daria falso
+  /// positivo e impediria a reconexão forçada no resume do app.
+  bool isConnected(String hubName) =>
+      _connections[hubName]?.state == HubConnectionState.Connected;
 
   /// Envia um comando 'DenyOrder' para o hub de travel-orders.
   /// Lança exceção se a conexão não estiver estabelecida.

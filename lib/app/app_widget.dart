@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
@@ -70,6 +71,13 @@ class _AppWidgetState extends State<AppWidget> with WidgetsBindingObserver {
       theme: AppTheme.theme,
       debugShowCheckedModeBanner: false,
       routerConfig: Modular.routerConfig,
+      locale: const Locale('pt', 'BR'),
+      supportedLocales: const [Locale('pt', 'BR')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
     );
   }
 }

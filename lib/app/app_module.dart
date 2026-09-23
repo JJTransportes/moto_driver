@@ -6,14 +6,18 @@ import 'package:moto_driver/modules/auth/domain/usecases/confirm_password_reset_
 import 'package:moto_driver/modules/auth/domain/usecases/i_confirm_password_reset_usecase.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/i_login_usecase.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/i_request_password_reset_usecase.dart';
+import 'package:moto_driver/modules/auth/domain/usecases/i_verify_reset_code_usecase.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/login_usecase.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/request_password_reset_usecase.dart';
+import 'package:moto_driver/modules/auth/domain/usecases/verify_reset_code_usecase.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_reset_bloc.dart';
+import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/login_page.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/password_recovery_page.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/password_reset_page.dart';
+import 'package:moto_driver/modules/auth/presentation/pages/verify_reset_code_page.dart';
 import 'package:moto_driver/modules/driver_registration/driver_registration_module.dart';
 import 'package:moto_driver/modules/driver_home/presentation/pages/order_alert_page.dart';
 import 'package:moto_driver/modules/driver_home/presentation/pages/order_refresh_page.dart';
@@ -39,6 +43,7 @@ class AppModule extends Module {
     i.add<ILoginUsecase>(LoginUsecase.new);
     i.add<IRequestPasswordResetUsecase>(RequestPasswordResetUsecase.new);
     i.add<IConfirmPasswordResetUsecase>(ConfirmPasswordResetUsecase.new);
+    i.add<IVerifyResetCodeUsecase>(VerifyResetCodeUsecase.new);
     i.addSingleton<LoginBloc>(LoginBloc.new);
     i.addSingleton<PasswordRecoveryBloc>(PasswordRecoveryBloc.new);
     i.addSingleton<UsageTermsBloc>(UsageTermsBloc.new);
@@ -69,15 +74,30 @@ class AppModule extends Module {
       ),
     );
     r.child(
-      '/reset-password',
+      '/verify-reset-code',
       child: (_) {
         final email = Modular.args.data['email'] as String;
         return BlocProvider(
-          create: (_) => PasswordResetBloc(
-            Modular.get<IConfirmPasswordResetUsecase>(),
+          create: (_) => VerifyResetCodeBloc(
+            Modular.get<IVerifyResetCodeUsecase>(),
             email: email,
           ),
-          child: const PasswordResetPage(),
+          child: VerifyResetCodePage(email: email),
+        );
+      },
+    );
+    r.child(
+      '/reset-password',
+      child: (_) {
+        final args = Modular.args.data as Map<String, dynamic>;
+        final resetToken = args['resetToken'] as String;
+        final email = args['email'] as String?;
+        return BlocProvider(
+          create: (_) => PasswordResetBloc(
+            Modular.get<IConfirmPasswordResetUsecase>(),
+            resetToken: resetToken,
+          ),
+          child: PasswordResetPage(email: email),
         );
       },
     );

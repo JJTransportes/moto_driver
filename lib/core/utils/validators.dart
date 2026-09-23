@@ -1,3 +1,5 @@
+import 'package:moto_driver/core/models/password_policy.dart';
+
 import 'masks.dart';
 
 /// Validates a Brazilian CPF using the standard check-digit algorithm.
@@ -72,8 +74,18 @@ String? validateCnh(String cnh) {
   return null;
 }
 
+/// Local part: one or more dot-separated segments (no leading/trailing dot,
+/// no `..`). Domain: one or more dot-separated labels, each not starting or
+/// ending with `-`, requiring at least one label after the last dot (TLD).
+/// Rejects things the old permissive regex let through, e.g. `a@b...com`.
+final RegExp _emailPattern = RegExp(
+  r"^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*"
+  r'@[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?'
+  r'(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+$',
+);
+
 String? validateEmailFormat(String email) {
-  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+  if (!_emailPattern.hasMatch(email)) {
     return 'E-mail inválido.';
   }
   final safeTextError = validateSafeText(email, 'E-mail');
@@ -86,6 +98,60 @@ String? validatePasswordLength(String password) {
   if (password.length < 8) return 'Senha deve ter no mínimo 8 caracteres.';
   if (password.length > 72) return 'Senha deve ter no máximo 72 caracteres.';
   return null;
+}
+
+/// Um requisito de política de senha já avaliado contra o texto digitado —
+/// consumido pelo widget `PasswordPolicyChecklist` (dumb, só desenha).
+class PasswordRequirement {
+  final String label;
+  final bool satisfied;
+
+  const PasswordRequirement({required this.label, required this.satisfied});
+}
+
+final RegExp _uppercasePattern = RegExp(r'[A-Z]');
+final RegExp _lowercasePattern = RegExp(r'[a-z]');
+final RegExp _digitPattern = RegExp(r'\d');
+final RegExp _specialCharPattern = RegExp(r'[^A-Za-z0-9\s]');
+
+/// Avalia [password] contra [policy], derivando dinamicamente os requisitos
+/// habilitados — mesmas 5 regras e labels do checklist "estilo gov.br" do
+/// painel web. Se um requisito vier desabilitado na policy (ex.: backend
+/// desliga `requireSpecialChar`), ele simplesmente não aparece na lista.
+List<PasswordRequirement> evaluatePasswordPolicy(String password, PasswordPolicy policy) {
+  return [
+    PasswordRequirement(
+      label: 'Mínimo ${policy.minLength} e máximo ${policy.maxLength} caracteres',
+      satisfied: password.length >= policy.minLength && password.length <= policy.maxLength,
+    ),
+    if (policy.requireUppercase)
+      PasswordRequirement(
+        label: 'Pelo menos 1 letra maiúscula',
+        satisfied: _uppercasePattern.hasMatch(password),
+      ),
+    if (policy.requireLowercase)
+      PasswordRequirement(
+        label: 'Pelo menos 1 letra minúscula',
+        satisfied: _lowercasePattern.hasMatch(password),
+      ),
+    if (policy.requireDigit)
+      PasswordRequirement(
+        label: 'Pelo menos 1 número',
+        satisfied: _digitPattern.hasMatch(password),
+      ),
+    if (policy.requireSpecialChar)
+      PasswordRequirement(
+        label: 'Pelo menos 1 caractere especial (ex: ! @ # \$ % &)',
+        satisfied: _specialCharPattern.hasMatch(password),
+      ),
+  ];
+}
+
+/// True somente quando todos os requisitos aplicáveis de [policy] são
+/// cumpridos por [password]. Usada para habilitar o botão de
+/// confirmar/criar, evitando round-trip desnecessário ao backend.
+bool isPasswordValid(String password, PasswordPolicy policy) {
+  return evaluatePasswordPolicy(password, policy).every((r) => r.satisfied);
 }
 
 String? validateMaxLength(String value, int max, String fieldName) {

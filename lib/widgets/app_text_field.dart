@@ -12,6 +12,7 @@ class AppTextField extends StatefulWidget {
   final TextInputType keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final int? maxLength;
+  final FocusNode? focusNode;
 
   const AppTextField({
     super.key,
@@ -23,6 +24,7 @@ class AppTextField extends StatefulWidget {
     this.keyboardType = TextInputType.text,
     this.inputFormatters,
     this.maxLength,
+    this.focusNode,
   });
 
   @override
@@ -56,6 +58,7 @@ class _AppTextFieldState extends State<AppTextField> {
         const SizedBox(height: 8),
         TextField(
           controller: widget.controller,
+          focusNode: widget.focusNode,
           obscureText: _obscured,
           keyboardType: widget.keyboardType,
           inputFormatters: widget.inputFormatters,
