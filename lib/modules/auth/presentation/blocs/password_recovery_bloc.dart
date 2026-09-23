@@ -23,7 +23,9 @@ class PasswordRecoveryBloc extends Bloc<PasswordRecoveryEvent, PasswordRecoveryS
       (_) => emit(PasswordRecoverySent(event.email)),
       (error) {
         final message = switch (error) {
+          NotFoundException() => error.message,
           RateLimitedException() => error.message,
+          UnapprovedAccountException() => error.message,
           _ => 'Erro ao enviar o código. Verifique sua conexão e tente novamente.',
         };
         emit(PasswordRecoveryError(message));

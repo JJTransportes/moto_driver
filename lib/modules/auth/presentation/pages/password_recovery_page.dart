@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/utils/server_error_guard.dart';
+import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_event.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_state.dart';
@@ -19,18 +21,70 @@ class PasswordRecoveryPage extends StatefulWidget {
 
 class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
   final _emailController = TextEditingController();
+  final _confirmEmailController = TextEditingController();
   String? _emailError;
+  String? _confirmEmailError;
+
+  // Bloqueia o botão "Enviar" depois de um erro do backend (ex.: e-mail não
+  // cadastrado) até o campo de e-mail ser editado — evita spammar o botão
+  // reenviando o mesmo e-mail rejeitado.
+  final _serverErrorGuard = ServerErrorGuard();
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_onFieldsChanged);
+    _confirmEmailController.addListener(_onFieldsChanged);
+  }
+
+  void _onFieldsChanged() {
+    if (_serverErrorGuard.isBlocking) {
+      _serverErrorGuard.clearIfEdited('email', _emailController.text);
+      if (!_serverErrorGuard.isBlocking) _emailError = null;
+    }
+    setState(() {});
+  }
+
+  String? get _liveConfirmEmailError {
+    if (_confirmEmailController.text.isEmpty) return null;
+    if (_confirmEmailController.text.trim().toLowerCase() !=
+        _emailController.text.trim().toLowerCase()) {
+      return 'Os e-mails não coincidem';
+    }
+    return null;
+  }
+
+  bool get _isFormComplete =>
+      validators.validateEmailFormat(_emailController.text.trim()) == null &&
+      validators.validateMaxLength(_emailController.text, 100, 'E-mail') == null &&
+      _confirmEmailController.text.trim().toLowerCase() ==
+          _emailController.text.trim().toLowerCase() &&
+      !_serverErrorGuard.isBlocking;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _confirmEmailController.dispose();
     super.dispose();
   }
 
   void _submit() {
     final email = _emailController.text.trim();
-    setState(() => _emailError = email.isEmpty ? 'E-mail obrigatório' : null);
-    if (_emailError != null) return;
+    final confirmEmail = _confirmEmailController.text.trim();
+    setState(() {
+      _emailError = email.isEmpty
+          ? 'E-mail obrigatório'
+          : validators.validateEmailFormat(email) ??
+              validators.validateMaxLength(email, 100, 'E-mail');
+      if (confirmEmail.isEmpty) {
+        _confirmEmailError = 'Campo obrigatório';
+      } else if (confirmEmail.toLowerCase() != email.toLowerCase()) {
+        _confirmEmailError = 'Os e-mails não coincidem';
+      } else {
+        _confirmEmailError = null;
+      }
+    });
+    if (_emailError != null || _confirmEmailError != null) return;
 
     context.read<PasswordRecoveryBloc>().add(RequestCodeSubmitted(email));
   }
@@ -38,7 +92,14 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<PasswordRecoveryBloc, PasswordRecoveryState>(
-      listener: (context, state) {},
+      listener: (context, state) {
+        if (state is PasswordRecoveryError) {
+          setState(() {
+            _emailError = state.message;
+            _serverErrorGuard.block('email', _emailController.text);
+          });
+        }
+      },
       builder: (context, state) {
         if (state is PasswordRecoverySent) {
           return _buildSent(state.email);
@@ -67,7 +128,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
               const SizedBox(height: 32),
               AppButton(
                 label: 'Já tenho o código',
-                onPressed: () => Modular.to.pushNamed('/reset-password', arguments: {'email': email}),
+                onPressed: () => Modular.to.pushNamed('/verify-reset-code', arguments: {'email': email}),
               ),
               const SizedBox(height: 12),
               TextButton(
@@ -110,6 +171,16 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 errorText: _emailError,
+                maxLength: 100,
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                label: 'Confirmar E-mail',
+                hint: 'Digite novamente seu e-mail',
+                controller: _confirmEmailController,
+                keyboardType: TextInputType.emailAddress,
+                errorText: _confirmEmailError ?? _liveConfirmEmailError,
+                maxLength: 100,
               ),
               if (errorMessage != null) ...[
                 const SizedBox(height: 12),
@@ -123,7 +194,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
               AppButton(
                 label: 'Enviar',
                 loading: isLoading,
-                onPressed: _submit,
+                onPressed: _isFormComplete ? _submit : null,
               ),
             ],
           ),

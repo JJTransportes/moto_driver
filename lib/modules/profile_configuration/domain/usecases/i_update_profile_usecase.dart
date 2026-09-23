@@ -2,5 +2,5 @@ import 'package:moto_driver/modules/profile_configuration/domain/entities/profil
 import 'package:result_dart/result_dart.dart';
 
 abstract class IUpdateProfileUseCase {
-  Future<Result<ProfileEntity>> call(ProfileEntity profile);
+  Future<Result<ProfileEntity>> call(ProfileEntity profile, {String? password});
 }

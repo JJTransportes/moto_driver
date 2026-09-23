@@ -31,10 +31,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _orderCancelledSub;
   StreamSubscription? _reconnectingSub;
   StreamSubscription? _reconnectedSub;
+  StreamSubscription? _closedSub;
   StreamSubscription? _travelCancelledSub;
   StreamSubscription? _travelStartedSub;
   StreamSubscription? _travelCompletedSub;
   bool _isReconnecting = false;
+  bool _reconnectLoopActive = false;
+  bool _signalRListenersRegistered = false;
   bool _checkingActiveTravel = false;
   String? _currentTravelStatus;
   String? _currentTravelId;
@@ -217,6 +220,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _travelCompletedSub?.cancel();
     _reconnectingSub?.cancel();
     _reconnectedSub?.cancel();
+    _closedSub?.cancel();
     super.dispose();
   }
 
@@ -270,7 +274,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // mudanças de status ocorridas enquanto o app não estava visível.
     if (state == AppLifecycleState.resumed) {
       _checkActiveTravelHttp();
+      _reconnectSignalRIfNeeded();
     }
+  }
+
+  /// O SO pode ter suspendido a conexão de rede com o app em background sem
+  /// avisar; o retry automático do SignalR pode já ter desistido (backoff
+  /// esgotado) nesse meio-tempo. Em vez de esperar o próximo ciclo de retry
+  /// (ou nenhum, se já desistiu), força uma reconexão na hora que o app volta
+  /// ao primeiro plano.
+  Future<void> _reconnectSignalRIfNeeded() async {
+    final signalR = Modular.get<SignalRService>();
+    if (signalR.isConnected('travel-orders') && signalR.isConnected('travel-management')) {
+      return;
+    }
+    await _connectSignalR();
   }
 
   Future<void> _loadUserId() async {
@@ -366,9 +384,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final token = await authStorage.getToken();
     if (token == null) return;
 
-    _newOrderSub = signalR.onNewOrder.listen((data) {
+    if (_signalRListenersRegistered) {
+      await _connectHubs(signalR, token);
+      return;
+    }
+    _signalRListenersRegistered = true;
+
+    _newOrderSub = signalR.onNewOrder.listen((data) async {
       if (NotificationService.orderAlertOpen) return;
       if (_currentTravelId != null) return;
+
+      // `_currentTravelId` só é atualizado por fluxos que passam pela home —
+      // um aceite via notificação push (OrderAlertPage → /active-travel)
+      // nunca toca essa variável, então sob nenhuma hipótese basta confiar
+      // só nela: confere a fonte persistida antes de exibir qualquer oferta.
+      final travelRepo = Modular.get<TravelLocalRepository>();
+      final active = await travelRepo.getActiveTravel();
+      if (active != null || !mounted) return;
 
       final orderId = data['orderId'] as String?;
       if (orderId == null) return;
@@ -466,6 +498,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _checkActiveTravelHttp();
     });
 
+    // Dispara quando o backoff automático se esgota e a conexão cai de vez
+    // (não é mais um "onReconnecting" — o client desistiu). Sem este
+    // listener a badge "Reconectando" ficava travada indefinidamente, já
+    // que nada tirava _isReconnecting de true nesse caso.
+    _closedSub = signalR.onClosed.listen((_) {
+      if (!mounted) return;
+      setState(() => _isReconnecting = true);
+      _reconnectSignalRWithRetry();
+    });
+
     _orderCancelledSub = signalR.onOrderCancelled.listen((data) {
       if (!mounted) return;
       // Página de pedido aberta: quem trata o cancelamento é a própria página
@@ -485,6 +527,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
 
     // ── Now connect to hubs (listeners are already registered) ──
+    await _connectHubs(signalR, token);
+  }
+
+  /// Reconecta após um onClosed, com retry em loop até dar certo.
+  ///
+  /// `connect()` pode falhar (ex.: handshake do protocolo SignalR cancelado
+  /// por uma race entre stop()/start(), hiccup de rede) — sem tratamento,
+  /// essa exceção subia sem catch pelo listener do stream ("Unhandled
+  /// Exception") e nenhuma nova tentativa era agendada, travando a badge
+  /// "Reconectando" pra sempre. Também garante que _isReconnecting volte a
+  /// false no sucesso: onReconnected só dispara para o auto-reconnect
+  /// interno do client, não para esse reconnect manual pós-close.
+  Future<void> _reconnectSignalRWithRetry() async {
+    if (_reconnectLoopActive) return;
+    _reconnectLoopActive = true;
+    try {
+      const retryDelay = Duration(seconds: 3);
+      while (mounted) {
+        try {
+          await _connectSignalR();
+          if (mounted) setState(() => _isReconnecting = false);
+          return;
+        } catch (e) {
+          developer.log('Falha ao reconectar SignalR, tentando novamente', error: e);
+          await Future.delayed(retryDelay);
+        }
+      }
+    } finally {
+      _reconnectLoopActive = false;
+    }
+  }
+
+  /// Conecta (ou reconecta) apenas os hubs, sem re-registrar os listeners —
+  /// esses são inscritos uma única vez nos streams persistentes do
+  /// [SignalRService]. Usado tanto no primeiro connect quanto na reconexão
+  /// forçada (resume do app / onClosed).
+  Future<void> _connectHubs(SignalRService signalR, String token) async {
     await signalR.connect(
       'travel-orders',
       '${AppConfig.getBaseUrl()}/hubs/travel-orders',

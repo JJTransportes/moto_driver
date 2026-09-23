@@ -72,7 +72,7 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
                             color: _statusColor(_travels[i]['status'] as String?),
                           ),
                           title: Text(_travels[i]['passengerName'] as String? ?? 'Passageiro'),
-                          subtitle: Text('Status: ${_travels[i]['status']}'),
+                          subtitle: Text('Status: ${_statusLabel(_travels[i]['status'] as String?)}'),
                           trailing: Text(
                             _formatDate(_travels[i]['createdAt'] as String?),
                             style: const TextStyle(fontSize: 12, color: Color(0xFF4E4E4E)),
@@ -98,6 +98,17 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
       case 'Cancelled': return Colors.red;
       case 'InProgress': return const Color(0xFF4685C0);
       default: return Colors.orange;
+    }
+  }
+
+  String _statusLabel(String? status) {
+    switch (status) {
+      case 'Completed': return 'Concluída';
+      case 'Cancelled': return 'Cancelada';
+      case 'InProgress': return 'Em andamento';
+      case 'Accepted': return 'Aceita';
+      case 'Pending': return 'Pendente';
+      default: return status ?? '';
     }
   }
 
