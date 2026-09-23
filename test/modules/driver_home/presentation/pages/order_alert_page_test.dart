@@ -40,6 +40,7 @@ void main() {
 
     when(() => locationService.getCurrentPosition())
         .thenAnswer((_) async => const LocationResult(status: LocationStatus.granted));
+    when(() => travelLocalRepository.getActiveTravel()).thenAnswer((_) async => null);
     when(() => signalRService.onOrderCancelled)
         .thenAnswer((_) => cancelController.stream);
     when(() => signalRService.isConnected(any())).thenReturn(true);
