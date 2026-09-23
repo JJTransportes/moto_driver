@@ -72,11 +72,13 @@ class ProfileDatasource implements IProfileDatasource {
   Exception _mapDioException(DioException e) {
     switch (e.response?.statusCode) {
       case 400:
-        return const ValidationException(
-          'Dados inválidos. Verifique as informações e tente novamente.',
+        return ValidationException(
+          _extractErrorMessage(e) ?? 'Dados inválidos. Verifique as informações e tente novamente.',
         );
       case 401:
         return const UnauthorizedException('Sessão expirada. Faça login novamente.');
+      case 403:
+        return const UnauthorizedException('Você só pode editar o próprio perfil.');
       case 404:
         return const NotFoundException('Perfil não encontrado.');
       case 413:
@@ -95,5 +97,17 @@ class ProfileDatasource implements IProfileDatasource {
         }
         return NetworkException(e.message ?? 'Erro inesperado. Tente novamente.');
     }
+  }
+
+  /// Extrai a mensagem do corpo de erro do backend (campo `error`), quando
+  /// presente, para repassar ao usuário (ex.: senha inválida, e-mail já usado).
+  String? _extractErrorMessage(DioException e) {
+    final data = e.response?.data;
+    if (data is Map) {
+      final raw = data['error'] ?? data['message'] ?? data['detail'] ?? data['title'];
+      if (raw is String && raw.isNotEmpty) return raw;
+    }
+    if (data is String && data.isNotEmpty) return data;
+    return null;
   }
 }

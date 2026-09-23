@@ -31,19 +31,22 @@ void main() {
       ],
     );
 
-    // Anti-enumeração: 404 (e-mail não cadastrado) já é convertido em sucesso
-    // pelo datasource, então do ponto de vista do bloc é indistinguível do
-    // caso acima — mas o teste documenta a garantia de ponta a ponta.
     blocTest<PasswordRecoveryBloc, PasswordRecoveryState>(
-      'trata resultado de sucesso da mesma forma independente do motivo (anti-enumeração)',
+      'emite erro "Email não cadastrado." em 404, sem navegar',
       build: () {
-        when(() => usecase.call(any())).thenAnswer((_) async => Success(unit));
+        when(() => usecase.call(any())).thenAnswer(
+          (_) async => Failure(const NotFoundException('Email não cadastrado.')),
+        );
         return PasswordRecoveryBloc(usecase);
       },
       act: (bloc) => bloc.add(const RequestCodeSubmitted('inexistente@moto.com')),
       expect: () => [
         const PasswordRecoveryLoading(),
-        const PasswordRecoverySent('inexistente@moto.com'),
+        isA<PasswordRecoveryError>().having(
+          (e) => e.message,
+          'message',
+          'Email não cadastrado.',
+        ),
       ],
     );
 

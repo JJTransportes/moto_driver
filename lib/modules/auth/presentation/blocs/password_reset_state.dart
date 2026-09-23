@@ -17,19 +17,21 @@ class PasswordResetSuccess extends PasswordResetState {
 class PasswordResetError extends PasswordResetState {
   final String message;
 
-  /// 409 (código já utilizado): o único caso em que o status HTTP sozinho
-  /// garante a causa, então oferecemos uma ação específica — pedir um código
-  /// novo. O 400 cobre código inválido/expirado E senha fora da política com
-  /// o mesmo status; só a mensagem do servidor distingue os dois, e ela já é
-  /// exibida — não tentamos adivinhar qual campo corrigir.
-  final bool codeConsumed;
+  /// No novo contrato (resetToken em vez de email+code), tanto o 409 (token
+  /// já usado) quanto o 400 (token inválido/expirado) tornam o resetToken
+  /// atual inutilizável — nos dois casos oferecemos a ação "pedir um novo
+  /// código", que manda o usuário de volta para a tela 1. A mensagem do
+  /// servidor continua exibida como está (o 400 também pode ser "senha fora
+  /// da política", mas isso é filtrado client-side antes do submit — ver
+  /// design D3/D5 — então na prática quase sempre é token).
+  final bool canRequestNewCode;
 
-  const PasswordResetError(this.message, {this.codeConsumed = false});
+  const PasswordResetError(this.message, {this.canRequestNewCode = false});
 
   @override
   bool operator ==(Object other) =>
-      other is PasswordResetError && other.message == message && other.codeConsumed == codeConsumed;
+      other is PasswordResetError && other.message == message && other.canRequestNewCode == canRequestNewCode;
 
   @override
-  int get hashCode => Object.hash(message, codeConsumed);
+  int get hashCode => Object.hash(message, canRequestNewCode);
 }

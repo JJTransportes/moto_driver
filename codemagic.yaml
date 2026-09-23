@@ -1,0 +1,75 @@
+workflows:
+  android_staging:
+    name: Moto Android Staging
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+
+    triggering:
+      events:
+      - push
+      branch_patterns:
+      - pattern: "android_staging"
+      - include: true
+      - source: true
+      cancel_previous_builds: true
+
+    environment:
+      flutter: 3.44.8
+      groups:
+      - moto_staging
+      android_signing:
+      - moto_keystore
+
+    cache:
+      cache_paths:
+      - $HOME/.pub-cache
+
+    scripts:
+    - name: Set up local.properties
+      script: echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
+
+    - name: Get Flutter packages
+      script: flutter pub get
+
+    - name: Config definitions
+      script: |
+        cat > .env << EOF
+        API_BASE_URL=$API_BASE_URL
+        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
+        EOF
+
+    - name: Run tests
+      script: flutter test
+
+    - name: Determine next build number
+      script: |
+        LATEST_BUILD_NUMBER=$(google-play get-latest-build-number \
+          --package-name "br.com.rockservicos.moto_driver" \
+          --credentials "@env:GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS")
+        NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+        echo "Latest build number across all tracks: $LATEST_BUILD_NUMBER"
+        echo "Next build number: $NEW_BUILD_NUMBER"
+        echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
+
+    - name: Build App Bundle
+      script: flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER
+
+    artifacts:
+    - build/**/outputs/**/*.aab
+    - build/**/outputs/**/mapping.txt
+    - flutter_drive.log
+
+    publishing:
+      email:
+        recipients:
+        - comercialpepiviagens@gmail.com
+        - igoralmeidarossi@gmail.com
+        - marcospl.nascimento12@gmail.com
+        notify:
+          success: true
+          failure: true
+
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: "internal"
+        submit_as_draft: false

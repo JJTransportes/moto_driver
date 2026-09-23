@@ -58,7 +58,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   _AcceptStatus _status = _AcceptStatus.idle;
   String? _errorMessage;
 
-  static const int _rejectTimeoutSeconds = 15;
+  // Alinhado ao prazo de resposta do backend (20s) — passageiro agora vê
+  // esse mesmo prazo via evento DriverContacted, então os dois lados
+  // precisam bater.
+  static const int _rejectTimeoutSeconds = 20;
   int _remainingSeconds = _rejectTimeoutSeconds;
   Timer? _rejectTimer;
 
@@ -334,6 +337,33 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // Navigate to active travel with route data
       Modular.to.pushNamed('/active-travel', arguments: acceptResult);
     } on DioException catch (e) {
+      // 403: a oferta já passou pro próximo motorista da fila (timeout de
+      // 20s) — é definitivo, não transitório. Não faz sentido deixar o card
+      // aberto pra um reenvio, então fecha igual ao fluxo de recusa.
+      if (e.response?.statusCode == 403) {
+        const message = 'Essa corrida não está mais disponível.';
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(message),
+              duration: Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+
+        final onDecision = widget.onDecision;
+        if (onDecision != null) {
+          NotificationService.setSheetVisible(false);
+          onDecision(OrderDecision.denied, null);
+        } else {
+          widget.onDenied?.call();
+          if (context.mounted) Navigator.of(context).pop();
+          NotificationService.setSheetVisible(false);
+        }
+        return;
+      }
+
       String message;
       switch (e.response?.statusCode) {
         case 401:

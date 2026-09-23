@@ -182,6 +182,49 @@ void main() {
         throwsA(isA<DeviceConflictException>()),
       );
     });
+
+    test('sends expectedRole when provided', () async {
+      when(() => mockDio.post(
+            any(),
+            data: any(named: 'data'),
+          )).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: ''),
+          data: validResponse,
+          statusCode: 200,
+        ),
+      );
+
+      await datasource.signIn('joao@moto.com', '123456', 'android', expectedRole: 'Driver');
+
+      verify(() => mockDio.post(
+            '/api/auth/sign-in',
+            data: {
+              'email': 'joao@moto.com',
+              'password': '123456',
+              'device': 'android',
+              'expectedRole': 'Driver',
+            },
+          )).called(1);
+    });
+
+    test('throws RoleMismatchException on 403 (wrong role)', () async {
+      when(() => mockDio.post(any(), data: any(named: 'data'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: ''),
+          response: Response(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 403,
+            data: {'error': 'This account is not authorized for this app.'},
+          ),
+        ),
+      );
+
+      expect(
+        () => datasource.signIn('joao@moto.com', '123456', 'android', expectedRole: 'Driver'),
+        throwsA(isA<RoleMismatchException>()),
+      );
+    });
   });
 
   group('refreshToken', () {
@@ -293,6 +336,49 @@ void main() {
         () => datasource.refreshToken('some_token', 'ios'),
         throwsA(isA<DeviceMismatchException>()),
       );
+    });
+  });
+
+  group('getPasswordPolicy', () {
+    test('parses the 6 fields on 200', () async {
+      when(() => mockDio.get(any())).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: ''),
+          statusCode: 200,
+          data: {
+            'minLength': 8,
+            'maxLength': 72,
+            'requireUppercase': true,
+            'requireLowercase': true,
+            'requireDigit': true,
+            'requireSpecialChar': true,
+          },
+        ),
+      );
+
+      final policy = await datasource.getPasswordPolicy();
+
+      expect(policy.minLength, 8);
+      expect(policy.maxLength, 72);
+      expect(policy.requireUppercase, isTrue);
+      expect(policy.requireLowercase, isTrue);
+      expect(policy.requireDigit, isTrue);
+      expect(policy.requireSpecialChar, isTrue);
+      verify(() => mockDio.get('/api/auth/password-policy')).called(1);
+    });
+
+    test('throws ServerException on 500', () async {
+      when(() => mockDio.get(any())).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: ''),
+          response: Response(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 500,
+          ),
+        ),
+      );
+
+      expect(() => datasource.getPasswordPolicy(), throwsA(isA<ServerException>()));
     });
   });
 }
