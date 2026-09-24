@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:moto_driver/core/utils/masks.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
+import 'package:moto_driver/modules/profile_configuration/domain/entities/profile_entity.dart';
 
 class ProfileForm extends StatefulWidget {
   final String initialName;
   final String initialEmail;
   final String initialPhone;
+
+  /// Endereço do motorista, vindo do objeto aninhado `address` do backend.
+  /// Sempre somente leitura — a edição de endereço é exclusiva do painel web
+  /// (ver F05 do relatório de auditoria). `null` quando o backend não retorna
+  /// endereço cadastrado.
+  final ProfileAddressEntity? address;
 
   /// Enquanto false, todos os campos ficam somente leitura (view mode).
   /// Quando true, nome/e-mail/confirmar e-mail/telefone ficam editáveis.
@@ -20,6 +27,7 @@ class ProfileForm extends StatefulWidget {
     required this.initialEmail,
     required this.initialPhone,
     required this.isEditing,
+    this.address,
     this.onChanged,
   });
 
@@ -245,6 +253,22 @@ class ProfileFormState extends State<ProfileForm> {
             fillColor: Colors.grey.shade100,
           ),
         ),
+        if (widget.address != null) ...[
+          const SizedBox(height: 16),
+          TextField(
+            controller: TextEditingController(text: widget.address!.formatted),
+            enabled: false,
+            readOnly: true,
+            maxLines: 2,
+            decoration: InputDecoration(
+              labelText: 'Endereço',
+              prefixIcon: const Icon(Icons.home),
+              border: const OutlineInputBorder(),
+              filled: true,
+              fillColor: Colors.grey.shade100,
+            ),
+          ),
+        ],
       ],
     );
   }

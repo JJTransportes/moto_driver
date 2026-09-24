@@ -9,7 +9,6 @@ import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
-import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/core/theme/app_theme.dart';
@@ -53,7 +52,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // ── Disponibilidade (modo de atendimento) ──
   DriverAvailabilityEntity? _availability;
   Timer? _availabilityTimer;
-  Timer? _driverPositionTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -211,7 +209,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _locationTimer?.cancel();
     _availabilityTimer?.cancel();
-    _driverPositionTimer?.cancel();
     _activeTravelPollTimer?.cancel();
     _newOrderSub?.cancel();
     _orderCancelledSub?.cancel();
@@ -241,31 +238,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       (_) => _checkActiveTravelHttp(),
     );
 
-    _driverPositionTimer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => _updateDriverPosition(),
-    );
-  }
-
-  Future<void> _updateDriverPosition() async {
-    try {
-      final dio = Modular.get<Dio>();
-      final localtionService = Modular.get<LocationService>();
-      final position = await localtionService.getCurrentPosition();
-
-      final response = await dio.post(
-        '/api/positions/drivers/$_userId',
-        data: {
-          "latitude": position.position?.latitude,
-          "longitude": position.position?.longitude,
-        },
-      );
-
-      developer.log('${response.statusCode}');
-    } on DioException catch (e) {
-      developer.log(e.message ?? "");
-      return;
-    }
+    // F04 (auditoria de escalabilidade): existia um terceiro canal aqui,
+    // `POST /api/positions/drivers/{userId}` via HTTP a cada 10s, rodando em
+    // paralelo ao `reportLocation` via SignalR abaixo — redundante (mesma
+    // informação, dois transportes, ao mesmo tempo, para o mesmo motorista).
+    // Removido; o SignalR já é o transporte usado para tudo mais no app.
   }
 
   @override
@@ -660,6 +637,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _locationTimer = Timer.periodic(
       const Duration(seconds: 30),
       (_) async {
+        // F04: enquanto a viagem está InProgress, o ActiveTravelPage já
+        // reporta a posição via SignalR a cada 10s (canal mais frequente e
+        // mais relevante nesse momento) — pausar este canal da Home evita
+        // dois canais de localização simultâneos, ao mesmo tempo, para o
+        // mesmo motorista. Retoma sozinho no próximo tick assim que a
+        // viagem deixar de ser InProgress (_currentTravelStatus muda em
+        // várias listeners de SignalR/HTTP já existentes acima).
+        if (_currentTravelStatus == 'InProgress') return;
+
         try {
           final hasPermission = await Geolocator.checkPermission();
           if (hasPermission == LocationPermission.denied || hasPermission == LocationPermission.deniedForever) {

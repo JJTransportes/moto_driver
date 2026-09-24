@@ -45,6 +45,11 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   bool _isActing = false;
   bool _hubConnected = false;
   Timer? _locationTimer;
+  // F09: conta ciclos consecutivos sem localização válida durante o
+  // tracking; após 3 (~30s) mostra aviso — sem isso o motorista não tinha
+  // nenhum sinal de que a posição parou de ser compartilhada.
+  int _locationFailureStreak = 0;
+  bool _locationUnavailable = false;
   StreamSubscription<Map<String, dynamic>>? _travelCancelledSub;
 
   final Set<Marker> _markers = {};
@@ -103,9 +108,10 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   void dispose() {
     _locationTimer?.cancel();
     _travelCancelledSub?.cancel();
-    if (_hubConnected) {
-      Modular.get<SignalRService>().disconnect('travel-management');
-    }
+    // F07: NÃO desconectar 'travel-management' aqui — é a mesma conexão que
+    // a HomeScreen usa (reportLocation em modo idle, eventos de viagem) e
+    // continua montada por baixo desta página. Desconectar deixava a Home
+    // "muda" nesse hub até um resume acidental do app reconectar sozinho.
     super.dispose();
   }
 
@@ -224,12 +230,24 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   }
 
   Future<void> _connectManagementHub() async {
+    final signalR = Modular.get<SignalRService>();
+
+    // F07: a HomeScreen (sempre montada por baixo desta página) já conecta
+    // 'travel-management' assim que abre e é a dona do ciclo de vida dessa
+    // conexão (também usada pelo reportLocation dela quando não há viagem
+    // ativa). connect() para e recria a conexão do zero — chamar de novo
+    // aqui sem necessidade derrubaria/recriaria à toa a conexão que a Home
+    // já mantém. Só conecta se, por algum motivo, ainda não estiver.
+    if (signalR.isConnected('travel-management')) {
+      if (mounted) setState(() => _hubConnected = true);
+      return;
+    }
+
     final authStorage = Modular.get<AuthStorage>();
     final token = await authStorage.getToken();
     if (token == null) return;
 
     try {
-      final signalR = Modular.get<SignalRService>();
       await signalR.connect(
         'travel-management',
         '${AppConfig.getBaseUrl()}/hubs/travel-management',
@@ -249,7 +267,10 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
       try {
         final locationService = Modular.get<LocationService>();
         final result = await locationService.getCurrentPosition();
-        if (!result.isGranted) return;
+        if (!result.isGranted) {
+          _registerLocationFailure();
+          return;
+        }
 
         final signalR = Modular.get<SignalRService>();
         await signalR.updateLocation(
@@ -257,10 +278,27 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
           result.position!.latitude,
           result.position!.longitude,
         );
+        _registerLocationSuccess();
       } catch (_) {
         // Best-effort — location send failure should not break anything
+        _registerLocationFailure();
       }
     });
+  }
+
+  void _registerLocationFailure() {
+    if (!mounted) return;
+    _locationFailureStreak++;
+    if (_locationFailureStreak >= 3 && !_locationUnavailable) {
+      setState(() => _locationUnavailable = true);
+    }
+  }
+
+  void _registerLocationSuccess() {
+    _locationFailureStreak = 0;
+    if (mounted && _locationUnavailable) {
+      setState(() => _locationUnavailable = false);
+    }
   }
 
   void _updateMapMarkers() {
@@ -426,9 +464,8 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
   Future<void> _goHome() async {
     _locationTimer?.cancel();
-    if (_hubConnected) {
-      await Modular.get<SignalRService>().disconnect('travel-management');
-    }
+    // F07: ver comentário em dispose() — 'travel-management' é da Home, não
+    // desconectar aqui.
     await Modular.get<TravelLocalRepository>().clearTravels();
     Modular.to.navigate('/home');
   }
@@ -747,7 +784,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                   }
                   return [const SizedBox.shrink()];
                 }(),
-                if (_hubConnected)
+                if (_hubConnected && !_locationUnavailable)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Row(
@@ -756,6 +793,29 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                         const SizedBox(width: 4),
                         const Text('Compartilhando localização', style: TextStyle(color: Colors.green, fontSize: 12)),
                       ],
+                    ),
+                  ),
+                // F09: sem isso o indicador acima simplesmente sumia (deixava
+                // de renderizar em silêncio) quando o GPS ficava indisponível
+                // durante a viagem — o motorista não tinha nenhum sinal de
+                // que parou de compartilhar a posição.
+                if (_hubConnected && _locationUnavailable)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: InkWell(
+                      onTap: () => Modular.get<LocationService>().openLocationSettings(),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.location_off, color: Colors.orange, size: 16),
+                          SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'Localização indisponível — toque para ativar o GPS',
+                              style: TextStyle(color: Colors.orange, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 const SizedBox(height: 12),

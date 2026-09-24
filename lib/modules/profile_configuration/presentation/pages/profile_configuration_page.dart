@@ -135,6 +135,7 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                     initialName: profile.name,
                     initialEmail: profile.email,
                     initialPhone: profile.phone ?? '',
+                    address: profile.address,
                     isEditing: _isEditing,
                     onChanged: () => setState(() {}),
                   ),
