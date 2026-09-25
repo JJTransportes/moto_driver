@@ -98,7 +98,7 @@ class _Dashed extends CustomPainter {
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
     for (double y = 5; y < s.height - 5; y += 8) {
-      canvas.drawLine(Offset(s.width / 2 + 10, y), Offset(s.width / 2 + 10, y + 4), p);
+      canvas.drawLine(Offset(s.width / 2, y), Offset(s.width / 2, y + 4), p);
     }
   }
 
