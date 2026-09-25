@@ -591,41 +591,46 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
           MotoSapphire(
             radius: BorderRadius.zero,
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-            child: Row(
-              children: [
-                MotoAvatar(
-                  initials: _initialsOf(_passengerName),
-                  size: 60,
-                  image: _passengerPhotoUrl != null && _passengerPhotoUrl!.isNotEmpty
-                      ? NetworkImage(_resolveImageUrl(_passengerPhotoUrl!), headers: _authHeaders)
-                      : null,
-                ),
-                const SizedBox(width: MotoSpace.s4),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      MotoStatusBadge.trip(isAccepted ? TripStatus.aceita : TripStatus.emAndamento),
-                      if (_passengerName != null) ...[
-                        const SizedBox(height: MotoSpace.s2),
-                        Text(_passengerName!, style: Theme.of(context).textTheme.headlineSmall),
-                        if (_passengerSolicitationCount != null)
-                          Text(
-                            '$_passengerSolicitationCount solicitaç${_passengerSolicitationCount == 1 ? 'ão' : 'ões'} realizada${_passengerSolicitationCount == 1 ? '' : 's'}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        if (_passengerPartitionName != null)
-                          Text(
-                            _passengerDepartments != null
-                                ? '$_passengerPartitionName · $_passengerDepartments'
-                                : _passengerPartitionName!,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                      ],
-                    ],
+            // Builder: pega o BuildContext DE DENTRO do MotoSapphire (Theme
+            // safira/escuro) — usar o `context` do build() externo pegava o
+            // Theme.of() de fora (claro), deixando o texto escuro no card azul.
+            child: Builder(
+              builder: (context) => Row(
+                children: [
+                  MotoAvatar(
+                    initials: _initialsOf(_passengerName),
+                    size: 60,
+                    image: _passengerPhotoUrl != null && _passengerPhotoUrl!.isNotEmpty
+                        ? NetworkImage(_resolveImageUrl(_passengerPhotoUrl!), headers: _authHeaders)
+                        : null,
                   ),
-                ),
-              ],
+                  const SizedBox(width: MotoSpace.s4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        MotoStatusBadge.trip(isAccepted ? TripStatus.aceita : TripStatus.emAndamento),
+                        if (_passengerName != null) ...[
+                          const SizedBox(height: MotoSpace.s2),
+                          Text(_passengerName!, style: Theme.of(context).textTheme.headlineSmall),
+                          if (_passengerSolicitationCount != null)
+                            Text(
+                              '$_passengerSolicitationCount solicitaç${_passengerSolicitationCount == 1 ? 'ão' : 'ões'} realizada${_passengerSolicitationCount == 1 ? '' : 's'}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          if (_passengerPartitionName != null)
+                            Text(
+                              _passengerDepartments != null
+                                  ? '$_passengerPartitionName · $_passengerDepartments'
+                                  : _passengerPartitionName!,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 

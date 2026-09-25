@@ -138,29 +138,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final isActive = _availability?.isActive ?? false;
 
     return MotoSapphire(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              MotoStatusBadge(
-                label: isActive ? 'Recebendo corridas' : 'Modo indisponível',
-                tone: isActive ? MotoTone.success : MotoTone.neutral,
-                live: isActive,
-              ),
-              const Spacer(),
-              Switch(
-                value: isActive,
-                onChanged: _isTogglingAvailability ? null : _onAvailabilityToggled,
-              ),
-            ],
-          ),
-          const SizedBox(height: MotoSpace.s4),
-          Text(
-            isActive ? 'Você está\nonline' : 'Você está\noffline',
-            style: Theme.of(context).textTheme.displaySmall,
-          ),
-        ],
+      // Builder: precisamos do BuildContext DE DENTRO do MotoSapphire (que
+      // troca o Theme ambiente para a paleta safira/escura) — usar o
+      // `context` do método externo pegava o Theme.of() de fora (claro),
+      // deixando o texto escuro em cima do card azul-marinho.
+      child: Builder(
+        builder: (context) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                MotoStatusBadge(
+                  label: isActive ? 'Recebendo corridas' : 'Modo indisponível',
+                  tone: isActive ? MotoTone.success : MotoTone.neutral,
+                  live: isActive,
+                ),
+                const Spacer(),
+                Switch(
+                  value: isActive,
+                  onChanged: _isTogglingAvailability ? null : _onAvailabilityToggled,
+                ),
+              ],
+            ),
+            const SizedBox(height: MotoSpace.s4),
+            Text(
+              isActive ? 'Você está\nonline' : 'Você está\noffline',
+              style: Theme.of(context).textTheme.displaySmall,
+            ),
+          ],
+        ),
       ),
     );
   }
