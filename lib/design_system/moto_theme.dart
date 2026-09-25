@@ -50,11 +50,16 @@ abstract final class MotoTheme {
       inverseSurface: c.textPrimary,
       onInverseSurface: c.bgBase,
       inversePrimary: c.accentBright,
-      surfaceTint: Colors.transparent, // M3 tinge superfícies de roxo por padrão — desliga
+      surfaceTint: Colors
+          .transparent, // M3 tinge superfícies de roxo por padrão — desliga
     );
     final text = _textTheme(c);
     const pill = StadiumBorder();
-    final btnText = text.labelLarge!.copyWith(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: -0.16);
+    final btnText = text.labelLarge!.copyWith(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      letterSpacing: -0.16,
+    );
 
     return ThemeData(
       useMaterial3: true,
@@ -88,23 +93,33 @@ abstract final class MotoTheme {
       ),
 
       // Primário: cápsula cobalto. (Gradiente + reflexo + gota = MotoButton.)
-      filledButtonTheme: FilledButtonThemeData(style: _primary(c, btnText, pill)),
-      elevatedButtonTheme: ElevatedButtonThemeData(style: _primary(c, btnText, pill)),
+      filledButtonTheme: FilledButtonThemeData(
+        style: _primary(c, btnText, pill),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: _primary(c, btnText, pill),
+      ),
 
       // Secundário: vidro branco com borda fina.
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: ButtonStyle(
           minimumSize: const WidgetStatePropertyAll(Size(64, 52)),
-          padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: MotoSpace.s6)),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: MotoSpace.s6),
+          ),
           shape: const WidgetStatePropertyAll(pill),
           textStyle: WidgetStatePropertyAll(btnText),
           backgroundColor: WidgetStatePropertyAll(c.glass2),
           foregroundColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.disabled) ? c.textDisabled : c.textPrimary,
+            (s) => s.contains(WidgetState.disabled)
+                ? c.textDisabled
+                : c.textPrimary,
           ),
           side: WidgetStateProperty.resolveWith(
             (s) => BorderSide(
-              color: s.contains(WidgetState.focused) || s.contains(WidgetState.hovered)
+              color:
+                  s.contains(WidgetState.focused) ||
+                      s.contains(WidgetState.hovered)
                   ? c.borderFocus
                   : c.borderDefault,
             ),
@@ -126,7 +141,9 @@ abstract final class MotoTheme {
 
       iconButtonTheme: IconButtonThemeData(
         style: ButtonStyle(
-          minimumSize: const WidgetStatePropertyAll(Size.square(MotoSpace.touchMin)),
+          minimumSize: const WidgetStatePropertyAll(
+            Size.square(MotoSpace.touchMin),
+          ),
           foregroundColor: WidgetStatePropertyAll(c.textPrimary),
           backgroundColor: WidgetStatePropertyAll(c.glass2),
           side: WidgetStatePropertyAll(BorderSide(color: c.borderSubtle)),
@@ -139,11 +156,20 @@ abstract final class MotoTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: WidgetStateColor.resolveWith(
-          (s) => s.contains(WidgetState.focused) || s.contains(WidgetState.error) ? c.bgRaised : c.bgSunken,
+          (s) =>
+              s.contains(WidgetState.focused) || s.contains(WidgetState.error)
+              ? c.bgRaised
+              : c.bgSunken,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: MotoSpace.s4, vertical: 19),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: MotoSpace.s4,
+          vertical: 19,
+        ),
         floatingLabelBehavior: FloatingLabelBehavior.always,
-        labelStyle: text.bodyMedium!.copyWith(color: c.textSecondary, fontWeight: FontWeight.w600),
+        labelStyle: text.bodyMedium!.copyWith(
+          color: c.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
         floatingLabelStyle: WidgetStateTextStyle.resolveWith(
           (s) => text.bodyMedium!.copyWith(
             fontWeight: FontWeight.w600,
@@ -156,7 +182,10 @@ abstract final class MotoTheme {
         ),
         hintStyle: text.bodyLarge!.copyWith(color: c.textTertiary),
         helperStyle: text.bodySmall!.copyWith(color: c.textTertiary),
-        errorStyle: text.bodySmall!.copyWith(color: c.danger, fontWeight: FontWeight.w500),
+        errorStyle: text.bodySmall!.copyWith(
+          color: c.danger,
+          fontWeight: FontWeight.w500,
+        ),
         prefixIconColor: WidgetStateColor.resolveWith(
           (s) => s.contains(WidgetState.focused) ? c.accent : c.textTertiary,
         ),
@@ -208,9 +237,17 @@ abstract final class MotoTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: c.bgRaised,
-        contentTextStyle: text.bodyMedium!.copyWith(color: c.textPrimary, fontWeight: FontWeight.w600),
+        contentTextStyle: text.bodyMedium!.copyWith(
+          color: c.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
         actionTextColor: c.accent,
-        insetPadding: const EdgeInsets.fromLTRB(MotoSpace.s4, 0, MotoSpace.s4, MotoSpace.s4),
+        insetPadding: const EdgeInsets.fromLTRB(
+          MotoSpace.s4,
+          0,
+          MotoSpace.s4,
+          MotoSpace.s4,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: const BorderRadius.all(Radius.circular(20)),
           side: BorderSide(color: c.borderSubtle),
@@ -220,9 +257,13 @@ abstract final class MotoTheme {
 
       switchTheme: SwitchThemeData(
         thumbColor: const WidgetStatePropertyAll(Colors.white),
-        trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? c.signal : c.bgSunken),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? c.signal : c.bgSunken,
+        ),
         trackOutlineColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? Colors.transparent : c.borderDefault,
+          (s) => s.contains(WidgetState.selected)
+              ? Colors.transparent
+              : c.borderDefault,
         ),
         thumbIcon: const WidgetStatePropertyAll(null),
       ),
@@ -230,11 +271,15 @@ abstract final class MotoTheme {
       checkboxTheme: CheckboxThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
         side: BorderSide(color: c.borderStrong, width: 1.5),
-        fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? c.accent : c.bgRaised),
+        fillColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? c.accent : c.bgRaised,
+        ),
         checkColor: WidgetStatePropertyAll(c.textOnAccent),
       ),
       radioTheme: RadioThemeData(
-        fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? c.accent : c.borderStrong),
+        fillColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? c.accent : c.borderStrong,
+        ),
       ),
 
       chipTheme: ChipThemeData(
@@ -242,8 +287,14 @@ abstract final class MotoTheme {
         selectedColor: c.accentSoft,
         side: BorderSide(color: c.borderSubtle),
         shape: const StadiumBorder(),
-        labelStyle: text.labelMedium!.copyWith(color: c.textSecondary, fontSize: 13),
-        padding: const EdgeInsets.symmetric(horizontal: MotoSpace.s3, vertical: 2),
+        labelStyle: text.labelMedium!.copyWith(
+          color: c.textSecondary,
+          fontSize: 13,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: MotoSpace.s3,
+          vertical: 2,
+        ),
       ),
 
       segmentedButtonTheme: SegmentedButtonThemeData(
@@ -254,9 +305,13 @@ abstract final class MotoTheme {
             (s) => s.contains(WidgetState.selected) ? c.bgRaised : c.bgSunken,
           ),
           foregroundColor: WidgetStateProperty.resolveWith(
-            (s) => s.contains(WidgetState.selected) ? c.textPrimary : c.textTertiary,
+            (s) => s.contains(WidgetState.selected)
+                ? c.textPrimary
+                : c.textTertiary,
           ),
-          textStyle: WidgetStatePropertyAll(text.labelLarge!.copyWith(fontSize: 14)),
+          textStyle: WidgetStatePropertyAll(
+            text.labelLarge!.copyWith(fontSize: 14),
+          ),
         ),
       ),
 
@@ -264,8 +319,14 @@ abstract final class MotoTheme {
         iconColor: c.accent,
         textColor: c.textPrimary,
         titleTextStyle: text.titleMedium,
-        subtitleTextStyle: text.bodyMedium!.copyWith(color: c.textTertiary, fontSize: 13),
-        contentPadding: const EdgeInsets.symmetric(horizontal: MotoSpace.s4, vertical: MotoSpace.s1),
+        subtitleTextStyle: text.bodyMedium!.copyWith(
+          color: c.textTertiary,
+          fontSize: 13,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: MotoSpace.s4,
+          vertical: MotoSpace.s1,
+        ),
         shape: const RoundedRectangleBorder(borderRadius: MotoRadius.brMd),
         tileColor: c.bgRaised.withValues(alpha: c.isDark ? .06 : .85),
         minVerticalPadding: MotoSpace.s3,
@@ -276,7 +337,9 @@ abstract final class MotoTheme {
         surfaceTintColor: Colors.transparent,
         indicatorColor: c.bgRaised,
         indicatorShape: const StadiumBorder(),
-        labelTextStyle: WidgetStatePropertyAll(text.labelSmall!.copyWith(letterSpacing: 0)),
+        labelTextStyle: WidgetStatePropertyAll(
+          text.labelSmall!.copyWith(letterSpacing: 0),
+        ),
         elevation: 0,
         height: 72,
       ),
@@ -289,9 +352,16 @@ abstract final class MotoTheme {
         borderRadius: MotoRadius.brPill,
       ),
 
-      dividerTheme: DividerThemeData(color: c.borderSubtle, thickness: 1, space: 1),
+      dividerTheme: DividerThemeData(
+        color: c.borderSubtle,
+        thickness: 1,
+        space: 1,
+      ),
       tooltipTheme: TooltipThemeData(
-        decoration: BoxDecoration(color: MotoRaw.tinta900, borderRadius: MotoRadius.brSm),
+        decoration: BoxDecoration(
+          color: MotoRaw.tinta900,
+          borderRadius: MotoRadius.brSm,
+        ),
         textStyle: text.bodySmall!.copyWith(color: Colors.white),
       ),
       datePickerTheme: DatePickerThemeData(
@@ -304,12 +374,20 @@ abstract final class MotoTheme {
     );
   }
 
-  static ButtonStyle _primary(MotoPalette c, TextStyle t, OutlinedBorder shape) => ButtonStyle(
+  static ButtonStyle _primary(
+    MotoPalette c,
+    TextStyle t,
+    OutlinedBorder shape,
+  ) => ButtonStyle(
     minimumSize: const WidgetStatePropertyAll(Size(64, 56)),
-    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: MotoSpace.s6)),
+    padding: const WidgetStatePropertyAll(
+      EdgeInsets.symmetric(horizontal: MotoSpace.s6),
+    ),
     shape: WidgetStatePropertyAll(shape),
     textStyle: WidgetStatePropertyAll(t),
-    elevation: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.disabled) ? 0 : 4),
+    elevation: WidgetStateProperty.resolveWith(
+      (s) => s.contains(WidgetState.disabled) ? 0 : 4,
+    ),
     shadowColor: WidgetStatePropertyAll(c.accent.withValues(alpha: .55)),
     backgroundColor: WidgetStateProperty.resolveWith((s) {
       if (s.contains(WidgetState.disabled)) return c.bgSunken;
@@ -323,10 +401,11 @@ abstract final class MotoTheme {
     animationDuration: MotoMotion.fast,
   );
 
-  static OutlineInputBorder _field(Color color, [double width = 1]) => OutlineInputBorder(
-    borderRadius: MotoRadius.brMd,
-    borderSide: BorderSide(color: color, width: width),
-  );
+  static OutlineInputBorder _field(Color color, [double width = 1]) =>
+      OutlineInputBorder(
+        borderRadius: MotoRadius.brSm,
+        borderSide: BorderSide(color: color, width: width),
+      );
 
   static TextTheme _textTheme(MotoPalette c) {
     TextStyle d(double size, double height, double tracking) => TextStyle(
@@ -337,7 +416,13 @@ abstract final class MotoTheme {
       fontWeight: FontWeight.w600,
       color: c.textPrimary,
     );
-    TextStyle u(double size, double height, FontWeight w, Color color, [double tracking = 0]) => TextStyle(
+    TextStyle u(
+      double size,
+      double height,
+      FontWeight w,
+      Color color, [
+      double tracking = 0,
+    ]) => TextStyle(
       fontFamily: MotoFont.ui,
       fontSize: size,
       height: height,
@@ -353,14 +438,26 @@ abstract final class MotoTheme {
       headlineMedium: d(27, 1.12, -0.035),
       headlineSmall: d(23, 1.18, -0.03), // H2
       titleLarge: d(18, 1.3, -0.03), // título de AppBar
-      titleMedium: u(16, 1.3, FontWeight.w600, c.textPrimary, -0.24), // título de item
+      titleMedium: u(
+        16,
+        1.3,
+        FontWeight.w600,
+        c.textPrimary,
+        -0.24,
+      ), // título de item
       titleSmall: u(14, 1.3, FontWeight.w600, c.textPrimary),
       bodyLarge: u(16, 1.5, FontWeight.w400, c.textPrimary, -0.08), // Body
       bodyMedium: u(14, 1.45, FontWeight.w400, c.textSecondary), // Small
       bodySmall: u(12, 1.35, FontWeight.w500, c.textTertiary), // Caption
       labelLarge: u(16, 1, FontWeight.w600, c.textPrimary),
       labelMedium: u(12, 1, FontWeight.w600, c.textSecondary),
-      labelSmall: u(11, 1.2, FontWeight.w600, c.textTertiary, 1.76), // Overline (usar .toUpperCase())
+      labelSmall: u(
+        11,
+        1.2,
+        FontWeight.w600,
+        c.textTertiary,
+        1.76,
+      ), // Overline (usar .toUpperCase())
     );
   }
 }
@@ -368,14 +465,18 @@ abstract final class MotoTheme {
 /// Números (km, min, horários, placa): Sora tabular.
 /// `Text('4,8', style: MotoNum.of(context, 22))`
 abstract final class MotoNum {
-  static TextStyle of(BuildContext context, double size, {FontWeight weight = FontWeight.w600, Color? color}) =>
-      TextStyle(
-        fontFamily: MotoFont.display,
-        fontSize: size,
-        fontWeight: weight,
-        letterSpacing: size * -0.03,
-        height: 1.05,
-        color: color ?? context.moto.textPrimary,
-        fontFeatures: const [FontFeature.tabularFigures()],
-      );
+  static TextStyle of(
+    BuildContext context,
+    double size, {
+    FontWeight weight = FontWeight.w600,
+    Color? color,
+  }) => TextStyle(
+    fontFamily: MotoFont.display,
+    fontSize: size,
+    fontWeight: weight,
+    letterSpacing: size * -0.03,
+    height: 1.05,
+    color: color ?? context.moto.textPrimary,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
 }

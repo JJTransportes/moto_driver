@@ -64,13 +64,32 @@ class _AppTextFieldState extends State<AppTextField> {
           keyboardType: widget.keyboardType,
           inputFormatters: widget.inputFormatters,
           maxLength: widget.maxLength,
-          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-          style: TextStyle(fontFamily: MotoFont.ui, fontSize: 16, color: c.textPrimary),
+          buildCounter:
+              (
+                context, {
+                required currentLength,
+                required isFocused,
+                maxLength,
+              }) => null,
+          style: TextStyle(
+            fontFamily: MotoFont.ui,
+            fontSize: 16,
+            color: c.textPrimary,
+          ),
           decoration: InputDecoration(
             hintText: widget.hint,
-            hintStyle: TextStyle(fontFamily: MotoFont.ui, fontSize: 16, color: c.textTertiary),
-            prefixIcon: widget.icon != null ? Icon(widget.icon, color: c.textTertiary, size: 20) : null,
-            contentPadding: const EdgeInsets.symmetric(horizontal: MotoSpace.s4, vertical: 18),
+            hintStyle: TextStyle(
+              fontFamily: MotoFont.ui,
+              fontSize: 16,
+              color: c.textTertiary,
+            ),
+            prefixIcon: widget.icon != null
+                ? Icon(widget.icon, color: c.textTertiary, size: 20)
+                : null,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: MotoSpace.s4,
+              vertical: 18,
+            ),
             suffixIcon: widget.obscureText
                 ? IconButton(
                     icon: Icon(
@@ -86,23 +105,23 @@ class _AppTextFieldState extends State<AppTextField> {
             filled: true,
             fillColor: c.bgRaised,
             border: OutlineInputBorder(
-              borderRadius: MotoRadius.brPill,
+              borderRadius: MotoRadius.brSm,
               borderSide: BorderSide(color: c.borderDefault),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: MotoRadius.brPill,
+              borderRadius: MotoRadius.brSm,
               borderSide: BorderSide(color: c.borderDefault),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: MotoRadius.brPill,
+              borderRadius: MotoRadius.brSm,
               borderSide: BorderSide(color: c.borderFocus, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: MotoRadius.brPill,
+              borderRadius: MotoRadius.brSm,
               borderSide: BorderSide(color: c.danger),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: MotoRadius.brPill,
+              borderRadius: MotoRadius.brSm,
               borderSide: BorderSide(color: c.danger, width: 1.5),
             ),
             errorText: widget.errorText,

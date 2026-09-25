@@ -45,6 +45,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   bool _isActing = false;
   bool _hubConnected = false;
   Timer? _locationTimer;
+  bool _locationUpdateInFlight = false;
   // F09: conta ciclos consecutivos sem localização válida durante o
   // tracking; após 3 (~30s) mostra aviso — sem isso o motorista não tinha
   // nenhum sinal de que a posição parou de ser compartilhada.
@@ -75,20 +76,21 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
     // antes só a home escutava esse evento, então esta tela (aberta por cima
     // da home) continuava mostrando a viagem como ativa até o motorista
     // tentar finalizar/cancelar e tomar erro do backend.
-    _travelCancelledSub = Modular.get<SignalRService>().onTravelCancelled.listen((data) {
-      if (!mounted) return;
-      final travelId = data['travelId'] as String?;
-      if (travelId != null && travelId != widget.travelId) return;
+    _travelCancelledSub = Modular.get<SignalRService>().onTravelCancelled
+        .listen((data) {
+          if (!mounted) return;
+          final travelId = data['travelId'] as String?;
+          if (travelId != null && travelId != widget.travelId) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Viagem cancelada pelo passageiro.'),
-          duration: Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      _goHome();
-    });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Viagem cancelada pelo passageiro.'),
+              duration: Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          _goHome();
+        });
   }
 
   void _extractRouteArgs() {
@@ -147,10 +149,26 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         }
 
         // Extract coordinates from routes
-        _passengerLat = (_pickupRoute?['destinationLatitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['initialLatitude'] as num?)?.toDouble() : null);
-        _passengerLng = (_pickupRoute?['destinationLongitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['initialLongitude'] as num?)?.toDouble() : null);
-        _destLat = (_tripRoute?['destinationLatitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['destinationLatitude'] as num?)?.toDouble() : null);
-        _destLng = (_tripRoute?['destinationLongitude'] as num?)?.toDouble() ?? (routes.isNotEmpty ? (routes[0]['destinationLongitude'] as num?)?.toDouble() : null);
+        _passengerLat =
+            (_pickupRoute?['destinationLatitude'] as num?)?.toDouble() ??
+            (routes.isNotEmpty
+                ? (routes[0]['initialLatitude'] as num?)?.toDouble()
+                : null);
+        _passengerLng =
+            (_pickupRoute?['destinationLongitude'] as num?)?.toDouble() ??
+            (routes.isNotEmpty
+                ? (routes[0]['initialLongitude'] as num?)?.toDouble()
+                : null);
+        _destLat =
+            (_tripRoute?['destinationLatitude'] as num?)?.toDouble() ??
+            (routes.isNotEmpty
+                ? (routes[0]['destinationLatitude'] as num?)?.toDouble()
+                : null);
+        _destLng =
+            (_tripRoute?['destinationLongitude'] as num?)?.toDouble() ??
+            (routes.isNotEmpty
+                ? (routes[0]['destinationLongitude'] as num?)?.toDouble()
+                : null);
 
         // Endereços das rotas
         _departureAddress = _pickupRoute?['destinationAddress'] as String?;
@@ -239,29 +257,37 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
   void _startLocationTracking() {
     _locationTimer?.cancel();
-    _locationTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
-      if (!_hubConnected) return;
+    _reportTravelLocation();
+    _locationTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _reportTravelLocation(),
+    );
+  }
 
-      try {
-        final locationService = Modular.get<LocationService>();
-        final result = await locationService.getCurrentPosition();
-        if (!result.isGranted) {
-          _registerLocationFailure();
-          return;
-        }
-
-        final signalR = Modular.get<SignalRService>();
-        await signalR.updateLocation(
-          widget.travelId,
-          result.position!.latitude,
-          result.position!.longitude,
-        );
-        _registerLocationSuccess();
-      } catch (_) {
-        // Best-effort — location send failure should not break anything
+  Future<void> _reportTravelLocation() async {
+    if (!_hubConnected || _locationUpdateInFlight) return;
+    _locationUpdateInFlight = true;
+    try {
+      final locationService = Modular.get<LocationService>();
+      final result = await locationService.getCurrentPosition();
+      if (!result.isGranted) {
         _registerLocationFailure();
+        return;
       }
-    });
+
+      final signalR = Modular.get<SignalRService>();
+      await signalR.updateLocation(
+        widget.travelId,
+        result.position!.latitude,
+        result.position!.longitude,
+      );
+      _registerLocationSuccess();
+    } catch (_) {
+      // Best-effort — location send failure should not break anything
+      _registerLocationFailure();
+    } finally {
+      _locationUpdateInFlight = false;
+    }
   }
 
   void _registerLocationFailure() {
@@ -291,7 +317,9 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         Marker(
           markerId: const MarkerId('passenger'),
           position: LatLng(_passengerLat!, _passengerLng!),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
           infoWindow: const InfoWindow(title: 'Passageiro'),
         ),
       );
@@ -300,7 +328,9 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
           Marker(
             markerId: const MarkerId('destination'),
             position: LatLng(_destLat!, _destLng!),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueRed,
+            ),
             infoWindow: const InfoWindow(title: 'Destino'),
           ),
         );
@@ -313,13 +343,8 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         if (encoded != null && encoded.isNotEmpty) {
           try {
             final points = DirectionsResult.decode(encoded);
-            _polylines.add(
-              Polyline(
-                polylineId: const PolylineId('route'),
-                points: points,
-                color: context.moto.accent,
-                width: 4,
-              ),
+            _polylines.addAll(
+              MotoMapRouteStyle.polylines(id: 'route', points: points),
             );
           } catch (_) {
             // Polyline inválida — apenas não renderiza
@@ -342,14 +367,19 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
       } else {
         // Fallback to HTTP if SignalR not connected
         final dio = Modular.get<Dio>();
-        await dio.post('${AppConfig.getBaseUrl()}/api/travels/${widget.travelId}/start');
+        await dio.post(
+          '${AppConfig.getBaseUrl()}/api/travels/${widget.travelId}/start',
+        );
       }
       if (!mounted) return;
       _loadTravel();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Erro ao iniciar viagem'), backgroundColor: context.moto.danger),
+        SnackBar(
+          content: const Text('Erro ao iniciar viagem'),
+          backgroundColor: context.moto.danger,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isActing = false);
@@ -364,8 +394,14 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         title: const Text('Finalizar viagem'),
         content: const Text('Tem certeza que deseja finalizar esta viagem?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Não')),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Sim, finalizar')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Não'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Sim, finalizar'),
+          ),
         ],
       ),
     );
@@ -390,18 +426,27 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         }
 
         final signalR = Modular.get<SignalRService>();
-        await signalR.finishTravel(widget.travelId, latitude: lat, longitude: lng);
+        await signalR.finishTravel(
+          widget.travelId,
+          latitude: lat,
+          longitude: lng,
+        );
         await Future.delayed(const Duration(milliseconds: 500));
       } else {
         final dio = Modular.get<Dio>();
-        await dio.post('${AppConfig.getBaseUrl()}/api/travels/${widget.travelId}/finish');
+        await dio.post(
+          '${AppConfig.getBaseUrl()}/api/travels/${widget.travelId}/finish',
+        );
       }
       if (!mounted) return;
       _loadTravel();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Erro ao finalizar viagem'), backgroundColor: context.moto.danger),
+        SnackBar(
+          content: const Text('Erro ao finalizar viagem'),
+          backgroundColor: context.moto.danger,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isActing = false);
@@ -416,8 +461,14 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         title: const Text('Cancelar viagem'),
         content: const Text('Tem certeza que deseja cancelar esta viagem?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Não')),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Sim, cancelar')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Não'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Sim, cancelar'),
+          ),
         ],
       ),
     );
@@ -427,13 +478,18 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
 
     try {
       final dio = Modular.get<Dio>();
-      await dio.post('${AppConfig.getBaseUrl()}/api/travels/${widget.travelId}/cancel');
+      await dio.post(
+        '${AppConfig.getBaseUrl()}/api/travels/${widget.travelId}/cancel',
+      );
       if (!mounted) return;
       _loadTravel();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Erro ao cancelar viagem'), backgroundColor: context.moto.danger),
+        SnackBar(
+          content: const Text('Erro ao cancelar viagem'),
+          backgroundColor: context.moto.danger,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isActing = false);
@@ -452,7 +508,10 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_statusLabel(), style: TextStyle(color: context.moto.textPrimary, fontSize: 18)),
+        title: Text(
+          _statusLabel(),
+          style: TextStyle(color: context.moto.textPrimary, fontSize: 18),
+        ),
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: context.moto.textPrimary),
@@ -522,7 +581,10 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
             children: [
               Icon(Icons.error_outline, size: 48, color: context.moto.danger),
               const SizedBox(height: 16),
-              const Text('Erro ao carregar viagem', style: TextStyle(fontSize: 16)),
+              const Text(
+                'Erro ao carregar viagem',
+                style: TextStyle(fontSize: 16),
+              ),
               const SizedBox(height: 8),
               Text(
                 _error!,
@@ -550,32 +612,58 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   Widget _buildTerminalState() {
     final isCompleted = _status == 'Completed';
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isCompleted ? Icons.task_alt : Icons.cancel,
-              size: 64,
-              color: isCompleted ? context.moto.success : context.moto.danger,
+    if (isCompleted) {
+      return MotoCanvas(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(MotoSpace.s6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const MotoSuccessCheck(),
+                const SizedBox(height: MotoSpace.s6),
+                Text(
+                  'Viagem concluída!',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: MotoSpace.s8),
+                MotoButton(
+                  label: 'Voltar para Home',
+                  large: false,
+                  expand: false,
+                  onPressed: _goHome,
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              isCompleted ? 'Viagem concluída!' : 'Viagem cancelada',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.moto.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+          ),
+        ),
+      );
+    }
+
+    return MotoCanvas(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(MotoSpace.s6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cancel_rounded, size: 64, color: context.moto.danger),
+              const SizedBox(height: MotoSpace.s4),
+              Text(
+                'Viagem cancelada',
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-              onPressed: _goHome,
-              child: Text('Voltar para Home', style: TextStyle(color: context.moto.textOnAccent)),
-            ),
-          ],
+              const SizedBox(height: MotoSpace.s8),
+              MotoButton(
+                label: 'Voltar para Home',
+                variant: MotoButtonVariant.danger,
+                large: false,
+                expand: false,
+                onPressed: _goHome,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -600,8 +688,13 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                   MotoAvatar(
                     initials: _initialsOf(_passengerName),
                     size: 60,
-                    image: _passengerPhotoUrl != null && _passengerPhotoUrl!.isNotEmpty
-                        ? NetworkImage(_resolveImageUrl(_passengerPhotoUrl!), headers: _authHeaders)
+                    image:
+                        _passengerPhotoUrl != null &&
+                            _passengerPhotoUrl!.isNotEmpty
+                        ? NetworkImage(
+                            _resolveImageUrl(_passengerPhotoUrl!),
+                            headers: _authHeaders,
+                          )
                         : null,
                   ),
                   const SizedBox(width: MotoSpace.s4),
@@ -609,10 +702,17 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        MotoStatusBadge.trip(isAccepted ? TripStatus.aceita : TripStatus.emAndamento),
+                        MotoStatusBadge.trip(
+                          isAccepted
+                              ? TripStatus.aceita
+                              : TripStatus.emAndamento,
+                        ),
                         if (_passengerName != null) ...[
                           const SizedBox(height: MotoSpace.s2),
-                          Text(_passengerName!, style: Theme.of(context).textTheme.headlineSmall),
+                          Text(
+                            _passengerName!,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
                           if (_passengerSolicitationCount != null)
                             Text(
                               '$_passengerSolicitationCount solicitaç${_passengerSolicitationCount == 1 ? 'ão' : 'ões'} realizada${_passengerSolicitationCount == 1 ? '' : 's'}',
@@ -655,12 +755,23 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
             width: double.infinity,
             decoration: BoxDecoration(
               color: context.moto.bgRaised,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
               boxShadow: [
-                BoxShadow(color: context.moto.shadow, blurRadius: 8, offset: const Offset(0, -2)),
+                BoxShadow(
+                  color: context.moto.shadow,
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
               ],
             ),
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              20 + MediaQuery.of(context).padding.bottom,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -670,11 +781,18 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.event_note, color: context.moto.accent, size: 20),
+                        Icon(
+                          Icons.event_note,
+                          color: context.moto.accent,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Solicitada às ${_formatTime(_requestedAt!)}',
-                          style: TextStyle(color: context.moto.textPrimary, fontSize: 14),
+                          style: TextStyle(
+                            color: context.moto.textPrimary,
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
@@ -685,10 +803,20 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.person_pin, color: context.moto.accent, size: 20),
+                        Icon(
+                          Icons.person_pin,
+                          color: context.moto.accent,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text('Embarque: ${_departureAddress!}', style: TextStyle(color: context.moto.textPrimary, fontSize: 14)),
+                          child: Text(
+                            'Embarque: ${_departureAddress!}',
+                            style: TextStyle(
+                              color: context.moto.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -698,10 +826,20 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.trip_origin, color: context.moto.accent, size: 20),
+                        Icon(
+                          Icons.trip_origin,
+                          color: context.moto.accent,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(_departureAddress!, style: TextStyle(color: context.moto.textPrimary, fontSize: 14)),
+                          child: Text(
+                            _departureAddress!,
+                            style: TextStyle(
+                              color: context.moto.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -714,7 +852,13 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                         Icon(Icons.flag, color: context.moto.accent, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(_destinationAddress!, style: TextStyle(color: context.moto.textPrimary, fontSize: 14)),
+                          child: Text(
+                            _destinationAddress!,
+                            style: TextStyle(
+                              color: context.moto.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -730,11 +874,18 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                     return [
                       Row(
                         children: [
-                          Icon(Icons.route, color: context.moto.accent, size: 20),
+                          Icon(
+                            Icons.route,
+                            color: context.moto.accent,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             '$dist m — ${h}h ${m}min',
-                            style: TextStyle(color: context.moto.textPrimary, fontSize: 14),
+                            style: TextStyle(
+                              color: context.moto.textPrimary,
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       ),
@@ -747,9 +898,19 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                     padding: const EdgeInsets.only(top: 4),
                     child: Row(
                       children: [
-                        Icon(Icons.my_location, color: context.moto.success, size: 16),
+                        Icon(
+                          Icons.my_location,
+                          color: context.moto.success,
+                          size: 16,
+                        ),
                         const SizedBox(width: 4),
-                        Text('Compartilhando localização', style: TextStyle(color: context.moto.success, fontSize: 12)),
+                        Text(
+                          'Compartilhando localização',
+                          style: TextStyle(
+                            color: context.moto.success,
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -761,15 +922,23 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: InkWell(
-                      onTap: () => Modular.get<LocationService>().openLocationSettings(),
+                      onTap: () =>
+                          Modular.get<LocationService>().openLocationSettings(),
                       child: Row(
                         children: [
-                          Icon(Icons.location_off, color: context.moto.warning, size: 16),
+                          Icon(
+                            Icons.location_off,
+                            color: context.moto.warning,
+                            size: 16,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               'Localização indisponível — toque para ativar o GPS',
-                              style: TextStyle(color: context.moto.warning, fontSize: 12),
+                              style: TextStyle(
+                                color: context.moto.warning,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ],
@@ -778,7 +947,9 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                   ),
                 const SizedBox(height: 12),
                 MotoButton(
-                  label: isAccepted ? 'Navegar até o passageiro' : 'Navegar até o destino',
+                  label: isAccepted
+                      ? 'Navegar até o passageiro'
+                      : 'Navegar até o destino',
                   icon: Icons.directions,
                   variant: MotoButtonVariant.glass,
                   large: false,

@@ -43,6 +43,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _currentPassengerName;
   Timer? _locationTimer;
   Timer? _activeTravelPollTimer;
+  Position? _lastReportedPosition;
+  DateTime? _lastLocationReportAt;
+  bool _locationReportInFlight = false;
+  bool _isAppActive = true;
   String? _userId;
   String? _userPhotoUrl;
   String? _userName;
@@ -53,6 +57,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   DriverAvailabilityEntity? _availability;
   Timer? _availabilityTimer;
   bool _isTogglingAvailability = false;
+
+  static const _locationReportInterval = Duration(seconds: 30);
+  static const _locationHeartbeatInterval = Duration(minutes: 5);
+  static const _minimumDisplacementMeters = 20.0;
 
   @override
   Widget build(BuildContext context) {
@@ -73,10 +81,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: context.moto.textOnAccent),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.moto.textOnAccent,
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      Text('Reconectando...', style: TextStyle(color: context.moto.textOnAccent)),
+                      Text(
+                        'Reconectando...',
+                        style: TextStyle(color: context.moto.textOnAccent),
+                      ),
                     ],
                   ),
                 ),
@@ -86,7 +100,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 userId: _userId ?? '',
                 onSignOut: _handleSignOut,
                 onSettingsTap: () async {
-                  await Modular.to.pushNamed('/profile-configuration', arguments: {'userId': _userId});
+                  await Modular.to.pushNamed(
+                    '/profile-configuration',
+                    arguments: {'userId': _userId},
+                  );
                   _loadUserId();
                 },
               ),
@@ -102,7 +119,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   child: Center(
                     child: Text(
                       'Aguardando novas viagens...',
-                      style: TextStyle(color: context.moto.textSecondary, fontSize: 15),
+                      style: TextStyle(
+                        color: context.moto.textSecondary,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
                 ),
@@ -119,9 +139,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         const MotoTile(icon: Icons.history),
                         const SizedBox(width: MotoSpace.s3),
                         Expanded(
-                          child: Text('Histórico de viagens', style: Theme.of(context).textTheme.titleMedium),
+                          child: Text(
+                            'Histórico de viagens',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
                         ),
-                        Icon(Icons.chevron_right, color: context.moto.textTertiary),
+                        Icon(
+                          Icons.chevron_right,
+                          color: context.moto.textTertiary,
+                        ),
                       ],
                     ),
                   ),
@@ -156,7 +182,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const Spacer(),
                 Switch(
                   value: isActive,
-                  onChanged: _isTogglingAvailability ? null : _onAvailabilityToggled,
+                  onChanged: _isTogglingAvailability
+                      ? null
+                      : _onAvailabilityToggled,
                 ),
               ],
             ),
@@ -173,7 +201,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildActiveTravelCard() {
     final isInProgress = _currentTravelStatus == 'InProgress';
-    final tripStatus = isInProgress ? TripStatus.emAndamento : TripStatus.aceita;
+    final tripStatus = isInProgress
+        ? TripStatus.emAndamento
+        : TripStatus.aceita;
 
     return GestureDetector(
       onTap: _openActiveTravel,
@@ -185,10 +215,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           children: [
             Row(
               children: [
-                const MotoTile(icon: Icons.directions_car, accent: true, size: 40),
+                const MotoTile(
+                  icon: Icons.directions_car,
+                  accent: true,
+                  size: 40,
+                ),
                 const SizedBox(width: MotoSpace.s3),
                 Expanded(
-                  child: Text('Viagem ativa', style: Theme.of(context).textTheme.titleMedium),
+                  child: Text(
+                    'Viagem ativa',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
                 MotoStatusBadge.trip(tripStatus),
               ],
@@ -201,7 +238,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   children: [
                     Icon(Icons.person, color: context.moto.accent, size: 20),
                     const SizedBox(width: MotoSpace.s2),
-                    Text(_currentPassengerName!, style: Theme.of(context).textTheme.bodyLarge),
+                    Text(
+                      _currentPassengerName!,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
                   ],
                 ),
               ),
@@ -246,10 +286,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // Rede de segurança: re-consulta o estado canônico periodicamente,
     // cobrindo eventos SignalR perdidos (não há replay para o motorista).
-    _activeTravelPollTimer = Timer.periodic(
-      const Duration(seconds: 15),
-      (_) => _checkActiveTravelHttp(),
-    );
+    _startActiveTravelPolling();
 
     // F04 (auditoria de escalabilidade): existia um terceiro canal aqui,
     // `POST /api/positions/drivers/{userId}` via HTTP a cada 10s, rodando em
@@ -260,12 +297,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isAppActive = state == AppLifecycleState.resumed;
+
+    if (!_isAppActive) {
+      // SignalR permanece conectado para não alterar recebimento de ofertas.
+      // Apenas leituras periódicas de GPS/HTTP e o repaint do contador param.
+      _locationTimer?.cancel();
+      _activeTravelPollTimer?.cancel();
+      _availabilityTimer?.cancel();
+      return;
+    }
+
     // Ao voltar de background, re-consulta a viagem ativa para refletir
     // mudanças de status ocorridas enquanto o app não estava visível.
-    if (state == AppLifecycleState.resumed) {
-      _checkActiveTravelHttp();
-      _reconnectSignalRIfNeeded();
-    }
+    _checkActiveTravelHttp();
+    _checkAvailability();
+    _startActiveTravelPolling();
+    _reconnectSignalRIfNeeded();
+  }
+
+  void _startActiveTravelPolling() {
+    _activeTravelPollTimer?.cancel();
+    if (!_isAppActive) return;
+    _activeTravelPollTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _checkActiveTravelHttp(),
+    );
   }
 
   /// O SO pode ter suspendido a conexão de rede com o app em background sem
@@ -275,7 +332,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// ao primeiro plano.
   Future<void> _reconnectSignalRIfNeeded() async {
     final signalR = Modular.get<SignalRService>();
-    if (signalR.isConnected('travel-orders') && signalR.isConnected('travel-management')) {
+    if (signalR.isConnected('travel-orders') &&
+        signalR.isConnected('travel-management')) {
       return;
     }
     await _connectSignalR();
@@ -293,12 +351,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _loadUserName(String userId) async {
     try {
       final dio = Modular.get<Dio>();
-      final response = await dio.get('${AppConfig.getBaseUrl()}/api/drivers/me');
+      final response = await dio.get(
+        '${AppConfig.getBaseUrl()}/api/drivers/me',
+      );
       if (!mounted) return;
       if (response.statusCode == 200 && response.data != null) {
         final name = response.data['name'] as String?;
         var photoUrl = response.data['photoUrl'] as String?;
-        if (photoUrl != null && photoUrl.isNotEmpty && !photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+        if (photoUrl != null &&
+            photoUrl.isNotEmpty &&
+            !photoUrl.startsWith('http://') &&
+            !photoUrl.startsWith('https://')) {
           photoUrl = '${AppConfig.getBaseUrl()}$photoUrl';
         }
         setState(() {
@@ -316,7 +379,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _checkingActiveTravel = true;
     try {
       final dio = Modular.get<Dio>();
-      final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/active');
+      final response = await dio.get(
+        '${AppConfig.getBaseUrl()}/api/travels/active',
+      );
       if (!mounted) return;
 
       // Contrato do endpoint GET /api/travels/active:
@@ -364,7 +429,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// Abre a página da viagem ativa e, ao voltar, re-consulta o estado canônico
   /// para que mudanças de status feitas na página reflitam na home na hora.
   Future<void> _openActiveTravel() async {
-    await Modular.to.pushNamed('/active-travel', arguments: {'travelId': _currentTravelId});
+    await Modular.to.pushNamed(
+      '/active-travel',
+      arguments: {'travelId': _currentTravelId},
+    );
     if (mounted) _checkActiveTravelHttp();
   }
 
@@ -381,7 +449,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _signalRListenersRegistered = true;
 
     _newOrderSub = signalR.onNewOrder.listen((data) async {
-      print('[DIAG] NewOrder event received: $data, orderAlertOpen=${NotificationService.orderAlertOpen}, sheetVisible=${NotificationService.sheetVisible}, currentTravelId=$_currentTravelId');
+      print(
+        '[DIAG] NewOrder event received: $data, orderAlertOpen=${NotificationService.orderAlertOpen}, sheetVisible=${NotificationService.sheetVisible}, currentTravelId=$_currentTravelId',
+      );
       if (NotificationService.orderAlertOpen) return;
       // Reenvio do mesmo evento NewOrder (reconexão do hub, retry do
       // backend) enquanto o sheet do pedido atual ainda está na tela —
@@ -546,7 +616,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           if (mounted) setState(() => _isReconnecting = false);
           return;
         } catch (e) {
-          developer.log('Falha ao reconectar SignalR, tentando novamente', error: e);
+          developer.log(
+            'Falha ao reconectar SignalR, tentando novamente',
+            error: e,
+          );
           await Future.delayed(retryDelay);
         }
       }
@@ -621,7 +694,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (availability.isActive) {
         _startAvailabilityTimer();
       } else if (!AvailabilitySheet.isOpen) {
-        final result = await AvailabilitySheet.show(context, datasource: datasource);
+        final result = await AvailabilitySheet.show(
+          context,
+          datasource: datasource,
+        );
         if (!mounted || result == null) return; // cancelou — permanece inactive
         setState(() => _availability = result);
         _startAvailabilityTimer();
@@ -659,7 +735,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (value) {
         // Ativar passa pelo sheet de confirmação (RF02/03/04) — mesma janela
         // de 4h já usada em outros pontos de entrada, não pula essa etapa.
-        final result = await AvailabilitySheet.show(context, datasource: datasource);
+        final result = await AvailabilitySheet.show(
+          context,
+          datasource: datasource,
+        );
         if (!mounted || result == null) return; // cancelou no sheet
         setState(() => _availability = result);
         _startAvailabilityTimer();
@@ -673,7 +752,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       developer.log('[AVAILABILITY] toggle failed: $e', name: 'availability');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Não foi possível atualizar sua disponibilidade.')),
+          const SnackBar(
+            content: Text('Não foi possível atualizar sua disponibilidade.'),
+          ),
         );
       }
     } finally {
@@ -683,33 +764,70 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _startLocationReporting(SignalRService signalR) {
     _locationTimer?.cancel();
-    _locationTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) async {
-        // F04: enquanto a viagem está InProgress, o ActiveTravelPage já
-        // reporta a posição via SignalR a cada 10s (canal mais frequente e
-        // mais relevante nesse momento) — pausar este canal da Home evita
-        // dois canais de localização simultâneos, ao mesmo tempo, para o
-        // mesmo motorista. Retoma sozinho no próximo tick assim que a
-        // viagem deixar de ser InProgress (_currentTravelStatus muda em
-        // várias listeners de SignalR/HTTP já existentes acima).
-        if (_currentTravelStatus == 'InProgress') return;
+    if (!_isAppActive) return;
 
-        try {
-          final hasPermission = await Geolocator.checkPermission();
-          if (hasPermission == LocationPermission.denied || hasPermission == LocationPermission.deniedForever) {
-            return;
-          }
-          final position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-            ),
-          );
-          await signalR.reportLocation(position.latitude, position.longitude);
-        } catch (_) {
-          // Silently skip on error
-        }
-      },
+    _reportIdleLocation(signalR, force: true);
+    _locationTimer = Timer.periodic(
+      _locationReportInterval,
+      (_) => _reportIdleLocation(signalR),
     );
+  }
+
+  Future<void> _reportIdleLocation(
+    SignalRService signalR, {
+    bool force = false,
+  }) async {
+    if (!_isAppActive ||
+        _currentTravelStatus == 'InProgress' ||
+        _locationReportInFlight) {
+      return;
+    }
+    _locationReportInFlight = true;
+    try {
+      // F04: enquanto a viagem está InProgress, o ActiveTravelPage já
+      // reporta a posição via SignalR a cada 10s (canal mais frequente e
+      // mais relevante nesse momento) — pausar este canal da Home evita
+      // dois canais de localização simultâneos, ao mesmo tempo, para o
+      // mesmo motorista. Retoma sozinho no próximo tick assim que a
+      // viagem deixar de ser InProgress (_currentTravelStatus muda em
+      // várias listeners de SignalR/HTTP já existentes acima).
+      final hasPermission = await Geolocator.checkPermission();
+      if (hasPermission == LocationPermission.denied ||
+          hasPermission == LocationPermission.deniedForever) {
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      if (!_isAppActive || _currentTravelStatus == 'InProgress') return;
+
+      final previous = _lastReportedPosition;
+      final lastReportAt = _lastLocationReportAt;
+      final heartbeatDue =
+          lastReportAt == null ||
+          DateTime.now().difference(lastReportAt) >= _locationHeartbeatInterval;
+      final movedEnough =
+          previous == null ||
+          Geolocator.distanceBetween(
+                previous.latitude,
+                previous.longitude,
+                position.latitude,
+                position.longitude,
+              ) >=
+              _minimumDisplacementMeters;
+
+      if (!force && !heartbeatDue && !movedEnough) return;
+
+      await signalR.reportLocation(position.latitude, position.longitude);
+      _lastReportedPosition = position;
+      _lastLocationReportAt = DateTime.now();
+    } catch (_) {
+      // Silently skip on error
+    } finally {
+      _locationReportInFlight = false;
+    }
   }
 }

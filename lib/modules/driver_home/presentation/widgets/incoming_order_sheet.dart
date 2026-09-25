@@ -21,7 +21,11 @@ class IncomingOrderSheet extends StatefulWidget {
   final Map<String, dynamic> order;
   final VoidCallback? onDenied;
 
-  final void Function(OrderDecision decision, Map<String, dynamic>? acceptResult)? onDecision;
+  final void Function(
+    OrderDecision decision,
+    Map<String, dynamic>? acceptResult,
+  )?
+  onDecision;
 
   const IncomingOrderSheet({
     super.key,
@@ -33,7 +37,11 @@ class IncomingOrderSheet extends StatefulWidget {
   @override
   State<IncomingOrderSheet> createState() => _IncomingOrderSheetState();
 
-  static void show(BuildContext context, Map<String, dynamic> order, {VoidCallback? onDenied}) {
+  static void show(
+    BuildContext context,
+    Map<String, dynamic> order, {
+    VoidCallback? onDenied,
+  }) {
     showModalBottomSheet(
       useSafeArea: true,
       constraints: BoxConstraints.expand(
@@ -76,13 +84,16 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     final orderId = widget.order['orderId'] as String;
     final distance = (widget.order['distanceToPassengerInMeters'] as int?) ?? 0;
     final timeHours = (widget.order['averageTravelTimeInHours'] as int?) ?? 0;
-    final timeMinutes = (widget.order['averageTravelTimeInMinutes'] as int?) ?? 0;
-    final totalDest = (widget.order['distanceToDestinationInMeters'] as int?) ?? 0;
+    final timeMinutes =
+        (widget.order['averageTravelTimeInMinutes'] as int?) ?? 0;
+    final totalDest =
+        (widget.order['distanceToDestinationInMeters'] as int?) ?? 0;
 
     final passLat = (widget.order['passengerLatitude'] as num).toDouble();
     final passLng = (widget.order['passengerLongitude'] as num).toDouble();
 
-    final isLoading = _status == _AcceptStatus.accepting || _status == _AcceptStatus.denying;
+    final isLoading =
+        _status == _AcceptStatus.accepting || _status == _AcceptStatus.denying;
 
     return MotoGlass(
       level: GlassLevel.sheet,
@@ -95,10 +106,17 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           // Header: título + anel de contagem regressiva
           Row(
             children: [
-              const MotoTile(icon: Icons.directions_car, accent: true, size: 40),
+              const MotoTile(
+                icon: Icons.directions_car,
+                accent: true,
+                size: 40,
+              ),
               const SizedBox(width: MotoSpace.s3),
               Expanded(
-                child: Text('Nova viagem', style: Theme.of(context).textTheme.titleLarge),
+                child: Text(
+                  'Nova viagem',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
               ),
               MotoCountdownRing(
                 seconds: _rejectTimeoutSeconds,
@@ -113,12 +131,19 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (widget.order['departureAddress'] != null && widget.order['destinationAddress'] != null)
+                  if (widget.order['departureAddress'] != null &&
+                      widget.order['destinationAddress'] != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: MotoSpace.s4),
                       child: MotoRoute(
-                        from: (widget.order['departureAddress'] as String, 'Embarque'),
-                        to: (widget.order['destinationAddress'] as String, 'Destino'),
+                        from: (
+                          widget.order['departureAddress'] as String,
+                          'Embarque',
+                        ),
+                        to: (
+                          widget.order['destinationAddress'] as String,
+                          'Destino',
+                        ),
                       ),
                     ),
                   SizedBox(
@@ -138,8 +163,16 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
                   const SizedBox(height: MotoSpace.s4),
                   MotoMetrics(
                     items: [
-                      (_metricDistanceValue(distance), _metricDistanceUnit(distance), 'Até o passageiro'),
-                      (_metricDistanceValue(totalDest), _metricDistanceUnit(totalDest), 'Até o destino'),
+                      (
+                        _metricDistanceValue(distance),
+                        _metricDistanceUnit(distance),
+                        'Até o passageiro',
+                      ),
+                      (
+                        _metricDistanceValue(totalDest),
+                        _metricDistanceUnit(totalDest),
+                        'Até o destino',
+                      ),
                       (_resolveTimeText(timeHours, timeMinutes), '', 'Duração'),
                     ],
                   ),
@@ -149,7 +182,12 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           ),
           const SizedBox(height: MotoSpace.s5),
           if (isLoading)
-            const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()))
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(8),
+                child: CircularProgressIndicator(),
+              ),
+            )
           else
             Row(
               children: [
@@ -165,7 +203,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
                 Expanded(
                   flex: 2,
                   child: MotoButton(
-                    label: _status == _AcceptStatus.success ? 'Aceita!' : 'Aceitar',
+                    label: _status == _AcceptStatus.success
+                        ? 'Aceita!'
+                        : 'Aceitar',
                     onPressed: () => _accept(context, orderId),
                   ),
                 ),
@@ -184,12 +224,19 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: context.moto.danger, size: 20),
+                    Icon(
+                      Icons.error_outline,
+                      color: context.moto.danger,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _errorMessage!,
-                        style: TextStyle(color: context.moto.danger, fontSize: 14),
+                        style: TextStyle(
+                          color: context.moto.danger,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],
@@ -239,8 +286,12 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // Get travelId and routes from response
       final travelId = response.data['travelId'] as String;
       final routesList = response.data['routes'] as List? ?? [];
-      final pickupRoute = routesList.isNotEmpty ? routesList[0] as Map<String, dynamic> : null;
-      final tripRoute = routesList.length > 1 ? routesList[1] as Map<String, dynamic> : null;
+      final pickupRoute = routesList.isNotEmpty
+          ? routesList[0] as Map<String, dynamic>
+          : null;
+      final tripRoute = routesList.length > 1
+          ? routesList[1] as Map<String, dynamic>
+          : null;
 
       final acceptResult = {
         'travelId': travelId,
@@ -331,8 +382,12 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       TravelLocalData(
         travelId: travelId,
         status: 'Accepted',
-        departureAddress: pickupRoute?['destinationAddress'] as String? ?? widget.order['departureAddress'] as String?,
-        destinationAddress: tripRoute?['destinationAddress'] as String? ?? widget.order['destinationAddress'] as String?,
+        departureAddress:
+            pickupRoute?['destinationAddress'] as String? ??
+            widget.order['departureAddress'] as String?,
+        destinationAddress:
+            tripRoute?['destinationAddress'] as String? ??
+            widget.order['destinationAddress'] as String?,
         createdAt: DateTime.now(),
       ),
     );
@@ -362,10 +417,15 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     } catch (_) {
       try {
         final dio = Modular.get<Dio>();
-        await dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
+        await dio.post(
+          '${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny',
+        );
       } on DioException catch (e) {
         // Log the error but don't block the UI — backend already recorded the denial
-        log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
+        log(
+          'Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}',
+          name: 'travel-deny',
+        );
       }
     }
   }
@@ -395,7 +455,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
         final dio = Modular.get<Dio>();
         dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
       } on DioException catch (e) {
-        log('Auto-deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
+        log(
+          'Auto-deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}',
+          name: 'travel-deny',
+        );
       }
     }
   }
@@ -411,14 +474,19 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
 
     setState(() {
       if (result.isGranted) {
-        _driverLocation = LatLng(result.position!.latitude, result.position!.longitude);
+        _driverLocation = LatLng(
+          result.position!.latitude,
+          result.position!.longitude,
+        );
       }
 
       _markers = {
         Marker(
           markerId: const MarkerId('passenger'),
           position: LatLng(passLat, passLng),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
           infoWindow: const InfoWindow(title: 'Passageiro'),
         ),
         Marker(
@@ -431,7 +499,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           Marker(
             markerId: const MarkerId('driver'),
             position: _driverLocation!,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueBlue,
+            ),
             infoWindow: const InfoWindow(title: 'Você'),
           ),
       };
@@ -440,7 +510,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       final routeJson = widget.order['routeJson'];
       if (routeJson != null) {
         try {
-          final routeData = routeJson is String ? jsonDecode(routeJson) : routeJson;
+          final routeData = routeJson is String
+              ? jsonDecode(routeJson)
+              : routeJson;
           final encodedPolyline = routeData['encodedPolyline'] as String?;
           if (encodedPolyline != null && encodedPolyline.isNotEmpty) {
             final result = DirectionsResult(
@@ -453,14 +525,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               endLng: destLng,
             );
             final points = result.decodePolyline();
-            _polylines = {
-              Polyline(
-                polylineId: const PolylineId('route'),
-                points: points,
-                color: context.moto.accent,
-                width: 4,
-              ),
-            };
+            _polylines = MotoMapRouteStyle.polylines(
+              id: 'route',
+              points: points,
+            );
           }
         } catch (_) {
           // Fallback: tentar encodedPolyline direto do payload
@@ -481,14 +549,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
             endLng: destLng,
           );
           final points = result.decodePolyline();
-          _polylines = {
-            Polyline(
-              polylineId: const PolylineId('route'),
-              points: points,
-              color: context.moto.accent,
-              width: 4,
-            ),
-          };
+          _polylines = MotoMapRouteStyle.polylines(
+            id: 'route',
+            points: points,
+          );
         }
       }
 
@@ -496,7 +560,8 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     });
   }
 
-  String _metricDistanceValue(int meters) => meters >= 1000 ? (meters / 1000).toStringAsFixed(1) : '$meters';
+  String _metricDistanceValue(int meters) =>
+      meters >= 1000 ? (meters / 1000).toStringAsFixed(1) : '$meters';
 
   String _metricDistanceUnit(int meters) => meters >= 1000 ? 'km' : 'm';
 
