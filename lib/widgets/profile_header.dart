@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/profile_configuration/presentation/widgets/profile_image_display.dart';
 
 class ProfileHeader extends StatelessWidget {
@@ -30,10 +31,10 @@ class ProfileHeader extends StatelessWidget {
         const SizedBox(width: 12),
         Text(
           'Olá, ${fullName.split(' ').first}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF4E4E4E),
+            color: context.moto.textPrimary,
           ),
         ),
         const Spacer(),

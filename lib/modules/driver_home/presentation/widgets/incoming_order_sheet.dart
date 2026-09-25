@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:moto_driver/core/config/app_config.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/core/local_db/models/local_data_models.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
@@ -58,6 +59,12 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   _AcceptStatus _status = _AcceptStatus.idle;
   String? _errorMessage;
 
+  // F16: `isLoading` (derivado de `_status`) só esconde os botões depois do
+  // rebuild — um duplo toque entre os dois toques do usuário e o frame
+  // seguinte ainda dispara `_accept`/`_deny` duas vezes. Guarda síncrona,
+  // checada antes de qualquer `await`, fecha essa janela.
+  bool _actionInFlight = false;
+
   // Alinhado ao prazo de resposta do backend (20s) — passageiro agora vê
   // esse mesmo prazo via evento DriverContacted, então os dois lados
   // precisam bater.
@@ -80,9 +87,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
 
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      decoration: BoxDecoration(
+        color: context.moto.bgRaised,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
@@ -92,12 +99,12 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           // Header com título + botões de ação
           Row(
             children: [
-              const Icon(Icons.directions_car, color: Color(0xFF4685C0)),
+              Icon(Icons.directions_car, color: context.moto.accent),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Nova Viagem',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4E4E4E)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.moto.textPrimary),
                 ),
               ),
               if (isLoading)
@@ -112,14 +119,14 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               else ...[
                 _IconActionButton(
                   icon: Icons.close,
-                  color: Colors.red,
+                  color: context.moto.danger,
                   tooltip: 'Recusar',
                   onPressed: () => _deny(context, orderId),
                 ),
                 const SizedBox(width: 12),
                 _IconActionButton(
                   icon: _status == _AcceptStatus.success ? Icons.check : Icons.check_circle_outline,
-                  color: _status == _AcceptStatus.success ? Colors.green : const Color(0xFF4685C0),
+                  color: _status == _AcceptStatus.success ? context.moto.success : context.moto.accent,
                   tooltip: 'Aceitar',
                   onPressed: () => _accept(context, orderId),
                 ),
@@ -148,12 +155,12 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 children: [
-                  const Icon(Icons.trip_origin, color: Color(0xFF4685C0), size: 20),
+                  Icon(Icons.trip_origin, color: context.moto.accent, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       widget.order['departureAddress'] as String,
-                      style: const TextStyle(color: Color(0xFF4E4E4E)),
+                      style: TextStyle(color: context.moto.textPrimary),
                     ),
                   ),
                 ],
@@ -165,12 +172,12 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 children: [
-                  const Icon(Icons.flag, color: Color(0xFF4685C0), size: 20),
+                  Icon(Icons.flag, color: context.moto.accent, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       widget.order['destinationAddress'] as String,
-                      style: const TextStyle(color: Color(0xFF4E4E4E)),
+                      style: TextStyle(color: context.moto.textPrimary),
                     ),
                   ),
                 ],
@@ -178,33 +185,33 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
             ),
           Row(
             children: [
-              const Icon(Icons.location_on, color: Color(0xFF4685C0), size: 20),
+              Icon(Icons.location_on, color: context.moto.accent, size: 20),
               const SizedBox(width: 8),
               Text(
                 _resolveDistanceText(distance),
-                style: const TextStyle(color: Color(0xFF4E4E4E)),
+                style: TextStyle(color: context.moto.textPrimary),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.route, color: Color(0xFF4685C0), size: 20),
+              Icon(Icons.route, color: context.moto.accent, size: 20),
               const SizedBox(width: 8),
               Text(
                 _resolveTotalDestText(totalDest),
-                style: const TextStyle(color: Color(0xFF4E4E4E)),
+                style: TextStyle(color: context.moto.textPrimary),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.timer, color: Color(0xFF4685C0), size: 20),
+              Icon(Icons.timer, color: context.moto.accent, size: 20),
               const SizedBox(width: 8),
               Text(
                 _resolveTimeText(timeHours, timeMinutes),
-                style: const TextStyle(color: Color(0xFF4E4E4E)),
+                style: TextStyle(color: context.moto.textPrimary),
               ),
             ],
           ),
@@ -217,16 +224,16 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
                   child: LinearProgressIndicator(
                     value: _remainingSeconds / _rejectTimeoutSeconds,
                     minHeight: 3,
-                    color: const Color(0xFFB0B0B0).withValues(alpha: 0.5),
-                    backgroundColor: const Color(0xFFE0E0E0).withValues(alpha: 0.3),
+                    color: context.moto.textTertiary.withValues(alpha: 0.5),
+                    backgroundColor: context.moto.borderSubtle,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   '${_remainingSeconds}s',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: Color(0xFFB0B0B0),
+                    color: context.moto.textTertiary,
                   ),
                 ),
               ],
@@ -239,18 +246,18 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: context.moto.dangerSoft,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(color: context.moto.danger),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                    Icon(Icons.error_outline, color: context.moto.danger, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _errorMessage!,
-                        style: const TextStyle(color: Colors.red, fontSize: 14),
+                        style: TextStyle(color: context.moto.danger, fontSize: 14),
                       ),
                     ),
                   ],
@@ -277,6 +284,8 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   }
 
   Future<void> _accept(BuildContext context, String id) async {
+    if (_actionInFlight) return;
+    _actionInFlight = true;
     _rejectTimer?.cancel();
     setState(() {
       _status = _AcceptStatus.accepting;
@@ -379,6 +388,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           message = 'Erro ao aceitar viagem. Tente novamente.';
       }
 
+      _actionInFlight = false;
       setState(() {
         _status = _AcceptStatus.error;
         _errorMessage = message;
@@ -405,6 +415,8 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   }
 
   Future<void> _deny(BuildContext context, String orderId) async {
+    if (_actionInFlight) return;
+    _actionInFlight = true;
     _rejectTimer?.cancel();
 
     final onDecision = widget.onDecision;
@@ -533,7 +545,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               Polyline(
                 polylineId: const PolylineId('route'),
                 points: points,
-                color: const Color(0xFF4685C0),
+                color: context.moto.accent,
                 width: 4,
               ),
             };
@@ -561,7 +573,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
             Polyline(
               polylineId: const PolylineId('route'),
               points: points,
-              color: const Color(0xFF4685C0),
+              color: context.moto.accent,
               width: 4,
             ),
           };

@@ -11,7 +11,7 @@ import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/driver_availability/data/datasources/availability_datasource.dart';
 import 'package:moto_driver/modules/driver_availability/domain/entities/driver_availability_entity.dart';
 import 'package:moto_driver/modules/driver_availability/presentation/widgets/availability_sheet.dart';
@@ -56,7 +56,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -64,18 +63,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             children: [
               if (_isReconnecting)
                 Container(
-                  color: Colors.orange,
+                  color: context.moto.warning,
                   padding: const EdgeInsets.all(8),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: context.moto.textOnAccent),
                       ),
-                      SizedBox(width: 8),
-                      Text('Reconectando...', style: TextStyle(color: Colors.white)),
+                      const SizedBox(width: 8),
+                      Text('Reconectando...', style: TextStyle(color: context.moto.textOnAccent)),
                     ],
                   ),
                 ),
@@ -93,9 +92,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               // Active travel card — exibido quando existe viagem ativa (Accepted/InProgress)
               if (_currentTravelId != null) _buildActiveTravelCard(),
               if (_currentTravelId == null)
-                const Expanded(
+                Expanded(
                   child: Center(
-                    child: Text('Aguardando novas viagens...', style: TextStyle(color: Color(0xFF4E4E4E), fontSize: 16)),
+                    child: Text('Aguardando novas viagens...', style: TextStyle(color: context.moto.textPrimary, fontSize: 16)),
                   ),
                 ),
               const SizedBox(height: 12),
@@ -106,8 +105,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   icon: const Icon(Icons.history),
                   label: const Text('Histórico de Viagens'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF4685C0),
-                    side: const BorderSide(color: Color(0xFF4685C0)),
+                    foregroundColor: context.moto.accent,
+                    side: BorderSide(color: context.moto.accent),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
@@ -129,20 +128,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         elevation: 4,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: Colors.grey.shade300),
+          side: BorderSide(color: context.moto.borderDefault),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.directions_car, color: Color(0xFF4685C0), size: 24),
-                  SizedBox(width: 8),
+                  Icon(Icons.directions_car, color: context.moto.accent, size: 24),
+                  const SizedBox(width: 8),
                   Text(
                     'Viagem Ativa',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF4E4E4E)),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.moto.textPrimary),
                   ),
                 ],
               ),
@@ -152,19 +151,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
-                      const Icon(Icons.person, color: Color(0xFF4685C0), size: 20),
+                      Icon(Icons.person, color: context.moto.accent, size: 20),
                       const SizedBox(width: 8),
-                      Text(_currentPassengerName!, style: const TextStyle(color: Color(0xFF4E4E4E), fontSize: 14)),
+                      Text(_currentPassengerName!, style: TextStyle(color: context.moto.textPrimary, fontSize: 14)),
                     ],
                   ),
                 ),
               Row(
                 children: [
-                  const Icon(Icons.info_outline, color: Color(0xFF4685C0), size: 20),
+                  Icon(Icons.info_outline, color: context.moto.accent, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     isInProgress ? 'Em andamento' : 'Aceita — aguardando início',
-                    style: const TextStyle(color: Color(0xFF4E4E4E), fontSize: 14),
+                    style: TextStyle(color: context.moto.textPrimary, fontSize: 14),
                   ),
                 ],
               ),
@@ -172,13 +171,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isInProgress ? Colors.green.shade100 : Colors.orange.shade100,
+                  color: isInProgress ? context.moto.successSoft : context.moto.warningSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   isInProgress ? 'Em andamento' : 'Aceita',
                   style: TextStyle(
-                    color: isInProgress ? Colors.green.shade800 : Colors.orange.shade800,
+                    color: isInProgress ? context.moto.success : context.moto.warning,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -189,12 +188,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: context.moto.accent,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: _openActiveTravel,
-                  child: const Text('Abrir Viagem', style: TextStyle(color: Colors.white, fontSize: 14)),
+                  child: Text('Abrir Viagem', style: TextStyle(color: context.moto.textOnAccent, fontSize: 14)),
                 ),
               ),
             ],
@@ -280,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _loadUserName(String userId) async {
     try {
       final dio = Modular.get<Dio>();
-      final response = await dio.get('${AppConfig.getBaseUrl()}/api/drivers/$userId');
+      final response = await dio.get('${AppConfig.getBaseUrl()}/api/drivers/me');
       if (!mounted) return;
       if (response.statusCode == 200 && response.data != null) {
         final name = response.data['name'] as String?;
@@ -368,7 +367,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _signalRListenersRegistered = true;
 
     _newOrderSub = signalR.onNewOrder.listen((data) async {
+      print('[DIAG] NewOrder event received: $data, orderAlertOpen=${NotificationService.orderAlertOpen}, sheetVisible=${NotificationService.sheetVisible}, currentTravelId=$_currentTravelId');
       if (NotificationService.orderAlertOpen) return;
+      // Reenvio do mesmo evento NewOrder (reconexão do hub, retry do
+      // backend) enquanto o sheet do pedido atual ainda está na tela —
+      // sem essa checagem, abria um segundo sheet por cima do primeiro.
+      if (NotificationService.sheetVisible) return;
       if (_currentTravelId != null) return;
 
       // `_currentTravelId` só é atualizado por fluxos que passam pela home —
@@ -377,6 +381,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // só nela: confere a fonte persistida antes de exibir qualquer oferta.
       final travelRepo = Modular.get<TravelLocalRepository>();
       final active = await travelRepo.getActiveTravel();
+      print('[DIAG] NewOrder: active local travel=$active, mounted=$mounted');
       if (active != null || !mounted) return;
 
       final orderId = data['orderId'] as String?;

@@ -5,10 +5,10 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:moto_driver/core/models/password_policy.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/core/utils/masks.dart';
 import 'package:moto_driver/core/utils/server_error_guard.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_usecase.dart';
 import 'package:moto_driver/modules/driver_registration/domain/usecases/register_params.dart';
 import 'package:moto_driver/modules/driver_registration/presentation/blocs/register_bloc.dart';
@@ -349,12 +349,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
         final errorMessage = state is RegisterFailure ? state.message : null;
 
         return Scaffold(
-          backgroundColor: AppColors.white,
           appBar: AppBar(
-            backgroundColor: AppColors.white,
-            surfaceTintColor: AppColors.white,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+              icon: Icon(Icons.arrow_back, color: context.moto.accent),
               onPressed: () => Navigator.of(context).pop(),
             ),
             title: Text(
@@ -362,7 +359,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
               style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppColors.primary,
+                color: context.moto.accent,
               ),
             ),
           ),
@@ -415,7 +412,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     inputFormatters: [PhoneInputFormatter()],
                     maxLength: 15,
                   ),
-                  _buildDateField(),
+                  _buildDateField(context),
                   AppTextField(
                     label: 'E-mail *',
                     hint: 'Informe seu e-mail',
@@ -432,8 +429,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     errorText: _confirmEmailError ?? _liveConfirmEmailError,
                     maxLength: 100,
                   ),
-                  _buildPasswordField(),
-                  _buildConfirmPasswordField(),
+                  _buildPasswordField(context),
+                  _buildConfirmPasswordField(context),
                   AppTextField(
                     label: 'CNH *',
                     hint: 'Número da CNH',
@@ -446,8 +443,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   if (errorMessage != null)
                     Text(
                       errorMessage,
-                      style: const TextStyle(
-                        color: Colors.red,
+                      style: TextStyle(
+                        color: context.moto.danger,
                         fontSize: 12,
                       ),
                       textAlign: TextAlign.center,
@@ -463,7 +460,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       'Já tem uma conta? Entrar',
                       style: GoogleFonts.inter(
                         fontSize: 12,
-                        color: AppColors.primary,
+                        color: context.moto.accent,
                       ),
                     ),
                   ),
@@ -476,7 +473,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 
-  Widget _buildDateField() {
+  Widget _buildDateField(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -485,7 +482,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+            color: context.moto.accent,
             letterSpacing: 0.2,
             height: 1.2,
           ),
@@ -499,7 +496,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(4),
               border: Border.all(
-                color: _birthdateError != null ? Colors.red : AppColors.primary,
+                color: _birthdateError != null ? context.moto.danger : context.moto.accent,
               ),
             ),
             child: Text(
@@ -507,7 +504,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
               style: GoogleFonts.robotoFlex(
                 fontSize: 10,
                 fontWeight: FontWeight.w300,
-                color: _birthdate != null ? AppColors.primary : AppColors.primary.withValues(alpha: 0.5),
+                color: _birthdate != null ? context.moto.accent : context.moto.accent.withValues(alpha: 0.5),
                 letterSpacing: 0.2,
               ),
             ),
@@ -518,18 +515,19 @@ class _RegistrationPageState extends State<RegistrationPage> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               _birthdateError!,
-              style: const TextStyle(color: Colors.red, fontSize: 10),
+              style: TextStyle(color: context.moto.danger, fontSize: 10),
             ),
           ),
       ],
     );
   }
 
-  Widget _buildPasswordField() {
+  Widget _buildPasswordField(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildObscureField(
+          context,
           label: 'Senha *',
           hint: 'Informe sua senha',
           controller: _passwordController,
@@ -548,8 +546,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 
-  Widget _buildConfirmPasswordField() {
+  Widget _buildConfirmPasswordField(BuildContext context) {
     return _buildObscureField(
+      context,
       label: 'Confirmar Senha *',
       hint: 'Digite novamente a senha',
       controller: _confirmPasswordController,
@@ -561,7 +560,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
   /// Campo de senha com toggle de visibilidade — compartilhado entre "Senha"
   /// e "Confirmar Senha" pra não duplicar toda a decoração do TextField.
-  Widget _buildObscureField({
+  Widget _buildObscureField(
+    BuildContext context, {
     required String label,
     required String hint,
     required TextEditingController controller,
@@ -578,7 +578,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+            color: context.moto.accent,
             letterSpacing: 0.2,
             height: 1.2,
           ),
@@ -593,7 +593,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
           style: GoogleFonts.robotoFlex(
             fontSize: 10,
             fontWeight: FontWeight.w300,
-            color: AppColors.primary,
+            color: context.moto.accent,
             letterSpacing: 0.2,
             height: 1.2,
           ),
@@ -602,7 +602,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
             hintStyle: GoogleFonts.robotoFlex(
               fontSize: 10,
               fontWeight: FontWeight.w300,
-              color: AppColors.primary.withValues(alpha: 0.5),
+              color: context.moto.accent.withValues(alpha: 0.5),
               letterSpacing: 0.2,
             ),
             contentPadding: const EdgeInsets.all(12),
@@ -610,29 +610,29 @@ class _RegistrationPageState extends State<RegistrationPage> {
               icon: Icon(
                 obscure ? Icons.visibility_off : Icons.visibility,
                 size: 18,
-                color: AppColors.primary,
+                color: context.moto.accent,
               ),
               onPressed: onToggleObscure,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
-              borderSide: const BorderSide(color: AppColors.primary),
+              borderSide: BorderSide(color: context.moto.accent),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
-              borderSide: const BorderSide(color: AppColors.primary),
+              borderSide: BorderSide(color: context.moto.accent),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+              borderSide: BorderSide(color: context.moto.accent, width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
-              borderSide: const BorderSide(color: Colors.red),
+              borderSide: BorderSide(color: context.moto.danger),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
-              borderSide: const BorderSide(color: Colors.red, width: 2),
+              borderSide: BorderSide(color: context.moto.danger, width: 2),
             ),
             errorText: errorText,
           ),

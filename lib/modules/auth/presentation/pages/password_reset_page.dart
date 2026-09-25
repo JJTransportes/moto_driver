@@ -3,8 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/models/password_policy.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/core/utils/server_error_guard.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_usecase.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_reset_bloc.dart';
@@ -144,18 +144,17 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
 
   Widget _buildSuccess() {
     return Scaffold(
-      backgroundColor: AppColors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 36),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.check_circle, color: AppColors.primary, size: 64),
+              Icon(Icons.check_circle, color: context.moto.accent, size: 64),
               const SizedBox(height: 24),
               Text(
                 'Senha redefinida com sucesso! Faça login novamente.',
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.primary),
+                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: context.moto.accent),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -175,7 +174,6 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
     final error = state is PasswordResetError ? state : null;
 
     return Scaffold(
-      backgroundColor: AppColors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 36),
@@ -189,7 +187,7 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
               const SizedBox(height: 72),
               Text(
                 'Defina sua nova senha',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black),
+                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: context.moto.textPrimary),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -224,7 +222,7 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
                     onPressed: _requestNewCode,
                     child: Text(
                       'Solicitar novo código',
-                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
+                      style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent),
                     ),
                   ),
                 ),

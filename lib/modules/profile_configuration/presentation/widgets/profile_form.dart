@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:moto_driver/core/utils/masks.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/profile_configuration/domain/entities/profile_entity.dart';
 
 class ProfileForm extends StatefulWidget {
@@ -201,7 +202,7 @@ class ProfileFormState extends State<ProfileForm> {
             border: const OutlineInputBorder(),
             errorText: _nameError,
             filled: !editing,
-            fillColor: Colors.grey.shade100,
+            fillColor: context.moto.bgSunken,
           ),
         ),
         const SizedBox(height: 16),
@@ -217,7 +218,7 @@ class ProfileFormState extends State<ProfileForm> {
             border: const OutlineInputBorder(),
             errorText: _emailError,
             filled: !editing,
-            fillColor: Colors.grey.shade100,
+            fillColor: context.moto.bgSunken,
           ),
         ),
         if (editing) ...[
@@ -250,7 +251,7 @@ class ProfileFormState extends State<ProfileForm> {
             hintText: '(12) 91234-5678',
             errorText: _phoneError,
             filled: !editing,
-            fillColor: Colors.grey.shade100,
+            fillColor: context.moto.bgSunken,
           ),
         ),
         if (widget.address != null) ...[
@@ -265,7 +266,7 @@ class ProfileFormState extends State<ProfileForm> {
               prefixIcon: const Icon(Icons.home),
               border: const OutlineInputBorder(),
               filled: true,
-              fillColor: Colors.grey.shade100,
+              fillColor: context.moto.bgSunken,
             ),
           ),
         ],

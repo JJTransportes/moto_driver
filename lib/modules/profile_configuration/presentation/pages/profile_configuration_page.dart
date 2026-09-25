@@ -4,6 +4,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/profile_configuration/domain/entities/profile_entity.dart';
 import 'package:moto_driver/modules/profile_configuration/presentation/blocs/profile_configuration_bloc.dart';
 import 'package:moto_driver/modules/profile_configuration/presentation/blocs/profile_configuration_event.dart';
@@ -50,11 +51,9 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configurações'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF4E4E4E),
+        foregroundColor: context.moto.textSecondary,
         elevation: 0,
       ),
-      backgroundColor: Colors.white,
       body: BlocConsumer<ProfileConfigurationBloc, ProfileConfigurationState>(
         listener: (context, state) {
           if (state is ProfileUpdateSuccess) {
@@ -141,9 +140,9 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                   ),
                   if (_hasActiveTravel) ...[
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Não é possível editar o perfil enquanto houver uma viagem em andamento.',
-                      style: TextStyle(fontSize: 12, color: Colors.red),
+                      style: TextStyle(fontSize: 12, color: context.moto.danger),
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -154,13 +153,13 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                       child: ElevatedButton(
                         onPressed: !canEdit ? null : _onEditTapped,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4685C0),
-                          disabledBackgroundColor: Colors.grey.shade300,
+                          backgroundColor: context.moto.accent,
+                          disabledBackgroundColor: context.moto.borderSubtle,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Editar',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(color: context.moto.textOnAccent, fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                       ),
                     )
@@ -186,20 +185,20 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                             child: ElevatedButton(
                               onPressed: isSaving || !(_formKey.currentState?.isValid ?? false) ? null : _onSave,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF4685C0),
-                                disabledBackgroundColor: Colors.grey.shade300,
+                                backgroundColor: context.moto.accent,
+                                disabledBackgroundColor: context.moto.borderSubtle,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               child: isSaving
-                                  ? const SizedBox(
+                                  ? SizedBox(
                                       height: 20,
                                       width: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: context.moto.textOnAccent),
                                     )
-                                  : const Text(
+                                  : Text(
                                       'Salvar',
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        color: context.moto.textOnAccent,
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -213,22 +212,22 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                   const Divider(),
                   const SizedBox(height: 16),
                   // Danger Zone section
-                  const Align(
+                  Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
                       'Zona de Perigo',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: Colors.red,
+                        color: context.moto.danger,
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Ao excluir sua conta, todos os seus dados serão perdidos '
                     'e você não poderá mais acessar o aplicativo.',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF4E4E4E)),
+                    style: TextStyle(fontSize: 14, color: context.moto.textSecondary),
                   ),
                   const SizedBox(height: 12),
                   Tooltip(
@@ -239,14 +238,14 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                         onPressed: _hasActiveTravel ? null : () => Modular.to.pushNamed('/delete-account/'),
                         icon: Icon(
                           Icons.delete_forever,
-                          color: _hasActiveTravel ? Colors.grey.shade400 : Colors.red,
+                          color: _hasActiveTravel ? context.moto.textDisabled : context.moto.danger,
                         ),
                         label: Text(
                           'Excluir conta',
-                          style: TextStyle(color: _hasActiveTravel ? Colors.grey.shade400 : Colors.red),
+                          style: TextStyle(color: _hasActiveTravel ? context.moto.textDisabled : context.moto.danger),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: _hasActiveTravel ? Colors.grey.shade300 : Colors.red),
+                          side: BorderSide(color: _hasActiveTravel ? context.moto.borderSubtle : context.moto.danger),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -265,7 +264,7 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  Icon(Icons.error_outline, size: 48, color: context.moto.danger),
                   const SizedBox(height: 16),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -395,7 +394,7 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
+        backgroundColor: isError ? context.moto.danger : context.moto.success,
         behavior: SnackBarBehavior.floating,
       ),
     );

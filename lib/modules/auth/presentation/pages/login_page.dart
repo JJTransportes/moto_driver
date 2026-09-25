@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/core/utils/server_error_guard.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
 import 'package:moto_driver/widgets/app_button.dart';
@@ -111,7 +111,6 @@ class _LoginPageState extends State<LoginPage> {
         final passwordError = _passwordError ?? (state is LoginFailure ? state.message : null);
 
         return Scaffold(
-          backgroundColor: AppColors.white,
           body: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(
@@ -152,7 +151,7 @@ class _LoginPageState extends State<LoginPage> {
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () => Navigator.of(context).pushNamed('/recovery'),
-                          child: Text('Esqueci minha senha', style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary)),
+                          child: Text('Esqueci minha senha', style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent)),
                         ),
                       ),
                       AppButton(
@@ -164,7 +163,7 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: () => Navigator.of(context).pushNamed('/driver-register/'),
                         child: Text(
                           'Criar conta',
-                          style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
+                          style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent),
                         ),
                       ),
                     ],
