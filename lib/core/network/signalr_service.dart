@@ -100,9 +100,16 @@ class SignalRService {
   }
 
   /// Finaliza a viagem (InProgress → Completed) via SignalR.
+  /// [latitude]/[longitude] são genuinamente opcionais — quando qualquer um
+  /// dos dois for nulo (localização indisponível), o argumento de posição é
+  /// omitido da invocação em vez de forçar um `!` sobre um valor nulo.
   Future<void> finishTravel(String travelId, {double? latitude, double? longitude}) async {
     final conn = _connections['travel-management'];
-    await conn?.invoke('FinishTravel', args: [travelId, latitude!, longitude!]);
+    final hasPosition = latitude != null && longitude != null;
+    await conn?.invoke(
+      'FinishTravel',
+      args: hasPosition ? [travelId, latitude, longitude] : [travelId],
+    );
   }
 
   /// Inicia a viagem (Accepted → InProgress) via SignalR.

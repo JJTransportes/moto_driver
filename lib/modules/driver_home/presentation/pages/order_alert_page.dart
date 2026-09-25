@@ -9,7 +9,7 @@ import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/driver_home/domain/entities/travel_order_entity.dart';
 import 'package:moto_driver/modules/driver_home/presentation/widgets/incoming_order_sheet.dart';
 import 'package:moto_driver/widgets/app_button.dart';
@@ -219,7 +219,6 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: AppColors.white,
         body: SafeArea(child: _buildBody()),
       ),
     );
@@ -228,8 +227,8 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
   Widget _buildBody() {
     switch (_state) {
       case _PageState.loading:
-        return const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
+        return Center(
+          child: CircularProgressIndicator(color: context.moto.accent),
         );
       case _PageState.order:
         final order = _order;
@@ -256,11 +255,11 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 64, color: AppColors.secondary),
+            Icon(Icons.error_outline, size: 64, color: context.moto.textTertiary),
             const SizedBox(height: 24),
             Text(
               message,
-              style: const TextStyle(fontSize: 14, color: Colors.black54),
+              style: TextStyle(fontSize: 14, color: context.moto.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),

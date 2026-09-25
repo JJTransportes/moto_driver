@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:dio/dio.dart';
@@ -5,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 
 class AppWidget extends StatefulWidget {
   const AppWidget({super.key});
@@ -15,6 +16,13 @@ class AppWidget extends StatefulWidget {
 }
 
 class _AppWidgetState extends State<AppWidget> with WidgetsBindingObserver {
+  // F17: `Future.delayed` solto aqui não era cancelável nem checava
+  // `mounted` — se o widget desmontasse dentro da janela de 2s (ou uma
+  // mudança de lifecycle seguinte disparasse outro delay antes do primeiro
+  // terminar), o callback rodava do mesmo jeito, arriscando usar um
+  // `Modular.get` de escopo já descartado.
+  Timer? _deviceStatusTimer;
+
   @override
   void initState() {
     super.initState();
@@ -33,13 +41,16 @@ class _AppWidgetState extends State<AppWidget> with WidgetsBindingObserver {
       _ => false,
     };
 
-    Future.delayed(const Duration(seconds: 2), () async {
+    _deviceStatusTimer?.cancel();
+    _deviceStatusTimer = Timer(const Duration(seconds: 2), () async {
+      if (!mounted) return;
       await _updateDeviceStatus(isActive);
     });
   }
 
   @override
   void dispose() {
+    _deviceStatusTimer?.cancel();
     Modular.to.removeListener(_logRoutes);
 
     WidgetsBinding.instance.removeObserver(this);
@@ -68,7 +79,7 @@ class _AppWidgetState extends State<AppWidget> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'App Motorista',
-      theme: AppTheme.theme,
+      theme: MotoTheme.claro(),
       debugShowCheckedModeBanner: false,
       routerConfig: Modular.routerConfig,
       locale: const Locale('pt', 'BR'),

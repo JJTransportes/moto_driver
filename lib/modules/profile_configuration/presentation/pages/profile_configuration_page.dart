@@ -4,6 +4,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/profile_configuration/domain/entities/profile_entity.dart';
 import 'package:moto_driver/modules/profile_configuration/presentation/blocs/profile_configuration_bloc.dart';
 import 'package:moto_driver/modules/profile_configuration/presentation/blocs/profile_configuration_event.dart';
@@ -50,11 +51,9 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configurações'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF4E4E4E),
+        foregroundColor: context.moto.textSecondary,
         elevation: 0,
       ),
-      backgroundColor: Colors.white,
       body: BlocConsumer<ProfileConfigurationBloc, ProfileConfigurationState>(
         listener: (context, state) {
           if (state is ProfileUpdateSuccess) {
@@ -135,123 +134,91 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                     initialName: profile.name,
                     initialEmail: profile.email,
                     initialPhone: profile.phone ?? '',
+                    address: profile.address,
                     isEditing: _isEditing,
                     onChanged: () => setState(() {}),
                   ),
                   if (_hasActiveTravel) ...[
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Não é possível editar o perfil enquanto houver uma viagem em andamento.',
-                      style: TextStyle(fontSize: 12, color: Colors.red),
+                      style: TextStyle(fontSize: 12, color: context.moto.danger),
                     ),
                   ],
                   const SizedBox(height: 24),
                   if (!_isEditing)
-                    SizedBox(
-                      height: 48,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: !canEdit ? null : _onEditTapped,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4685C0),
-                          disabledBackgroundColor: Colors.grey.shade300,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text(
-                          'Editar',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                      ),
+                    MotoButton(
+                      label: 'Editar',
+                      large: false,
+                      onPressed: !canEdit ? null : _onEditTapped,
                     )
                   else
                     Row(
                       children: [
                         Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: OutlinedButton(
-                              onPressed: isSaving ? null : _onCancelEdit,
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: const Text('Cancelar'),
-                            ),
+                          child: MotoButton(
+                            label: 'Cancelar',
+                            variant: MotoButtonVariant.glass,
+                            large: false,
+                            onPressed: isSaving ? null : _onCancelEdit,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: MotoSpace.s3),
                         Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: ElevatedButton(
-                              onPressed: isSaving || !(_formKey.currentState?.isValid ?? false) ? null : _onSave,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF4685C0),
-                                disabledBackgroundColor: Colors.grey.shade300,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: isSaving
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Text(
-                                      'Salvar',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                            ),
+                          child: MotoButton(
+                            label: 'Salvar',
+                            large: false,
+                            loading: isSaving,
+                            onPressed: isSaving || !(_formKey.currentState?.isValid ?? false) ? null : _onSave,
                           ),
                         ),
                       ],
                     ),
                   const SizedBox(height: 32),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  // Danger Zone section
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Zona de Perigo',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.red,
-                      ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(MotoSpace.s4),
+                    decoration: BoxDecoration(
+                      color: context.moto.dangerSoft,
+                      borderRadius: MotoRadius.brLg,
+                      border: Border.all(color: context.moto.danger.withValues(alpha: .18)),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Ao excluir sua conta, todos os seus dados serão perdidos '
-                    'e você não poderá mais acessar o aplicativo.',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF4E4E4E)),
-                  ),
-                  const SizedBox(height: 12),
-                  Tooltip(
-                    message: _hasActiveTravel ? 'Não é possível excluir a conta enquanto houver viagens em andamento.' : '',
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _hasActiveTravel ? null : () => Modular.to.pushNamed('/delete-account/'),
-                        icon: Icon(
-                          Icons.delete_forever,
-                          color: _hasActiveTravel ? Colors.grey.shade400 : Colors.red,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded, color: context.moto.danger, size: 20),
+                            const SizedBox(width: MotoSpace.s2),
+                            Text(
+                              'Zona de perigo',
+                              style: TextStyle(
+                                fontFamily: MotoFont.ui,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: context.moto.danger,
+                              ),
+                            ),
+                          ],
                         ),
-                        label: Text(
-                          'Excluir conta',
-                          style: TextStyle(color: _hasActiveTravel ? Colors.grey.shade400 : Colors.red),
+                        const SizedBox(height: MotoSpace.s2),
+                        Text(
+                          'Excluir a conta apaga seus dados e o histórico. Não dá pra desfazer.',
+                          style: TextStyle(fontSize: 13, color: context.moto.textSecondary),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: _hasActiveTravel ? Colors.grey.shade300 : Colors.red),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        const SizedBox(height: MotoSpace.s3),
+                        Tooltip(
+                          message: _hasActiveTravel ? 'Não é possível excluir a conta enquanto houver viagens em andamento.' : '',
+                          child: MotoButton(
+                            label: 'Excluir minha conta',
+                            icon: Icons.delete_forever,
+                            variant: MotoButtonVariant.danger,
+                            large: false,
+                            expand: false,
+                            onPressed: _hasActiveTravel ? null : () => Modular.to.pushNamed('/delete-account/'),
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ],
@@ -264,7 +231,7 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  Icon(Icons.error_outline, size: 48, color: context.moto.danger),
                   const SizedBox(height: 16),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -274,13 +241,15 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  ElevatedButton(
+                  MotoButton(
+                    label: 'Tentar novamente',
+                    large: false,
+                    expand: false,
                     onPressed: () {
                       context.read<ProfileConfigurationBloc>().add(
                         ProfileLoadEvent(userId: widget.userId),
                       );
                     },
-                    child: const Text('Tentar novamente'),
                   ),
                 ],
               ),
@@ -394,7 +363,7 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
+        backgroundColor: isError ? context.moto.danger : context.moto.success,
         behavior: SnackBarBehavior.floating,
       ),
     );

@@ -100,11 +100,15 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    // Não usa pumpAndSettle: o MotoCountdownRing anima por 20s (duração real
+    // do prazo de resposta) — pumpAndSettle rodaria essa animação até o fim
+    // e disparava o auto-reject antes mesmo do teste interagir com o sheet.
+    await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Aceitar'));
+    await tester.tap(find.text('Aceitar'));
     // Estado 'accepting' mostra spinner infinito — pumps limitados bastam
     // para os futures (location/dio/persist) completarem.
     await tester.pump();
@@ -121,7 +125,7 @@ void main() {
           arguments: any(named: 'arguments')),
     );
     // O card permanece montado (sem pop).
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
     // Aceite persistido localmente.
     verify(() => travelLocalRepository.saveActiveTravel(any())).called(1);
 
@@ -145,16 +149,20 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    // Não usa pumpAndSettle: o MotoCountdownRing anima por 20s (duração real
+    // do prazo de resposta) — pumpAndSettle rodaria essa animação até o fim
+    // e disparava o auto-reject antes mesmo do teste interagir com o sheet.
+    await tester.pump(const Duration(milliseconds: 50));
 
-    await tester.tap(find.byTooltip('Recusar'));
+    await tester.tap(find.text('Recusar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(decision, OrderDecision.denied);
     verify(() => signalRService.denyOrder('order-1')).called(1);
     // Sem pop no modo embutido.
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
     await teardown(tester);
   });
@@ -199,10 +207,13 @@ void main() {
     );
 
     await tester.tap(find.text('abrir'));
-    await tester.pumpAndSettle();
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    // Não usa pumpAndSettle: o MotoCountdownRing anima por 20s — só espera
+    // a transição de abertura do modal (~300ms) resolver.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Nova viagem'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Aceitar'));
+    await tester.tap(find.text('Aceitar'));
     // Accepting → spinner infinito; pop do modal + pushNamed via mocks.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
@@ -219,7 +230,7 @@ void main() {
           arguments: any(named: 'arguments')),
     ).called(1);
     // Sheet modal fechou (pop).
-    expect(find.text('Nova Viagem'), findsNothing);
+    expect(find.text('Nova viagem'), findsNothing);
 
     await teardown(tester);
   });

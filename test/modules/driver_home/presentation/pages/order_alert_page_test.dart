@@ -76,7 +76,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: OrderAlertPage(orderId: orderId)),
     );
-    await tester.pumpAndSettle();
+    // Não usa pumpAndSettle: o MotoCountdownRing do IncomingOrderSheet anima
+    // por 20s (duração real do prazo de resposta) — pumpAndSettle rodaria
+    // essa animação até o fim e disparava o auto-reject antes da hora.
+    // 1100ms cobre o retry automático de rede (1s) desta página.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1100));
   }
 
   /// Desmonta a árvore (dispose da página → cancela timer/assinaturas).
@@ -91,7 +96,7 @@ void main() {
     stubOrderFetched();
     await pumpPage(tester);
 
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
     expect(find.text('Av. Paulista, 1000'), findsOneWidget);
     expect(find.text('Av. Faria Lima, 2000'), findsOneWidget);
 
@@ -208,9 +213,10 @@ void main() {
     // "Tentar novamente" recomeça do zero (attempt reset) → agora 200.
     stubOrderFetched();
     await tester.tap(find.text('Tentar novamente'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
     verify(() => dio.get(any())).called(1); // nova chamada após o tap
 
     await disposeTree(tester);
@@ -233,9 +239,9 @@ void main() {
     NotificationService.setPendingOrder('order-1');
 
     await pumpPage(tester);
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Aceitar'));
+    await tester.tap(find.text('Aceitar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -260,9 +266,9 @@ void main() {
     NotificationService.setPendingOrder('order-1');
 
     await pumpPage(tester);
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Recusar'));
+    await tester.tap(find.text('Recusar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -286,12 +292,12 @@ void main() {
     NotificationService.setPendingOrder('order-1');
 
     await pumpPage(tester);
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
     // Segundo clique (outro pedido) enquanto a página está aberta.
     NotificationService.setPendingOrder('order-2');
 
-    await tester.tap(find.byTooltip('Recusar'));
+    await tester.tap(find.text('Recusar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -311,7 +317,7 @@ void main() {
 
     await pumpPage(tester, orderId: null);
 
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
     final captured = verify(() => dio.get(captureAny())).captured;
     expect(captured.single, contains('/api/travels/orders/order-9'));
 
@@ -331,7 +337,7 @@ void main() {
       (tester) async {
     stubOrderFetched();
     await pumpPage(tester);
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
     cancelController.add({'orderId': 'order-1'});
     await tester.pump(); // microtask entrega o evento → setState agenda frame
@@ -350,7 +356,7 @@ void main() {
     cancelController.add({'orderId': 'outro-pedido'});
     await tester.pump();
 
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
     await disposeTree(tester);
   });
@@ -388,14 +394,14 @@ void main() {
       (tester) async {
     stubOrderFetched();
     await pumpPage(tester);
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
     final dynamic widgetsApp = tester.state(find.byType(WidgetsApp));
     await widgetsApp.didPopRoute();
     await tester.pump();
 
     // A página permanece (decisão explícita via Aceitar/Recusar).
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
     await disposeTree(tester);
   });
@@ -433,7 +439,7 @@ void main() {
         .thenAnswer((_) async => null);
 
     await pumpPage(tester);
-    await tester.tap(find.byTooltip('Aceitar'));
+    await tester.tap(find.text('Aceitar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
