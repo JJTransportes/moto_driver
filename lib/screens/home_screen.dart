@@ -52,14 +52,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // ── Disponibilidade (modo de atendimento) ──
   DriverAvailabilityEntity? _availability;
   Timer? _availabilityTimer;
+  bool _isTogglingAvailability = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_isReconnecting)
                 Container(
@@ -88,26 +90,77 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   _loadUserId();
                 },
               ),
-              const SizedBox(height: 24),
-              // Active travel card — exibido quando existe viagem ativa (Accepted/InProgress)
-              if (_currentTravelId != null) _buildActiveTravelCard(),
-              if (_currentTravelId == null)
-                Expanded(
+              const SizedBox(height: MotoSpace.s5),
+              _buildAvailabilityCard(),
+              const SizedBox(height: MotoSpace.s4),
+              if (_currentTravelId != null)
+                _buildActiveTravelCard()
+              else
+                MotoGlass(
+                  painted: true,
+                  padding: const EdgeInsets.all(MotoSpace.s5),
                   child: Center(
-                    child: Text('Aguardando novas viagens...', style: TextStyle(color: context.moto.textPrimary, fontSize: 16)),
+                    child: Text(
+                      'Aguardando novas viagens...',
+                      style: TextStyle(color: context.moto.textSecondary, fontSize: 15),
+                    ),
                   ),
                 ),
-              const SizedBox(height: 12),
-              MotoButton(
-                label: 'Histórico de viagens',
-                icon: Icons.history,
-                variant: MotoButtonVariant.glass,
-                large: false,
-                onPressed: () => Modular.to.pushNamed('/travel-history'),
+              const SizedBox(height: MotoSpace.s4),
+              MotoGlass(
+                painted: true,
+                child: InkWell(
+                  borderRadius: MotoRadius.brLg,
+                  onTap: () => Modular.to.pushNamed('/travel-history'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(MotoSpace.s4),
+                    child: Row(
+                      children: [
+                        const MotoTile(icon: Icons.history),
+                        const SizedBox(width: MotoSpace.s3),
+                        Expanded(
+                          child: Text('Histórico de viagens', style: Theme.of(context).textTheme.titleMedium),
+                        ),
+                        Icon(Icons.chevron_right, color: context.moto.textTertiary),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAvailabilityCard() {
+    final isActive = _availability?.isActive ?? false;
+
+    return MotoSapphire(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              MotoStatusBadge(
+                label: isActive ? 'Recebendo corridas' : 'Modo indisponível',
+                tone: isActive ? MotoTone.success : MotoTone.neutral,
+                live: isActive,
+              ),
+              const Spacer(),
+              Switch(
+                value: isActive,
+                onChanged: _isTogglingAvailability ? null : _onAvailabilityToggled,
+              ),
+            ],
+          ),
+          const SizedBox(height: MotoSpace.s4),
+          Text(
+            isActive ? 'Você está\nonline' : 'Você está\noffline',
+            style: Theme.of(context).textTheme.displaySmall,
+          ),
+        ],
       ),
     );
   }
@@ -590,6 +643,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _stopAvailabilityTimer() {
     _availabilityTimer?.cancel();
     _availabilityTimer = null;
+  }
+
+  Future<void> _onAvailabilityToggled(bool value) async {
+    final datasource = Modular.get<AvailabilityDatasource>();
+    setState(() => _isTogglingAvailability = true);
+
+    try {
+      if (value) {
+        // Ativar passa pelo sheet de confirmação (RF02/03/04) — mesma janela
+        // de 4h já usada em outros pontos de entrada, não pula essa etapa.
+        final result = await AvailabilitySheet.show(context, datasource: datasource);
+        if (!mounted || result == null) return; // cancelou no sheet
+        setState(() => _availability = result);
+        _startAvailabilityTimer();
+      } else {
+        final result = await datasource.deactivate();
+        if (!mounted) return;
+        setState(() => _availability = result);
+        _stopAvailabilityTimer();
+      }
+    } catch (e) {
+      developer.log('[AVAILABILITY] toggle failed: $e', name: 'availability');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não foi possível atualizar sua disponibilidade.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTogglingAvailability = false);
+    }
   }
 
   void _startLocationReporting(SignalRService signalR) {
