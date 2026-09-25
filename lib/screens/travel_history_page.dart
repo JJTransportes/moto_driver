@@ -10,6 +10,8 @@ class DriverTravelHistoryPage extends StatefulWidget {
   State<DriverTravelHistoryPage> createState() => _DriverTravelHistoryPageState();
 }
 
+enum _HistoryFilter { todas, concluidas, canceladas }
+
 class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
   static const int _pageSize = 20;
 
@@ -21,6 +23,13 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
   bool _isLoading = true;
   bool _isLoadingMore = false;
   String? _error;
+  _HistoryFilter _filter = _HistoryFilter.todas;
+
+  List<String>? get _statusQuery => switch (_filter) {
+        _HistoryFilter.todas => null,
+        _HistoryFilter.concluidas => const ['Completed'],
+        _HistoryFilter.canceladas => const ['Cancelled'],
+      };
 
   @override
   void initState() {
@@ -45,6 +54,13 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
     }
   }
 
+  Map<String, dynamic> _queryParams(int page) {
+    final params = <String, dynamic>{'page': page, 'pageSize': _pageSize};
+    final status = _statusQuery;
+    if (status != null) params['status'] = status;
+    return params;
+  }
+
   Future<void> _loadHistory() async {
     setState(() {
       _isLoading = true;
@@ -54,7 +70,7 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
 
     try {
       final dio = Modular.get<Dio>();
-      final response = await dio.get('/api/travels/driver?page=1&pageSize=$_pageSize');
+      final response = await dio.get('/api/travels/driver', queryParameters: _queryParams(1));
       final items = (response.data['items'] as List).cast<Map<String, dynamic>>();
       setState(() {
         _travels
@@ -77,7 +93,7 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
     try {
       final dio = Modular.get<Dio>();
       final nextPage = _page + 1;
-      final response = await dio.get('/api/travels/driver?page=$nextPage&pageSize=$_pageSize');
+      final response = await dio.get('/api/travels/driver', queryParameters: _queryParams(nextPage));
       final items = (response.data['items'] as List).cast<Map<String, dynamic>>();
       setState(() {
         _travels.addAll(items);
@@ -92,79 +108,165 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
     }
   }
 
+  void _onFilterChanged(_HistoryFilter filter) {
+    if (filter == _filter) return;
+    setState(() => _filter = filter);
+    _loadHistory();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final displayItems = _buildDisplayItems();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Histórico de Viagens'),
+        title: const Text('Histórico'),
         foregroundColor: context.moto.textPrimary,
         elevation: 0,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Erro ao carregar: $_error'),
-                      const SizedBox(height: 16),
-                      MotoButton(label: 'Tentar novamente', large: false, expand: false, onPressed: _loadHistory),
-                    ],
-                  ),
-                )
-              : _travels.isEmpty
-                  ? const Center(child: Text('Nenhuma viagem encontrada'))
-                  : RefreshIndicator(
-                      onRefresh: _loadHistory,
-                      child: ListView.separated(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _travels.length + (_hasMore ? 1 : 0),
-                        separatorBuilder: (_, __) => const SizedBox(height: MotoSpace.s3),
-                        itemBuilder: (_, i) {
-                          if (i >= _travels.length) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            );
-                          }
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: SegmentedButton<_HistoryFilter>(
+              segments: const [
+                ButtonSegment(value: _HistoryFilter.todas, label: Text('Todas')),
+                ButtonSegment(value: _HistoryFilter.concluidas, label: Text('Concluídas')),
+                ButtonSegment(value: _HistoryFilter.canceladas, label: Text('Canceladas')),
+              ],
+              selected: {_filter},
+              showSelectedIcon: false,
+              onSelectionChanged: (s) => _onFilterChanged(s.first),
+            ),
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Erro ao carregar: $_error'),
+                            const SizedBox(height: 16),
+                            MotoButton(label: 'Tentar novamente', large: false, expand: false, onPressed: _loadHistory),
+                          ],
+                        ),
+                      )
+                    : _travels.isEmpty
+                        ? const Center(child: Text('Nenhuma viagem encontrada'))
+                        : RefreshIndicator(
+                            onRefresh: _loadHistory,
+                            child: ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.all(16),
+                              itemCount: displayItems.length + (_hasMore ? 1 : 0),
+                              itemBuilder: (_, i) {
+                                if (i >= displayItems.length) {
+                                  return const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 16),
+                                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  );
+                                }
 
-                          final status = _travels[i]['status'] as String?;
-                          return MotoEnter(
-                            index: i,
-                            child: MotoGlass(
-                              painted: true,
-                              padding: const EdgeInsets.all(MotoSpace.s4),
-                              child: Row(
-                                children: [
-                                  MotoTile(icon: _statusIcon(status), tone: _statusTone(status)),
-                                  const SizedBox(width: MotoSpace.s3),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _travels[i]['passengerName'] as String? ?? 'Passageiro',
-                                          style: Theme.of(context).textTheme.titleMedium,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        MotoStatusBadge.trip(_tripStatus(status)),
-                                      ],
+                                final item = displayItems[i];
+                                if (item is String) {
+                                  return Padding(
+                                    padding: const EdgeInsets.fromLTRB(4, MotoSpace.s4, 4, MotoSpace.s2),
+                                    child: Text(
+                                      item,
+                                      style: TextStyle(
+                                        fontFamily: MotoFont.ui,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 1.2,
+                                        color: context.moto.textTertiary,
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final travel = item as Map<String, dynamic>;
+                                final status = travel['status'] as String?;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: MotoSpace.s3),
+                                  child: MotoEnter(
+                                    index: i,
+                                    child: MotoGlass(
+                                      painted: true,
+                                      padding: const EdgeInsets.all(MotoSpace.s4),
+                                      child: Row(
+                                        children: [
+                                          MotoTile(icon: _statusIcon(status), tone: _statusTone(status)),
+                                          const SizedBox(width: MotoSpace.s3),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  travel['passengerName'] as String? ?? 'Passageiro',
+                                                  style: Theme.of(context).textTheme.titleMedium,
+                                                ),
+                                                const SizedBox(height: 4),
+                                                MotoStatusBadge.trip(_tripStatus(status)),
+                                              ],
+                                            ),
+                                          ),
+                                          Text(
+                                            _formatTime(travel['createdAt'] as String?),
+                                            style: Theme.of(context).textTheme.bodySmall,
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                  Text(
-                                    _formatDate(_travels[i]['createdAt'] as String?),
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-                    ),
+                          ),
+          ),
+        ],
+      ),
     );
+  }
+
+  /// Mistura cabeçalhos de data ("HOJE · 18 SET") com as viagens, na ordem
+  /// em que já chegam da API (mais recentes primeiro).
+  List<Object> _buildDisplayItems() {
+    final items = <Object>[];
+    String? lastDayLabel;
+    for (final travel in _travels) {
+      final dt = DateTime.tryParse(travel['createdAt'] as String? ?? '')?.toLocal();
+      final label = dt == null ? '' : _dayLabel(dt);
+      if (label != lastDayLabel) {
+        items.add(label);
+        lastDayLabel = label;
+      }
+      items.add(travel);
+    }
+    return items;
+  }
+
+  static const _months = [
+    'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ',
+  ];
+
+  String _dayLabel(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final that = DateTime(dt.year, dt.month, dt.day);
+    final diff = today.difference(that).inDays;
+    final dateSuffix = '${dt.day} ${_months[dt.month - 1]}';
+    if (diff == 0) return 'HOJE · $dateSuffix';
+    if (diff == 1) return 'ONTEM · $dateSuffix';
+    return dateSuffix;
+  }
+
+  String _formatTime(String? dateStr) {
+    if (dateStr == null) return '';
+    final dt = DateTime.tryParse(dateStr)?.toLocal();
+    if (dt == null) return '';
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   IconData _statusIcon(String? status) {
@@ -195,10 +297,4 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
     }
   }
 
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return '';
-    final dt = DateTime.tryParse(dateStr);
-    if (dt == null) return '';
-    return '${dt.day}/${dt.month}/${dt.year}';
-  }
 }
