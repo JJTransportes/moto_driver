@@ -147,63 +147,29 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                   ],
                   const SizedBox(height: 24),
                   if (!_isEditing)
-                    SizedBox(
-                      height: 48,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: !canEdit ? null : _onEditTapped,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: context.moto.accent,
-                          disabledBackgroundColor: context.moto.borderSubtle,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: Text(
-                          'Editar',
-                          style: TextStyle(color: context.moto.textOnAccent, fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                      ),
+                    MotoButton(
+                      label: 'Editar',
+                      large: false,
+                      onPressed: !canEdit ? null : _onEditTapped,
                     )
                   else
                     Row(
                       children: [
                         Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: OutlinedButton(
-                              onPressed: isSaving ? null : _onCancelEdit,
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: const Text('Cancelar'),
-                            ),
+                          child: MotoButton(
+                            label: 'Cancelar',
+                            variant: MotoButtonVariant.glass,
+                            large: false,
+                            onPressed: isSaving ? null : _onCancelEdit,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: MotoSpace.s3),
                         Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: ElevatedButton(
-                              onPressed: isSaving || !(_formKey.currentState?.isValid ?? false) ? null : _onSave,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: context.moto.accent,
-                                disabledBackgroundColor: context.moto.borderSubtle,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: isSaving
-                                  ? SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: context.moto.textOnAccent),
-                                    )
-                                  : Text(
-                                      'Salvar',
-                                      style: TextStyle(
-                                        color: context.moto.textOnAccent,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                            ),
+                          child: MotoButton(
+                            label: 'Salvar',
+                            large: false,
+                            loading: isSaving,
+                            onPressed: isSaving || !(_formKey.currentState?.isValid ?? false) ? null : _onSave,
                           ),
                         ),
                       ],
@@ -232,26 +198,12 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                   const SizedBox(height: 12),
                   Tooltip(
                     message: _hasActiveTravel ? 'Não é possível excluir a conta enquanto houver viagens em andamento.' : '',
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _hasActiveTravel ? null : () => Modular.to.pushNamed('/delete-account/'),
-                        icon: Icon(
-                          Icons.delete_forever,
-                          color: _hasActiveTravel ? context.moto.textDisabled : context.moto.danger,
-                        ),
-                        label: Text(
-                          'Excluir conta',
-                          style: TextStyle(color: _hasActiveTravel ? context.moto.textDisabled : context.moto.danger),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: _hasActiveTravel ? context.moto.borderSubtle : context.moto.danger),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
+                    child: MotoButton(
+                      label: 'Excluir conta',
+                      icon: Icons.delete_forever,
+                      variant: MotoButtonVariant.danger,
+                      large: false,
+                      onPressed: _hasActiveTravel ? null : () => Modular.to.pushNamed('/delete-account/'),
                     ),
                   ),
                 ],
@@ -274,13 +226,15 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  ElevatedButton(
+                  MotoButton(
+                    label: 'Tentar novamente',
+                    large: false,
+                    expand: false,
                     onPressed: () {
                       context.read<ProfileConfigurationBloc>().add(
                         ProfileLoadEvent(userId: widget.userId),
                       );
                     },
-                    child: const Text('Tentar novamente'),
                   ),
                 ],
               ),

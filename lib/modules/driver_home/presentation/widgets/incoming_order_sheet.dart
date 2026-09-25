@@ -67,10 +67,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
 
   // Alinhado ao prazo de resposta do backend (20s) — passageiro agora vê
   // esse mesmo prazo via evento DriverContacted, então os dois lados
-  // precisam bater.
+  // precisam bater. MotoCountdownRing controla a contagem visualmente e
+  // dispara _autoReject sozinho ao chegar em zero (onTimeout).
   static const int _rejectTimeoutSeconds = 20;
-  int _remainingSeconds = _rejectTimeoutSeconds;
-  Timer? _rejectTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -85,160 +84,93 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
 
     final isLoading = _status == _AcceptStatus.accepting || _status == _AcceptStatus.denying;
 
-    return Container(
+    return MotoGlass(
+      level: GlassLevel.sheet,
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: context.moto.bgRaised,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header com título + botões de ação
+          // Header: título + anel de contagem regressiva
           Row(
             children: [
-              Icon(Icons.directions_car, color: context.moto.accent),
-              const SizedBox(width: 8),
+              const MotoTile(icon: Icons.directions_car, accent: true, size: 40),
+              const SizedBox(width: MotoSpace.s3),
               Expanded(
-                child: Text(
-                  'Nova Viagem',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.moto.textPrimary),
-                ),
+                child: Text('Nova viagem', style: Theme.of(context).textTheme.titleLarge),
               ),
-              if (isLoading)
-                const Padding(
-                  padding: EdgeInsets.only(right: 8),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              else ...[
-                _IconActionButton(
-                  icon: Icons.close,
-                  color: context.moto.danger,
-                  tooltip: 'Recusar',
-                  onPressed: () => _deny(context, orderId),
-                ),
-                const SizedBox(width: 12),
-                _IconActionButton(
-                  icon: _status == _AcceptStatus.success ? Icons.check : Icons.check_circle_outline,
-                  color: _status == _AcceptStatus.success ? context.moto.success : context.moto.accent,
-                  tooltip: 'Aceitar',
-                  onPressed: () => _accept(context, orderId),
-                ),
-              ],
+              MotoCountdownRing(
+                seconds: _rejectTimeoutSeconds,
+                size: 52,
+                onTimeout: _autoReject,
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: MediaQuery.sizeOf(context).height * 0.16,
-            child: _mapLoaded
-                ? GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: LatLng(passLat, passLng),
-                      zoom: 13,
-                    ),
-                    markers: _markers,
-                    polylines: _polylines,
-                    zoomControlsEnabled: false,
-                  )
-                : const Center(child: CircularProgressIndicator()),
-          ),
-          const SizedBox(height: 12),
-          // Endereço de partida (origem do passageiro)
-          if (widget.order['departureAddress'] != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
+          const SizedBox(height: MotoSpace.s4),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.trip_origin, color: context.moto.accent, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.order['departureAddress'] as String,
-                      style: TextStyle(color: context.moto.textPrimary),
+                  if (widget.order['departureAddress'] != null && widget.order['destinationAddress'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: MotoSpace.s4),
+                      child: MotoRoute(
+                        from: (widget.order['departureAddress'] as String, 'Embarque'),
+                        to: (widget.order['destinationAddress'] as String, 'Destino'),
+                      ),
                     ),
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height * 0.16,
+                    child: _mapLoaded
+                        ? GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: LatLng(passLat, passLng),
+                              zoom: 13,
+                            ),
+                            markers: _markers,
+                            polylines: _polylines,
+                            zoomControlsEnabled: false,
+                          )
+                        : const Center(child: CircularProgressIndicator()),
+                  ),
+                  const SizedBox(height: MotoSpace.s4),
+                  MotoMetrics(
+                    items: [
+                      (_metricDistanceValue(distance), _metricDistanceUnit(distance), 'Até o passageiro'),
+                      (_metricDistanceValue(totalDest), _metricDistanceUnit(totalDest), 'Até o destino'),
+                      (_resolveTimeText(timeHours, timeMinutes), '', 'Duração'),
+                    ],
                   ),
                 ],
               ),
             ),
-          // Endereço de destino
-          if (widget.order['destinationAddress'] != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.flag, color: context.moto.accent, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.order['destinationAddress'] as String,
-                      style: TextStyle(color: context.moto.textPrimary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          Row(
-            children: [
-              Icon(Icons.location_on, color: context.moto.accent, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                _resolveDistanceText(distance),
-                style: TextStyle(color: context.moto.textPrimary),
-              ),
-            ],
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.route, color: context.moto.accent, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                _resolveTotalDestText(totalDest),
-                style: TextStyle(color: context.moto.textPrimary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.timer, color: context.moto.accent, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                _resolveTimeText(timeHours, timeMinutes),
-                style: TextStyle(color: context.moto.textPrimary),
-              ),
-            ],
-          ),
-          // Timer regressivo discreto
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(
+          const SizedBox(height: MotoSpace.s5),
+          if (isLoading)
+            const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()))
+          else
+            Row(
               children: [
                 Expanded(
-                  child: LinearProgressIndicator(
-                    value: _remainingSeconds / _rejectTimeoutSeconds,
-                    minHeight: 3,
-                    color: context.moto.textTertiary.withValues(alpha: 0.5),
-                    backgroundColor: context.moto.borderSubtle,
+                  child: MotoButton(
+                    label: 'Recusar',
+                    variant: MotoButtonVariant.glass,
+                    large: false,
+                    onPressed: () => _deny(context, orderId),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '${_remainingSeconds}s',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: context.moto.textTertiary,
+                const SizedBox(width: MotoSpace.s3),
+                Expanded(
+                  flex: 2,
+                  child: MotoButton(
+                    label: _status == _AcceptStatus.success ? 'Aceita!' : 'Aceitar',
+                    onPressed: () => _accept(context, orderId),
                   ),
                 ),
               ],
             ),
-          ),
           // Error message container
           if (_status == _AcceptStatus.error && _errorMessage != null)
             Padding(
@@ -274,19 +206,11 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     super.initState();
     log(jsonEncode(widget.order), name: 'travel-order');
     _loadDriverLocation();
-    _startRejectTimer();
-  }
-
-  @override
-  void dispose() {
-    _rejectTimer?.cancel();
-    super.dispose();
   }
 
   Future<void> _accept(BuildContext context, String id) async {
     if (_actionInFlight) return;
     _actionInFlight = true;
-    _rejectTimer?.cancel();
     setState(() {
       _status = _AcceptStatus.accepting;
       _errorMessage = null;
@@ -417,7 +341,6 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   Future<void> _deny(BuildContext context, String orderId) async {
     if (_actionInFlight) return;
     _actionInFlight = true;
-    _rejectTimer?.cancel();
 
     final onDecision = widget.onDecision;
     if (onDecision != null) {
@@ -445,17 +368,6 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
         log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
       }
     }
-  }
-
-  void _startRejectTimer() {
-    _rejectTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_remainingSeconds <= 1) {
-        _rejectTimer?.cancel();
-        _autoReject();
-        return;
-      }
-      setState(() => _remainingSeconds--);
-    });
   }
 
   void _autoReject() {
@@ -584,55 +496,11 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     });
   }
 
-  String _resolveDistanceText(int distance) {
-    if (distance >= 1000) {
-      return '${(distance / 1000).toStringAsFixed(1)} km até o passageiro';
-    }
-    return '$distance m até o passageiro';
-  }
+  String _metricDistanceValue(int meters) => meters >= 1000 ? (meters / 1000).toStringAsFixed(1) : '$meters';
 
-  String _resolveTotalDestText(int totalDest) {
-    if (totalDest >= 1000) {
-      return '${(totalDest / 1000).toStringAsFixed(1)} km até o destino';
-    }
-    return '$totalDest m até o destino';
-  }
+  String _metricDistanceUnit(int meters) => meters >= 1000 ? 'km' : 'm';
 
   String _resolveTimeText(int timeHours, int timeMinutes) {
     return '${timeHours}h ${timeMinutes}min';
-  }
-}
-
-class _IconActionButton extends StatelessWidget {
-  const _IconActionButton({
-    required this.icon,
-    required this.color,
-    this.tooltip,
-    this.onPressed,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String? tooltip;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip ?? '',
-      child: Material(
-        color: color.withAlpha(25),
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed,
-          customBorder: const CircleBorder(),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Icon(icon, color: color, size: 22),
-          ),
-        ),
-      ),
-    );
   }
 }

@@ -109,7 +109,7 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
                     children: [
                       Text('Erro ao carregar: $_error'),
                       const SizedBox(height: 16),
-                      ElevatedButton(onPressed: _loadHistory, child: const Text('Tentar novamente')),
+                      MotoButton(label: 'Tentar novamente', large: false, expand: false, onPressed: _loadHistory),
                     ],
                   ),
                 )
@@ -121,7 +121,7 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
                         itemCount: _travels.length + (_hasMore ? 1 : 0),
-                        separatorBuilder: (_, __) => const Divider(),
+                        separatorBuilder: (_, __) => const SizedBox(height: MotoSpace.s3),
                         itemBuilder: (_, i) {
                           if (i >= _travels.length) {
                             return const Padding(
@@ -130,16 +130,35 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
                             );
                           }
 
-                          return ListTile(
-                            leading: Icon(
-                              _statusIcon(_travels[i]['status'] as String?),
-                              color: _statusColor(_travels[i]['status'] as String?),
-                            ),
-                            title: Text(_travels[i]['passengerName'] as String? ?? 'Passageiro'),
-                            subtitle: Text('Status: ${_statusLabel(_travels[i]['status'] as String?)}'),
-                            trailing: Text(
-                              _formatDate(_travels[i]['createdAt'] as String?),
-                              style: TextStyle(fontSize: 12, color: context.moto.textPrimary),
+                          final status = _travels[i]['status'] as String?;
+                          return MotoEnter(
+                            index: i,
+                            child: MotoGlass(
+                              painted: true,
+                              padding: const EdgeInsets.all(MotoSpace.s4),
+                              child: Row(
+                                children: [
+                                  MotoTile(icon: _statusIcon(status), tone: _statusTone(status)),
+                                  const SizedBox(width: MotoSpace.s3),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _travels[i]['passengerName'] as String? ?? 'Passageiro',
+                                          style: Theme.of(context).textTheme.titleMedium,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        MotoStatusBadge.trip(_tripStatus(status)),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatDate(_travels[i]['createdAt'] as String?),
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },
@@ -157,23 +176,22 @@ class _DriverTravelHistoryPageState extends State<DriverTravelHistoryPage> {
     }
   }
 
-  Color _statusColor(String? status) {
+  MotoTone _statusTone(String? status) {
     switch (status) {
-      case 'Completed': return context.moto.success;
-      case 'Cancelled': return context.moto.danger;
-      case 'InProgress': return context.moto.accent;
-      default: return context.moto.warning;
+      case 'Completed': return MotoTone.success;
+      case 'Cancelled': return MotoTone.danger;
+      case 'InProgress': return MotoTone.info;
+      default: return MotoTone.warning;
     }
   }
 
-  String _statusLabel(String? status) {
+  TripStatus _tripStatus(String? status) {
     switch (status) {
-      case 'Completed': return 'Concluída';
-      case 'Cancelled': return 'Cancelada';
-      case 'InProgress': return 'Em andamento';
-      case 'Accepted': return 'Aceita';
-      case 'Pending': return 'Pendente';
-      default: return status ?? '';
+      case 'Completed': return TripStatus.concluida;
+      case 'Cancelled': return TripStatus.cancelada;
+      case 'InProgress': return TripStatus.emAndamento;
+      case 'Accepted': return TripStatus.aceita;
+      default: return TripStatus.solicitada;
     }
   }
 

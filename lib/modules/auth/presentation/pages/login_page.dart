@@ -5,7 +5,6 @@ import 'package:moto_driver/core/utils/server_error_guard.dart';
 import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
-import 'package:moto_driver/widgets/app_button.dart';
 import 'package:moto_driver/widgets/app_text_field.dart';
 import 'package:moto_driver/widgets/gradient_text.dart';
 
@@ -111,7 +110,8 @@ class _LoginPageState extends State<LoginPage> {
         final passwordError = _passwordError ?? (state is LoginFailure ? state.message : null);
 
         return Scaffold(
-          body: SafeArea(
+          body: MotoCanvas(
+            child: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(
                 horizontal: 36,
@@ -154,22 +154,21 @@ class _LoginPageState extends State<LoginPage> {
                           child: Text('Esqueci minha senha', style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent)),
                         ),
                       ),
-                      AppButton(
+                      MotoButton(
                         label: 'Entrar',
                         loading: isLoading,
                         onPressed: _isFormComplete ? _submit : null,
                       ),
-                      TextButton(
+                      MotoButton(
+                        label: 'Criar conta',
+                        variant: MotoButtonVariant.glass,
                         onPressed: () => Navigator.of(context).pushNamed('/driver-register/'),
-                        child: Text(
-                          'Criar conta',
-                          style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent),
-                        ),
                       ),
                     ],
                   ),
                 ],
               ),
+            ),
             ),
           ),
         );

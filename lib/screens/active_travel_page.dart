@@ -186,6 +186,14 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
     return '${AppConfig.getBaseUrl()}$url';
   }
 
+  String _initialsOf(String? name) {
+    if (name == null || name.trim().isEmpty) return '?';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    final first = parts.first.characters.first;
+    final last = parts.length > 1 ? parts.last.characters.first : '';
+    return (first + last).toUpperCase();
+  }
+
   Map<String, String>? get _authHeaders {
     final token = _authToken;
     if (token == null) return null;
@@ -580,61 +588,37 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
       child: Column(
         children: [
           // Status indicator
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            color: context.moto.bgRaised,
+          MotoSapphire(
+            radius: BorderRadius.zero,
             child: Row(
               children: [
-                if (_passengerName != null) ...[
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: context.moto.accent.withAlpha(30),
-                    backgroundImage: _passengerPhotoUrl != null && _passengerPhotoUrl!.isNotEmpty
-                        ? NetworkImage(_resolveImageUrl(_passengerPhotoUrl!), headers: _authHeaders)
-                        : null,
-                    child: _passengerPhotoUrl == null || _passengerPhotoUrl!.isEmpty
-                        ? Icon(Icons.person, color: context.moto.accent)
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                ] else ...[
-                  Icon(
-                    isAccepted ? Icons.access_time : Icons.directions_car,
-                    color: context.moto.accent,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 12),
-                ],
+                MotoAvatar(
+                  initials: _initialsOf(_passengerName),
+                  size: 48,
+                  image: _passengerPhotoUrl != null && _passengerPhotoUrl!.isNotEmpty
+                      ? NetworkImage(_resolveImageUrl(_passengerPhotoUrl!), headers: _authHeaders)
+                      : null,
+                ),
+                const SizedBox(width: MotoSpace.s3),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        isAccepted ? 'Aguardando início' : 'Em andamento',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: context.moto.textPrimary,
-                        ),
-                      ),
+                      MotoStatusBadge.trip(isAccepted ? TripStatus.aceita : TripStatus.emAndamento),
                       if (_passengerName != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Passageiro: $_passengerName',
-                          style: TextStyle(color: context.moto.textPrimary),
-                        ),
+                        const SizedBox(height: MotoSpace.s2),
+                        Text(_passengerName!, style: Theme.of(context).textTheme.titleMedium),
                         if (_passengerSolicitationCount != null)
                           Text(
                             '$_passengerSolicitationCount solicitaç${_passengerSolicitationCount == 1 ? 'ão' : 'ões'} realizada${_passengerSolicitationCount == 1 ? '' : 's'}',
-                            style: TextStyle(fontSize: 12, color: context.moto.textPrimary),
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         if (_passengerPartitionName != null)
                           Text(
                             _passengerDepartments != null
                                 ? '$_passengerPartitionName · $_passengerDepartments'
                                 : _passengerPartitionName!,
-                            style: TextStyle(fontSize: 12, color: context.moto.textPrimary),
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                       ],
                     ],
@@ -787,58 +771,54 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                     ),
                   ),
                 const SizedBox(height: 12),
-                // Botão de navegação
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _navigateToDestination,
-                    icon: Icon(Icons.directions, color: context.moto.textOnAccent, size: 20),
-                    label: Text(
-                      isAccepted ? 'Navegar até o passageiro' : 'Navegar até o destino',
-                      style: TextStyle(color: context.moto.textOnAccent, fontSize: 14),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: context.moto.accent,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
+                MotoButton(
+                  label: isAccepted ? 'Navegar até o passageiro' : 'Navegar até o destino',
+                  icon: Icons.directions,
+                  variant: MotoButtonVariant.glass,
+                  large: false,
+                  onPressed: _navigateToDestination,
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isActing ? null : _cancelTravel,
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: context.moto.danger),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                if (isAccepted)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: MotoButton(
+                          label: 'Cancelar',
+                          variant: MotoButtonVariant.danger,
+                          large: false,
+                          loading: _isActing,
+                          onPressed: _isActing ? null : _cancelTravel,
                         ),
-                        child: _isActing
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                            : Text('Cancelar', style: TextStyle(color: context.moto.danger, fontSize: 16)),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isActing ? null : (isAccepted ? _startTravel : _finishTravel),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: context.moto.accent,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      const SizedBox(width: MotoSpace.s4),
+                      Expanded(
+                        flex: 2,
+                        child: MotoButton(
+                          label: 'Iniciar viagem',
+                          large: false,
+                          loading: _isActing,
+                          onPressed: _isActing ? null : _startTravel,
                         ),
-                        child: _isActing
-                            ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: context.moto.textOnAccent))
-                            : Text(
-                                isAccepted ? 'Iniciar Viagem' : 'Finalizar Viagem',
-                                style: TextStyle(color: context.moto.textOnAccent, fontSize: 16),
-                              ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  )
+                else ...[
+                  MotoSwipeToConfirm(
+                    label: 'Deslize para finalizar',
+                    onConfirmed: () {
+                      if (!_isActing) _finishTravel();
+                    },
+                  ),
+                  const SizedBox(height: MotoSpace.s3),
+                  MotoButton(
+                    label: 'Cancelar viagem',
+                    variant: MotoButtonVariant.glass,
+                    large: false,
+                    loading: _isActing,
+                    onPressed: _isActing ? null : _cancelTravel,
+                  ),
+                ],
               ],
             ),
           ),

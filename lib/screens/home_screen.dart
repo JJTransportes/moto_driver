@@ -98,19 +98,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => Modular.to.pushNamed('/travel-history'),
-                  icon: const Icon(Icons.history),
-                  label: const Text('Histórico de Viagens'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: context.moto.accent,
-                    side: BorderSide(color: context.moto.accent),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
+              MotoButton(
+                label: 'Histórico de viagens',
+                icon: Icons.history,
+                variant: MotoButtonVariant.glass,
+                large: false,
+                onPressed: () => Modular.to.pushNamed('/travel-history'),
               ),
             ],
           ),
@@ -121,83 +114,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildActiveTravelCard() {
     final isInProgress = _currentTravelStatus == 'InProgress';
+    final tripStatus = isInProgress ? TripStatus.emAndamento : TripStatus.aceita;
 
     return GestureDetector(
       onTap: _openActiveTravel,
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: context.moto.borderDefault),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.directions_car, color: context.moto.accent, size: 24),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Viagem Ativa',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.moto.textPrimary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (_currentPassengerName != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.person, color: context.moto.accent, size: 20),
-                      const SizedBox(width: 8),
-                      Text(_currentPassengerName!, style: TextStyle(color: context.moto.textPrimary, fontSize: 14)),
-                    ],
-                  ),
+      child: MotoGlass(
+        painted: true,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const MotoTile(icon: Icons.directions_car, accent: true, size: 40),
+                const SizedBox(width: MotoSpace.s3),
+                Expanded(
+                  child: Text('Viagem ativa', style: Theme.of(context).textTheme.titleMedium),
                 ),
-              Row(
-                children: [
-                  Icon(Icons.info_outline, color: context.moto.accent, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    isInProgress ? 'Em andamento' : 'Aceita — aguardando início',
-                    style: TextStyle(color: context.moto.textPrimary, fontSize: 14),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isInProgress ? context.moto.successSoft : context.moto.warningSoft,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  isInProgress ? 'Em andamento' : 'Aceita',
-                  style: TextStyle(
-                    color: isInProgress ? context.moto.success : context.moto.warning,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+                MotoStatusBadge.trip(tripStatus),
+              ],
+            ),
+            const SizedBox(height: MotoSpace.s4),
+            if (_currentPassengerName != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: MotoSpace.s2),
+                child: Row(
+                  children: [
+                    Icon(Icons.person, color: context.moto.accent, size: 20),
+                    const SizedBox(width: MotoSpace.s2),
+                    Text(_currentPassengerName!, style: Theme.of(context).textTheme.bodyLarge),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: context.moto.accent,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: _openActiveTravel,
-                  child: Text('Abrir Viagem', style: TextStyle(color: context.moto.textOnAccent, fontSize: 14)),
-                ),
-              ),
-            ],
-          ),
+            const SizedBox(height: MotoSpace.s3),
+            MotoButton(
+              label: 'Abrir viagem',
+              large: false,
+              onPressed: _openActiveTravel,
+            ),
+          ],
         ),
       ),
     );

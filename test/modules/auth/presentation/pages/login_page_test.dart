@@ -5,8 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moto_driver/modules/auth/domain/entities/user_entity.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/login_page.dart';
-import 'package:moto_driver/widgets/app_button.dart';
 
 void main() {
   late MockLoginBloc mockBloc;
@@ -70,7 +70,7 @@ void main() {
 
     await tester.pumpWidget(buildWidget());
 
-    final button = tester.widget<AppButton>(find.byType(AppButton));
+    final button = tester.widget<MotoButton>(find.widgetWithText(MotoButton, 'Entrar'));
     expect(button.onPressed, isNull);
   });
 
@@ -85,7 +85,7 @@ void main() {
     );
     await tester.pump();
 
-    final button = tester.widget<AppButton>(find.byType(AppButton));
+    final button = tester.widget<MotoButton>(find.widgetWithText(MotoButton, 'Entrar'));
     expect(button.onPressed, isNull);
   });
 
@@ -121,7 +121,10 @@ void main() {
 
     await tester.pumpWidget(buildWidget());
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    final button = tester
+        .widgetList<MotoButton>(find.byType(MotoButton))
+        .firstWhere((b) => b.label == 'Entrar');
+    expect(button.loading, isTrue);
   });
 
   testWidgets('shows error message on failure', (tester) async {
