@@ -590,16 +590,17 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
           // Status indicator
           MotoSapphire(
             radius: BorderRadius.zero,
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
             child: Row(
               children: [
                 MotoAvatar(
                   initials: _initialsOf(_passengerName),
-                  size: 48,
+                  size: 60,
                   image: _passengerPhotoUrl != null && _passengerPhotoUrl!.isNotEmpty
                       ? NetworkImage(_resolveImageUrl(_passengerPhotoUrl!), headers: _authHeaders)
                       : null,
                 ),
-                const SizedBox(width: MotoSpace.s3),
+                const SizedBox(width: MotoSpace.s4),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -607,7 +608,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
                       MotoStatusBadge.trip(isAccepted ? TripStatus.aceita : TripStatus.emAndamento),
                       if (_passengerName != null) ...[
                         const SizedBox(height: MotoSpace.s2),
-                        Text(_passengerName!, style: Theme.of(context).textTheme.titleMedium),
+                        Text(_passengerName!, style: Theme.of(context).textTheme.headlineSmall),
                         if (_passengerSolicitationCount != null)
                           Text(
                             '$_passengerSolicitationCount solicitaç${_passengerSolicitationCount == 1 ? 'ão' : 'ões'} realizada${_passengerSolicitationCount == 1 ? '' : 's'}',

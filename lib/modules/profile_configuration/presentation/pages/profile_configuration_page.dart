@@ -175,35 +175,50 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                       ],
                     ),
                   const SizedBox(height: 32),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  // Danger Zone section
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Zona de Perigo',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: context.moto.danger,
-                      ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(MotoSpace.s4),
+                    decoration: BoxDecoration(
+                      color: context.moto.dangerSoft,
+                      borderRadius: MotoRadius.brLg,
+                      border: Border.all(color: context.moto.danger.withValues(alpha: .18)),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Ao excluir sua conta, todos os seus dados serão perdidos '
-                    'e você não poderá mais acessar o aplicativo.',
-                    style: TextStyle(fontSize: 14, color: context.moto.textSecondary),
-                  ),
-                  const SizedBox(height: 12),
-                  Tooltip(
-                    message: _hasActiveTravel ? 'Não é possível excluir a conta enquanto houver viagens em andamento.' : '',
-                    child: MotoButton(
-                      label: 'Excluir conta',
-                      icon: Icons.delete_forever,
-                      variant: MotoButtonVariant.danger,
-                      large: false,
-                      onPressed: _hasActiveTravel ? null : () => Modular.to.pushNamed('/delete-account/'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded, color: context.moto.danger, size: 20),
+                            const SizedBox(width: MotoSpace.s2),
+                            Text(
+                              'Zona de perigo',
+                              style: TextStyle(
+                                fontFamily: MotoFont.ui,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: context.moto.danger,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: MotoSpace.s2),
+                        Text(
+                          'Excluir a conta apaga seus dados e o histórico. Não dá pra desfazer.',
+                          style: TextStyle(fontSize: 13, color: context.moto.textSecondary),
+                        ),
+                        const SizedBox(height: MotoSpace.s3),
+                        Tooltip(
+                          message: _hasActiveTravel ? 'Não é possível excluir a conta enquanto houver viagens em andamento.' : '',
+                          child: MotoButton(
+                            label: 'Excluir minha conta',
+                            icon: Icons.delete_forever,
+                            variant: MotoButtonVariant.danger,
+                            large: false,
+                            expand: false,
+                            onPressed: _hasActiveTravel ? null : () => Modular.to.pushNamed('/delete-account/'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
