@@ -32,7 +32,8 @@ void main() {
 
     await tester.pumpWidget(buildWidget());
 
-    expect(find.text('App Motorista'), findsOneWidget);
+    expect(find.text('APP MOTORISTA'), findsOneWidget);
+    expect(find.text('Bom te ver de novo.'), findsOneWidget);
   });
 
   testWidgets('shows email and password fields', (tester) async {

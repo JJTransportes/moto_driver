@@ -6,7 +6,6 @@ import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
 import 'package:moto_driver/widgets/app_text_field.dart';
-import 'package:moto_driver/widgets/gradient_text.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -89,8 +88,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-
     return BlocConsumer<LoginBloc, LoginState>(
       listener: (context, state) {
         if (state is LoginSuccess) {
@@ -112,63 +109,72 @@ class _LoginPageState extends State<LoginPage> {
         return Scaffold(
           body: MotoCanvas(
             child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 36,
-                vertical: 36,
-              ),
-              child: Column(
-                spacing: size.height * 0.016,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  GradientText(
-                    'App Motorista',
-                    style: GoogleFonts.inter(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLogo(),
+                    const SizedBox(height: 32),
+                    Text(
+                      'APP MOTORISTA',
+                      style: TextStyle(
+                        fontFamily: MotoFont.ui,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.6,
+                        color: context.moto.accent,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildLogo(),
-                  Column(
-                    spacing: 16,
-                    children: [
-                      AppTextField(
-                        label: 'E-mail',
-                        hint: 'Informe seu e-mail',
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        errorText: _emailError,
-                      ),
-                      AppTextField(
-                        label: 'Senha',
-                        hint: 'Informe sua senha',
-                        controller: _passwordController,
-                        obscureText: true,
-                        errorText: passwordError,
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () => Navigator.of(context).pushNamed('/recovery'),
-                          child: Text('Esqueci minha senha', style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent)),
+                    const SizedBox(height: MotoSpace.s2),
+                    Text('Bom te ver de novo.', style: Theme.of(context).textTheme.displaySmall),
+                    const SizedBox(height: MotoSpace.s2),
+                    Text(
+                      'Entre para receber suas corridas.',
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(color: context.moto.textSecondary),
+                    ),
+                    const SizedBox(height: 40),
+                    Column(
+                      spacing: 16,
+                      children: [
+                        AppTextField(
+                          label: 'E-mail',
+                          hint: 'Informe seu e-mail',
+                          icon: Icons.mail_outline,
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          errorText: _emailError,
                         ),
-                      ),
-                      MotoButton(
-                        label: 'Entrar',
-                        loading: isLoading,
-                        onPressed: _isFormComplete ? _submit : null,
-                      ),
-                      MotoButton(
-                        label: 'Criar conta',
-                        variant: MotoButtonVariant.glass,
-                        onPressed: () => Navigator.of(context).pushNamed('/driver-register/'),
-                      ),
-                    ],
-                  ),
-                ],
+                        AppTextField(
+                          label: 'Senha',
+                          hint: 'Informe sua senha',
+                          icon: Icons.lock_outline,
+                          controller: _passwordController,
+                          obscureText: true,
+                          errorText: passwordError,
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => Navigator.of(context).pushNamed('/recovery'),
+                            child: Text('Esqueci minha senha', style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent)),
+                          ),
+                        ),
+                        MotoButton(
+                          label: 'Entrar',
+                          loading: isLoading,
+                          onPressed: _isFormComplete ? _submit : null,
+                        ),
+                        MotoButton(
+                          label: 'Criar conta',
+                          variant: MotoButtonVariant.glass,
+                          onPressed: () => Navigator.of(context).pushNamed('/driver-register/'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
             ),
           ),
         );
@@ -177,17 +183,18 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildLogo() {
-    final size = MediaQuery.sizeOf(context);
-
-    return Image.asset(
-      'assets/images/moto_driver_logo.png',
-      height: size.height * 0.4,
-      width: size.width * 0.4,
-      fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => const SizedBox(
-        width: 224,
-        height: 90,
-        child: Placeholder(),
+    return ClipRRect(
+      borderRadius: MotoRadius.brMd,
+      child: Image.asset(
+        'assets/images/moto_driver_logo.png',
+        height: 72,
+        width: 72,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          width: 72,
+          height: 72,
+          color: context.moto.accent,
+        ),
       ),
     );
   }
