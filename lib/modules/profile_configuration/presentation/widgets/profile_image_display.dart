@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 
 class ProfileImageDisplay extends StatefulWidget {
   final String? photoUrl;
@@ -49,20 +50,20 @@ class _ProfileImageDisplayState extends State<ProfileImageDisplay> {
         radius: widget.radius,
         backgroundImage:
             NetworkImage(widget.photoUrl!, headers: _authHeaders),
-        onBackgroundImageError: (_, __) => _buildFallback(),
+        onBackgroundImageError: (_, __) => _buildFallback(context),
       );
     }
-    return _buildFallback();
+    return _buildFallback(context);
   }
 
-  Widget _buildFallback() {
+  Widget _buildFallback(BuildContext context) {
     return CircleAvatar(
-      backgroundColor: const Color(0xFF4685C0),
+      backgroundColor: context.moto.accent,
       radius: widget.radius,
       child: Text(
         widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?',
         style: TextStyle(
-          color: Colors.white,
+          color: context.moto.textOnAccent,
           fontWeight: FontWeight.bold,
           fontSize: widget.radius > 25 ? 24 : 16,
         ),

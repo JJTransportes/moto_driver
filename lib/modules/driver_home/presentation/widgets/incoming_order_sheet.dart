@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:moto_driver/core/config/app_config.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/core/local_db/models/local_data_models.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
@@ -20,7 +21,11 @@ class IncomingOrderSheet extends StatefulWidget {
   final Map<String, dynamic> order;
   final VoidCallback? onDenied;
 
-  final void Function(OrderDecision decision, Map<String, dynamic>? acceptResult)? onDecision;
+  final void Function(
+    OrderDecision decision,
+    Map<String, dynamic>? acceptResult,
+  )?
+  onDecision;
 
   const IncomingOrderSheet({
     super.key,
@@ -32,7 +37,11 @@ class IncomingOrderSheet extends StatefulWidget {
   @override
   State<IncomingOrderSheet> createState() => _IncomingOrderSheetState();
 
-  static void show(BuildContext context, Map<String, dynamic> order, {VoidCallback? onDenied}) {
+  static void show(
+    BuildContext context,
+    Map<String, dynamic> order, {
+    VoidCallback? onDenied,
+  }) {
     showModalBottomSheet(
       useSafeArea: true,
       constraints: BoxConstraints.expand(
@@ -58,180 +67,150 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   _AcceptStatus _status = _AcceptStatus.idle;
   String? _errorMessage;
 
+  // F16: `isLoading` (derivado de `_status`) só esconde os botões depois do
+  // rebuild — um duplo toque entre os dois toques do usuário e o frame
+  // seguinte ainda dispara `_accept`/`_deny` duas vezes. Guarda síncrona,
+  // checada antes de qualquer `await`, fecha essa janela.
+  bool _actionInFlight = false;
+
   // Alinhado ao prazo de resposta do backend (20s) — passageiro agora vê
   // esse mesmo prazo via evento DriverContacted, então os dois lados
-  // precisam bater.
+  // precisam bater. MotoCountdownRing controla a contagem visualmente e
+  // dispara _autoReject sozinho ao chegar em zero (onTimeout).
   static const int _rejectTimeoutSeconds = 20;
-  int _remainingSeconds = _rejectTimeoutSeconds;
-  Timer? _rejectTimer;
 
   @override
   Widget build(BuildContext context) {
     final orderId = widget.order['orderId'] as String;
     final distance = (widget.order['distanceToPassengerInMeters'] as int?) ?? 0;
     final timeHours = (widget.order['averageTravelTimeInHours'] as int?) ?? 0;
-    final timeMinutes = (widget.order['averageTravelTimeInMinutes'] as int?) ?? 0;
-    final totalDest = (widget.order['distanceToDestinationInMeters'] as int?) ?? 0;
+    final timeMinutes =
+        (widget.order['averageTravelTimeInMinutes'] as int?) ?? 0;
+    final totalDest =
+        (widget.order['distanceToDestinationInMeters'] as int?) ?? 0;
 
     final passLat = (widget.order['passengerLatitude'] as num).toDouble();
     final passLng = (widget.order['passengerLongitude'] as num).toDouble();
 
-    final isLoading = _status == _AcceptStatus.accepting || _status == _AcceptStatus.denying;
+    final isLoading =
+        _status == _AcceptStatus.accepting || _status == _AcceptStatus.denying;
 
-    return Container(
+    return MotoGlass(
+      level: GlassLevel.sheet,
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header com título + botões de ação
+          // Header: título + anel de contagem regressiva
           Row(
             children: [
-              const Icon(Icons.directions_car, color: Color(0xFF4685C0)),
-              const SizedBox(width: 8),
-              const Expanded(
+              const MotoTile(
+                icon: Icons.directions_car,
+                accent: true,
+                size: 40,
+              ),
+              const SizedBox(width: MotoSpace.s3),
+              Expanded(
                 child: Text(
-                  'Nova Viagem',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4E4E4E)),
+                  'Nova viagem',
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
-              if (isLoading)
-                const Padding(
-                  padding: EdgeInsets.only(right: 8),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              else ...[
-                _IconActionButton(
-                  icon: Icons.close,
-                  color: Colors.red,
-                  tooltip: 'Recusar',
-                  onPressed: () => _deny(context, orderId),
-                ),
-                const SizedBox(width: 12),
-                _IconActionButton(
-                  icon: _status == _AcceptStatus.success ? Icons.check : Icons.check_circle_outline,
-                  color: _status == _AcceptStatus.success ? Colors.green : const Color(0xFF4685C0),
-                  tooltip: 'Aceitar',
-                  onPressed: () => _accept(context, orderId),
-                ),
-              ],
+              MotoCountdownRing(
+                seconds: _rejectTimeoutSeconds,
+                size: 52,
+                onTimeout: _autoReject,
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: MediaQuery.sizeOf(context).height * 0.16,
-            child: _mapLoaded
-                ? GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: LatLng(passLat, passLng),
-                      zoom: 13,
-                    ),
-                    markers: _markers,
-                    polylines: _polylines,
-                    zoomControlsEnabled: false,
-                  )
-                : const Center(child: CircularProgressIndicator()),
-          ),
-          const SizedBox(height: 12),
-          // Endereço de partida (origem do passageiro)
-          if (widget.order['departureAddress'] != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
+          const SizedBox(height: MotoSpace.s4),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.trip_origin, color: Color(0xFF4685C0), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.order['departureAddress'] as String,
-                      style: const TextStyle(color: Color(0xFF4E4E4E)),
+                  if (widget.order['departureAddress'] != null &&
+                      widget.order['destinationAddress'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: MotoSpace.s4),
+                      child: MotoRoute(
+                        from: (
+                          widget.order['departureAddress'] as String,
+                          'Embarque',
+                        ),
+                        to: (
+                          widget.order['destinationAddress'] as String,
+                          'Destino',
+                        ),
+                      ),
                     ),
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height * 0.16,
+                    child: _mapLoaded
+                        ? GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: LatLng(passLat, passLng),
+                              zoom: 13,
+                            ),
+                            markers: _markers,
+                            polylines: _polylines,
+                            zoomControlsEnabled: false,
+                          )
+                        : const Center(child: CircularProgressIndicator()),
+                  ),
+                  const SizedBox(height: MotoSpace.s4),
+                  MotoMetrics(
+                    items: [
+                      (
+                        _metricDistanceValue(distance),
+                        _metricDistanceUnit(distance),
+                        'Até o passageiro',
+                      ),
+                      (
+                        _metricDistanceValue(totalDest),
+                        _metricDistanceUnit(totalDest),
+                        'Até o destino',
+                      ),
+                      (_resolveTimeText(timeHours, timeMinutes), '', 'Duração'),
+                    ],
                   ),
                 ],
               ),
             ),
-          // Endereço de destino
-          if (widget.order['destinationAddress'] != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.flag, color: Color(0xFF4685C0), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.order['destinationAddress'] as String,
-                      style: const TextStyle(color: Color(0xFF4E4E4E)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          Row(
-            children: [
-              const Icon(Icons.location_on, color: Color(0xFF4685C0), size: 20),
-              const SizedBox(width: 8),
-              Text(
-                _resolveDistanceText(distance),
-                style: const TextStyle(color: Color(0xFF4E4E4E)),
-              ),
-            ],
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.route, color: Color(0xFF4685C0), size: 20),
-              const SizedBox(width: 8),
-              Text(
-                _resolveTotalDestText(totalDest),
-                style: const TextStyle(color: Color(0xFF4E4E4E)),
+          const SizedBox(height: MotoSpace.s5),
+          if (isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(8),
+                child: CircularProgressIndicator(),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.timer, color: Color(0xFF4685C0), size: 20),
-              const SizedBox(width: 8),
-              Text(
-                _resolveTimeText(timeHours, timeMinutes),
-                style: const TextStyle(color: Color(0xFF4E4E4E)),
-              ),
-            ],
-          ),
-          // Timer regressivo discreto
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(
+            )
+          else
+            Row(
               children: [
                 Expanded(
-                  child: LinearProgressIndicator(
-                    value: _remainingSeconds / _rejectTimeoutSeconds,
-                    minHeight: 3,
-                    color: const Color(0xFFB0B0B0).withValues(alpha: 0.5),
-                    backgroundColor: const Color(0xFFE0E0E0).withValues(alpha: 0.3),
+                  child: MotoButton(
+                    label: 'Recusar',
+                    variant: MotoButtonVariant.glass,
+                    large: false,
+                    onPressed: () => _deny(context, orderId),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '${_remainingSeconds}s',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFFB0B0B0),
+                const SizedBox(width: MotoSpace.s3),
+                Expanded(
+                  flex: 2,
+                  child: MotoButton(
+                    label: _status == _AcceptStatus.success
+                        ? 'Aceita!'
+                        : 'Aceitar',
+                    onPressed: () => _accept(context, orderId),
                   ),
                 ),
               ],
             ),
-          ),
           // Error message container
           if (_status == _AcceptStatus.error && _errorMessage != null)
             Padding(
@@ -239,18 +218,25 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: context.moto.dangerSoft,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(color: context.moto.danger),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                    Icon(
+                      Icons.error_outline,
+                      color: context.moto.danger,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _errorMessage!,
-                        style: const TextStyle(color: Colors.red, fontSize: 14),
+                        style: TextStyle(
+                          color: context.moto.danger,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],
@@ -267,17 +253,11 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     super.initState();
     log(jsonEncode(widget.order), name: 'travel-order');
     _loadDriverLocation();
-    _startRejectTimer();
-  }
-
-  @override
-  void dispose() {
-    _rejectTimer?.cancel();
-    super.dispose();
   }
 
   Future<void> _accept(BuildContext context, String id) async {
-    _rejectTimer?.cancel();
+    if (_actionInFlight) return;
+    _actionInFlight = true;
     setState(() {
       _status = _AcceptStatus.accepting;
       _errorMessage = null;
@@ -306,8 +286,12 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // Get travelId and routes from response
       final travelId = response.data['travelId'] as String;
       final routesList = response.data['routes'] as List? ?? [];
-      final pickupRoute = routesList.isNotEmpty ? routesList[0] as Map<String, dynamic> : null;
-      final tripRoute = routesList.length > 1 ? routesList[1] as Map<String, dynamic> : null;
+      final pickupRoute = routesList.isNotEmpty
+          ? routesList[0] as Map<String, dynamic>
+          : null;
+      final tripRoute = routesList.length > 1
+          ? routesList[1] as Map<String, dynamic>
+          : null;
 
       final acceptResult = {
         'travelId': travelId,
@@ -379,6 +363,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           message = 'Erro ao aceitar viagem. Tente novamente.';
       }
 
+      _actionInFlight = false;
       setState(() {
         _status = _AcceptStatus.error;
         _errorMessage = message;
@@ -397,15 +382,20 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       TravelLocalData(
         travelId: travelId,
         status: 'Accepted',
-        departureAddress: pickupRoute?['destinationAddress'] as String? ?? widget.order['departureAddress'] as String?,
-        destinationAddress: tripRoute?['destinationAddress'] as String? ?? widget.order['destinationAddress'] as String?,
+        departureAddress:
+            pickupRoute?['destinationAddress'] as String? ??
+            widget.order['departureAddress'] as String?,
+        destinationAddress:
+            tripRoute?['destinationAddress'] as String? ??
+            widget.order['destinationAddress'] as String?,
         createdAt: DateTime.now(),
       ),
     );
   }
 
   Future<void> _deny(BuildContext context, String orderId) async {
-    _rejectTimer?.cancel();
+    if (_actionInFlight) return;
+    _actionInFlight = true;
 
     final onDecision = widget.onDecision;
     if (onDecision != null) {
@@ -427,23 +417,17 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     } catch (_) {
       try {
         final dio = Modular.get<Dio>();
-        await dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
+        await dio.post(
+          '${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny',
+        );
       } on DioException catch (e) {
         // Log the error but don't block the UI — backend already recorded the denial
-        log('Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
+        log(
+          'Deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}',
+          name: 'travel-deny',
+        );
       }
     }
-  }
-
-  void _startRejectTimer() {
-    _rejectTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_remainingSeconds <= 1) {
-        _rejectTimer?.cancel();
-        _autoReject();
-        return;
-      }
-      setState(() => _remainingSeconds--);
-    });
   }
 
   void _autoReject() {
@@ -471,7 +455,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
         final dio = Modular.get<Dio>();
         dio.post('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/deny');
       } on DioException catch (e) {
-        log('Auto-deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}', name: 'travel-deny');
+        log(
+          'Auto-deny failed (order $orderId): ${e.response?.statusCode} ${e.response?.statusMessage}',
+          name: 'travel-deny',
+        );
       }
     }
   }
@@ -487,14 +474,19 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
 
     setState(() {
       if (result.isGranted) {
-        _driverLocation = LatLng(result.position!.latitude, result.position!.longitude);
+        _driverLocation = LatLng(
+          result.position!.latitude,
+          result.position!.longitude,
+        );
       }
 
       _markers = {
         Marker(
           markerId: const MarkerId('passenger'),
           position: LatLng(passLat, passLng),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
           infoWindow: const InfoWindow(title: 'Passageiro'),
         ),
         Marker(
@@ -507,7 +499,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           Marker(
             markerId: const MarkerId('driver'),
             position: _driverLocation!,
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueBlue,
+            ),
             infoWindow: const InfoWindow(title: 'Você'),
           ),
       };
@@ -516,7 +510,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       final routeJson = widget.order['routeJson'];
       if (routeJson != null) {
         try {
-          final routeData = routeJson is String ? jsonDecode(routeJson) : routeJson;
+          final routeData = routeJson is String
+              ? jsonDecode(routeJson)
+              : routeJson;
           final encodedPolyline = routeData['encodedPolyline'] as String?;
           if (encodedPolyline != null && encodedPolyline.isNotEmpty) {
             final result = DirectionsResult(
@@ -529,14 +525,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               endLng: destLng,
             );
             final points = result.decodePolyline();
-            _polylines = {
-              Polyline(
-                polylineId: const PolylineId('route'),
-                points: points,
-                color: const Color(0xFF4685C0),
-                width: 4,
-              ),
-            };
+            _polylines = MotoMapRouteStyle.polylines(
+              id: 'route',
+              points: points,
+            );
           }
         } catch (_) {
           // Fallback: tentar encodedPolyline direto do payload
@@ -557,14 +549,10 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
             endLng: destLng,
           );
           final points = result.decodePolyline();
-          _polylines = {
-            Polyline(
-              polylineId: const PolylineId('route'),
-              points: points,
-              color: const Color(0xFF4685C0),
-              width: 4,
-            ),
-          };
+          _polylines = MotoMapRouteStyle.polylines(
+            id: 'route',
+            points: points,
+          );
         }
       }
 
@@ -572,55 +560,12 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     });
   }
 
-  String _resolveDistanceText(int distance) {
-    if (distance >= 1000) {
-      return '${(distance / 1000).toStringAsFixed(1)} km até o passageiro';
-    }
-    return '$distance m até o passageiro';
-  }
+  String _metricDistanceValue(int meters) =>
+      meters >= 1000 ? (meters / 1000).toStringAsFixed(1) : '$meters';
 
-  String _resolveTotalDestText(int totalDest) {
-    if (totalDest >= 1000) {
-      return '${(totalDest / 1000).toStringAsFixed(1)} km até o destino';
-    }
-    return '$totalDest m até o destino';
-  }
+  String _metricDistanceUnit(int meters) => meters >= 1000 ? 'km' : 'm';
 
   String _resolveTimeText(int timeHours, int timeMinutes) {
     return '${timeHours}h ${timeMinutes}min';
-  }
-}
-
-class _IconActionButton extends StatelessWidget {
-  const _IconActionButton({
-    required this.icon,
-    required this.color,
-    this.tooltip,
-    this.onPressed,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String? tooltip;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip ?? '',
-      child: Material(
-        color: color.withAlpha(25),
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed,
-          customBorder: const CircleBorder(),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Icon(icon, color: color, size: 22),
-          ),
-        ),
-      ),
-    );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
@@ -34,16 +35,31 @@ class OneSignalNotificationService implements INotificationService {
 
       await OneSignal.initialize(appId);
 
+      // F11: antes, o chamador (BootstrapBloc) fazia um `Future.delayed(8s)`
+      // incondicional após iniciar o OneSignal, só pra "dar tempo" do
+      // playerId chegar — somando ~10s fixos a todo cold start, sempre,
+      // mesmo quando o observer já disparou em bem menos tempo. Agora
+      // `initialize()` só retorna quando o primeiro playerId chega (ou após
+      // um teto de 8s como fallback de segurança, não como comportamento
+      // padrão).
+      final firstPlayerId = Completer<void>();
+
       OneSignal.User.addObserver(
         (state) async {
           final playerId = state.current.onesignalId;
           if (playerId == null) throw Exception('Player id not found.');
 
           await _notificationsLocalRepository.savePlayerId(playerId);
+          if (!firstPlayerId.isCompleted) firstPlayerId.complete();
         },
       );
 
       await handleForegroundNotification();
+
+      await firstPlayerId.future.timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {},
+      );
 
       _initialized = true;
     } catch (e) {
@@ -94,6 +110,17 @@ class OneSignalNotificationService implements INotificationService {
     OneSignal.Notifications.addClickListener((event) async {
       log(jsonEncode(event.notification.body));
       await handleNotificationClick(event.notification.additionalData);
+    });
+
+    // F13: com o app em primeiro plano, um pedido novo já chega via SignalR
+    // e abre o `IncomingOrderSheet` (ver home_screen.dart). Sem isto, o
+    // OneSignal também exibe o banner nativo da mesma notificação por cima
+    // do sheet — duplicando o alerta do mesmo pedido.
+    OneSignal.Notifications.addForegroundWillDisplayListener((event) {
+      final data = event.notification.additionalData;
+      if (data != null && data['type'] == 'NewOrder') {
+        event.preventDefault();
+      }
     });
   }
 

@@ -8,6 +8,12 @@ class NotificationService {
     return _sheetVisible;
   }
 
+  /// True enquanto o `IncomingOrderSheet` já está na tela — usada pra evitar
+  /// abrir um segundo sheet por cima do primeiro se o backend reenviar o
+  /// mesmo evento `NewOrder` (reconexão do hub, retry) antes do motorista
+  /// decidir aceitar/recusar o pedido atual.
+  static bool get sheetVisible => _sheetVisible;
+
   // ── Pedido pendente (push notification) ──────────────────────────────
 
   static String? _pendingOrderId;
