@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/core/utils/server_error_guard.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_event.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_state.dart';
@@ -97,7 +97,6 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage> {
     final error = state is VerifyCodeError ? state : null;
 
     return Scaffold(
-      backgroundColor: AppColors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 36),
@@ -111,7 +110,7 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage> {
               const SizedBox(height: 72),
               Text(
                 'Informe o código de verificação enviado para ${widget.email}',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black),
+                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: context.moto.textPrimary),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -131,7 +130,7 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage> {
                     onPressed: () => Navigator.of(context).pushReplacementNamed('/recovery'),
                     child: Text(
                       'Solicitar novo código',
-                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary),
+                      style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent),
                     ),
                   ),
                 ),

@@ -45,6 +45,13 @@ android {
                 keyAlias = System.getenv()["CM_KEY_ALIAS"]
                 keyPassword = System.getenv()["CM_KEY_PASSWORD"]
             } else {
+                // ATENÇÃO: fora de CI, este branch assina com o keystore local
+                // (ex.: debug_local.jks / key.properties) usado só para builds
+                // de desenvolvimento na máquina do dev. Este keystore NUNCA deve
+                // ser usado para assinar um artefato distribuído/release oficial
+                // — a distribuição oficial deve sempre passar pelo branch CI
+                // acima, com segredos próprios de release. Ver F12 do relatório
+                // de auditoria.
                 storeFile = file(keystoreProperties.getProperty("storeFile"))
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")

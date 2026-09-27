@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 
 class AppButton extends StatelessWidget {
   final String label;
@@ -16,48 +15,10 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDisabled = !loading && onPressed == null;
-
-    return SizedBox(
-      width: double.infinity,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: isDisabled ? null : AppGradients.primary,
-          color: isDisabled ? AppColors.secondary : null,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: ElevatedButton(
-          onPressed: loading ? null : onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            disabledBackgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          child: loading
-              ? const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.white,
-                  ),
-                )
-              : Text(
-                  label,
-                  style: GoogleFonts.robotoFlex(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.white,
-                    letterSpacing: 0.24,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-        ),
-      ),
+    return MotoButton(
+      label: label,
+      onPressed: onPressed,
+      loading: loading,
     );
   }
 }

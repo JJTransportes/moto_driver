@@ -9,7 +9,6 @@ import 'package:moto_driver/core/local_db/repositories/notifications_local_repos
 import 'package:moto_driver/core/local_db/repositories/profile_local_repository.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
-import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/inotification_service.dart';
 import 'package:moto_driver/core/notifications/one_signal_notification_service.dart';
@@ -33,7 +32,6 @@ class CommonModule extends Module {
     i.addSingleton<SignOutService>(SignOutService.new);
     i.addSingleton<SignalRService>(SignalRService.new);
     i.addSingleton<LocationService>(LocationService.new);
-    i.addSingleton<DirectionsService>(DirectionsService.new);
     i.addSingleton<NotificationsLocalRepository>(NotificationsLocalRepository.new);
     i.addSingleton<INotificationService>(OneSignalNotificationService.new);
     i.add<IAuthDatasource>(AuthDatasource.new);
