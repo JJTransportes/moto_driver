@@ -472,7 +472,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (orderId == null) return;
 
       // If this order was already denied, ignore the re-send
-      if (_deniedOrderIds.contains(orderId)) return;
+      if (_deniedOrderIds.contains(orderId) ||
+          await NotificationService.isOrderDismissed(orderId)) {
+        return;
+      }
+      if (!mounted) return;
 
       // A new (non-denied) order signals a fresh dispatch round — clear old denials
       if (_deniedOrderIds.isNotEmpty) {
@@ -484,6 +488,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         data,
         onDenied: () {
           _deniedOrderIds.add(orderId);
+          NotificationService.dismissOrder(orderId);
           NotificationService.setSheetVisible(false);
         },
       );

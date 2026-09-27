@@ -13,6 +13,7 @@ import 'package:moto_driver/core/local_db/repositories/travel_local_repository.d
 import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/core/notifications/inotification_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 
 enum OrderDecision { accepted, denied }
@@ -396,6 +397,8 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   Future<void> _deny(BuildContext context, String orderId) async {
     if (_actionInFlight) return;
     _actionInFlight = true;
+    NotificationService.dismissOrder(orderId);
+    unawaited(_dismissNativeNotification(orderId));
 
     final onDecision = widget.onDecision;
     if (onDecision != null) {
@@ -433,6 +436,8 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   void _autoReject() {
     if (!mounted) return;
     final orderId = widget.order['orderId'] as String;
+    NotificationService.dismissOrder(orderId);
+    unawaited(_dismissNativeNotification(orderId));
 
     final onDecision = widget.onDecision;
     if (onDecision != null) {
@@ -460,6 +465,16 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
           name: 'travel-deny',
         );
       }
+    }
+  }
+
+  Future<void> _dismissNativeNotification(String orderId) async {
+    try {
+      await Modular.get<INotificationService>().dismissNewOrder(orderId);
+    } catch (_) {
+      // O bloqueio local é a garantia durante a sessão. A remoção visual do
+      // push é best-effort porque o plugin pode não estar disponível; após um
+      // reinício, o backend continua sendo a autoridade e recusa a oferta.
     }
   }
 
