@@ -10,9 +10,12 @@ workflows:
       # in a working branch — re-add "- push" under events when ready to resume
       # automatic builds/publishing on android_release.
       branch_patterns:
-      - pattern: "android_release"
-      - include: true
-      - source: true
+      - pattern: "android_staging"
+        include: true
+        source: true
+      - pattern: "*"
+        include: false
+        source: true
       cancel_previous_builds: true
 
     environment:

@@ -4,6 +4,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/errors/exceptions.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/user_deletion/presentation/blocs/delete_account_bloc.dart';
 import 'package:moto_driver/modules/user_deletion/presentation/blocs/delete_account_event.dart';
 import 'package:moto_driver/modules/user_deletion/presentation/blocs/delete_account_state.dart';
@@ -61,7 +62,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: context.moto.danger, foregroundColor: context.moto.textOnAccent),
               onPressed: () => Navigator.of(dialogContext).pop(passwordController.text),
               child: const Text('Confirmar exclusão'),
             ),
@@ -83,7 +84,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: context.moto.danger,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -104,15 +105,13 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Excluir conta'),
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF4E4E4E),
+          foregroundColor: context.moto.textPrimary,
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ),
-        backgroundColor: Colors.white,
         body: BlocConsumer<DeleteAccountBloc, DeleteAccountState>(
           listener: (context, state) {
             if (state is DeleteAccountSuccess) {
@@ -130,27 +129,27 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.red, size: 32),
-                      SizedBox(width: 12),
+                      Icon(Icons.warning_amber_rounded, color: context.moto.danger, size: 32),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Tem certeza que deseja excluir sua conta?',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
-                            color: Colors.red,
+                            color: context.moto.danger,
                           ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  const Text(
+                  Text(
                     'Esta ação é irreversível e todos os seus dados, incluindo '
                     'histórico de viagens, serão perdidos.',
-                    style: TextStyle(fontSize: 16, color: Color(0xFF4E4E4E)),
+                    style: TextStyle(fontSize: 16, color: context.moto.textPrimary),
                   ),
                   const SizedBox(height: 32),
                   SizedBox(
@@ -158,19 +157,19 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                     child: ElevatedButton(
                       onPressed: isLoading ? null : _onContinueTapped,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade300,
+                        backgroundColor: context.moto.danger,
+                        foregroundColor: context.moto.textOnAccent,
+                        disabledBackgroundColor: context.moto.borderStrong,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       child: isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 22,
                               height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: context.moto.textOnAccent),
                             )
                           : const Text(
                               'Continuar',

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/core/utils/server_error_guard.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/core/utils/validators.dart' as validators;
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_bloc.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/password_recovery_event.dart';
@@ -111,18 +111,17 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
 
   Widget _buildSent(String email) {
     return Scaffold(
-      backgroundColor: AppColors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 36),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.email_outlined, color: AppColors.primary, size: 64),
+              Icon(Icons.email_outlined, color: context.moto.accent, size: 64),
               const SizedBox(height: 24),
               Text(
                 'Se o e-mail estiver cadastrado, você receberá um código de verificação em instantes.',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black),
+                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: context.moto.textPrimary),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -133,7 +132,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
               const SizedBox(height: 12),
               TextButton(
                 onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
-                child: Text('Voltar ao login', style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary)),
+                child: Text('Voltar ao login', style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent)),
               ),
             ],
           ),
@@ -147,7 +146,6 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
     final errorMessage = state is PasswordRecoveryError ? state.message : null;
 
     return Scaffold(
-      backgroundColor: AppColors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 36),
@@ -161,7 +159,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
               const SizedBox(height: 72),
               Text(
                 'Informe o e-mail da sua conta. Enviaremos um código de verificação para que você redefina sua senha.',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: Colors.black),
+                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: context.moto.textPrimary),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -186,7 +184,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
                 const SizedBox(height: 12),
                 Text(
                   errorMessage,
-                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                  style: TextStyle(color: context.moto.danger, fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
               ],

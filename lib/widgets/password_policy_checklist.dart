@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
 import 'package:moto_driver/core/utils/validators.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 
 /// Checklist "estilo gov.br" da política de senha: cada item começa neutro
 /// (cinza, sem estado de erro) e vira verde com ✓ quando cumprido. Nunca
@@ -27,7 +27,7 @@ class PasswordPolicyChecklist extends StatelessWidget {
                 Icon(
                   requirement.satisfied ? Icons.check_circle : Icons.circle_outlined,
                   size: 16,
-                  color: requirement.satisfied ? AppColors.success : AppColors.secondary,
+                  color: requirement.satisfied ? context.moto.success : context.moto.textTertiary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -35,7 +35,7 @@ class PasswordPolicyChecklist extends StatelessWidget {
                     requirement.label,
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: requirement.satisfied ? AppColors.success : AppColors.secondary,
+                      color: requirement.satisfied ? context.moto.success : context.moto.textTertiary,
                     ),
                   ),
                 ),

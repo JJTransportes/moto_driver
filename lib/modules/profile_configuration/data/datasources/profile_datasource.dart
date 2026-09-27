@@ -12,7 +12,11 @@ class ProfileDatasource implements IProfileDatasource {
   @override
   Future<ProfileModel> fetchProfile(String userId) async {
     try {
-      final response = await _dio.get('/api/drivers/$userId');
+      // `/api/drivers/{id}` agora exige papel GlobalAdmin (fechamos o IDOR
+      // que deixava qualquer motorista ler o perfil de outro só sabendo o
+      // GUID) — motorista consultando o PRÓPRIO perfil usa o endpoint de
+      // self-service, que resolve o usuário pelo token, não pelo {id} da URL.
+      final response = await _dio.get('/api/drivers/me');
       final json = Map<String, dynamic>.from(response.data as Map);
       return ProfileModel.fromJson(_resolvePhotoUrl(json));
     } on DioException catch (e) {
