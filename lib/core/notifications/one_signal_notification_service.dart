@@ -99,7 +99,10 @@ class OneSignalNotificationService implements INotificationService {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
-      log('[PUSH] Device registered: $platform / $playerId (status=${response.statusCode})', name: 'push');
+      log(
+        '[PUSH] Device registered: $platform / $playerId (status=${response.statusCode})',
+        name: 'push',
+      );
     } catch (e) {
       log('[PUSH] login/register-device failed: $e', name: 'push', level: 900);
     }
@@ -131,6 +134,12 @@ class OneSignalNotificationService implements INotificationService {
     final orderId = data['order_id'] as String? ?? data['orderId'] as String?;
     if (orderId == null || orderId.isEmpty) return;
 
+    if (await NotificationService.isOrderDismissed(orderId)) {
+      log('[PUSH] Ignoring dismissed order: orderId=$orderId', name: 'push');
+      unawaited(dismissNewOrder(orderId));
+      return;
+    }
+
     log('[PUSH] Notification clicked: orderId=$orderId', name: 'push');
 
     if (NotificationService.orderAlertOpen) {
@@ -141,5 +150,18 @@ class OneSignalNotificationService implements INotificationService {
     NotificationService.setPendingOrder(orderId);
 
     Modular.to.pushNamed('/order-refresh', arguments: {'orderId': orderId});
+  }
+
+  @override
+  Future<void> dismissNewOrder(String orderId) async {
+    if (kIsWeb || orderId.isEmpty) return;
+    try {
+      await OneSignal.Notifications.removeGroupedNotifications(
+        'order_$orderId',
+      );
+    } catch (e) {
+      // Best-effort: versões antigas do push podem não ter o grupo.
+      log('[PUSH] Failed to remove order notification: $e', name: 'push');
+    }
   }
 }
