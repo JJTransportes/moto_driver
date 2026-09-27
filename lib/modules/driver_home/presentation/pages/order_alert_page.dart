@@ -43,6 +43,7 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
     _cancelSub = Modular.get<SignalRService>().onOrderCancelled.listen((data) {
       final cancelledId = data['orderId'] as String?;
       if (cancelledId != null && cancelledId != _orderId) return;
+      if (cancelledId != null) NotificationService.dismissOrder(cancelledId);
       if (!mounted) return;
       setState(() {
         _state = _PageState.unavailable;
@@ -118,12 +119,17 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
 
     try {
       final dio = Modular.get<Dio>();
-      final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/orders/$orderId');
+      final response = await dio.get(
+        '${AppConfig.getBaseUrl()}/api/travels/orders/$orderId',
+      );
       if (!mounted) return;
 
-      final entity = TravelOrderEntity.fromJson(response.data as Map<String, dynamic>);
+      final entity = TravelOrderEntity.fromJson(
+        response.data as Map<String, dynamic>,
+      );
 
       if (entity.status == 'cancelled' || entity.status == 'accepted') {
+        NotificationService.dismissOrder(orderId);
         setState(() {
           _state = _PageState.unavailable;
           _message = 'Pedido não está mais disponível.';
@@ -140,12 +146,14 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
 
       switch (e.response?.statusCode) {
         case 403:
+          NotificationService.dismissOrder(orderId);
           setState(() {
             _state = _PageState.unavailable;
             _message = 'Este pedido não está mais disponível para você.';
           });
           return;
         case 404:
+          NotificationService.dismissOrder(orderId);
           setState(() {
             _state = _PageState.unavailable;
             _message = 'Pedido não encontrado.';
@@ -210,7 +218,10 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
     }
 
     if (nextOrderId != null) {
-      Modular.to.pushNamed('/order-refresh', arguments: {'orderId': nextOrderId});
+      Modular.to.pushNamed(
+        '/order-refresh',
+        arguments: {'orderId': nextOrderId},
+      );
     }
   }
 
@@ -244,7 +255,10 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
       case _PageState.unavailable:
         return _buildMessage(_message ?? 'Pedido não está mais disponível.');
       case _PageState.error:
-        return _buildMessage(_message ?? 'Não foi possível carregar o pedido.', showRetry: true);
+        return _buildMessage(
+          _message ?? 'Não foi possível carregar o pedido.',
+          showRetry: true,
+        );
     }
   }
 
@@ -255,7 +269,11 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: context.moto.textTertiary),
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: context.moto.textTertiary,
+            ),
             const SizedBox(height: 24),
             Text(
               message,
