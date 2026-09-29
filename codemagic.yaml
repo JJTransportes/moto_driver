@@ -1,25 +1,24 @@
 workflows:
-  android_staging:
-    name: Moto Android Staging
+  android_release:
+    name: Moto Android Release
     instance_type: mac_mini_m2
     max_build_duration: 30
 
     triggering:
-      events:
-      - push
+      events: []
+      # push trigger temporarily disabled while this pipeline is being reconstructed
+      # in a working branch — re-add "- push" under events when ready to resume
+      # automatic builds/publishing on android_release.
       branch_patterns:
-      - pattern: "android_staging"
-        include: true
-        source: true
-      - pattern: "*"
-        include: false
-        source: true
+      - pattern: "android_release"
+      - include: true
+      - source: true
       cancel_previous_builds: true
 
     environment:
-      flutter: 3.44.8
+      flutter: 3.44.0
       groups:
-      - moto_staging
+      - release
       android_signing:
       - moto_keystore
 
@@ -74,5 +73,5 @@ workflows:
 
       google_play:
         credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
-        track: "internal"
+        track: production
         submit_as_draft: false
