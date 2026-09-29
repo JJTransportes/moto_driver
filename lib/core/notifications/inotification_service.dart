@@ -3,4 +3,5 @@ abstract class INotificationService {
   Future<bool> requestNotificationPermission();
   Future<void> login(String subscription, String token);
   Future<void> handleForegroundNotification();
+  Future<void> dismissNewOrder(String orderId);
 }

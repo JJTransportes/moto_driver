@@ -1,68 +1,65 @@
 workflows:
-  ios_staging:
-    name: Moto IOs Release
+  ios_release:
+    name: Moto Driver iOS Release
     instance_type: mac_mini_m2
     max_build_duration: 30
     integrations:
       app_store_connect: Moto Driver
-
     triggering:
+      # Builds stay manual until Apple's organization migration is complete.
       events: []
-      # push trigger temporarily disabled while the release/pre-release pipelines
-      # are being reconstructed — re-add "- push" under events when ready to
-      # resume automatic builds/publishing on this branch.
       branch_patterns:
       - pattern: "ios_release"
-      - include: true
-      - source: true
+        include: true
+        source: true
       cancel_previous_builds: true
-
     environment:
-      flutter: 3.44.8
+      flutter: 3.44.0
       groups:
       - release
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: $BUNDLE_ID
-
+        bundle_identifier: br.com.rockservicos.motoDriverApp
+    cache:
+      cache_paths:
+      - $HOME/.pub-cache
     scripts:
     - name: Set up code signing settings on Xcode project
-      script: |
-        xcode-project use-profiles
-
+      script: xcode-project use-profiles
     - name: Get Flutter packages
-      script: |
-        flutter pub get
-
+      script: flutter pub get
+    - name: Run tests
+      script: flutter test
     - name: Set application secrets
       script: |
         cat <<EOF > ios/Flutter/Secrets.xcconfig
         IOS_MAPS_API_KEY=$IOS_MAPS_API_KEY
         EOF
-
     - name: Install pods
-      script: |
-        find . -name "Podfile" -execdir pod install \;
-
-    - name: Config definitions
+      script: find . -name "Podfile" -execdir pod install \;
+    - name: Configure runtime definitions
       script: |
         cat > .env << EOF
         API_BASE_URL=$API_BASE_URL
         ONE_SIGNAL_ID=$ONE_SIGNAL_ID
         EOF
-
-    - name: Flutter build ipa
-      script: |+
+    - name: Determine next build number
+      script: |
+        LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
+        NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+        echo "Latest TestFlight build number: $LATEST_BUILD_NUMBER"
+        echo "Next build number: $NEW_BUILD_NUMBER"
+        echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
+    - name: Build IPA
+      script: |
         flutter build ipa --release \
           --build-name=2.0.0 \
-          --build-number=38 \
+          --build-number=$NEW_BUILD_NUMBER \
           --export-options-plist=/Users/builder/export_options.plist
-          
     artifacts:
     - build/ios/ipa/*.ipa
     - /tmp/xcodebuild_logs/*.log
     - flutter_drive.log
-
     publishing:
       email:
         recipients:
@@ -70,7 +67,6 @@ workflows:
         notify:
           success: false
           failure: true
-
       app_store_connect:
         auth: integration
         beta_groups:
