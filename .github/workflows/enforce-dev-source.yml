@@ -21,11 +21,7 @@ jobs:
     steps:
       - name: Fail if source branch is not dev
         run: |
-          # Exceção única para reconciliar a divergência histórica da branch
-          # de produção. Deve ser removida após o merge do PR correspondente.
-          if [ "${{ github.head_ref }}" != "dev" ] && \
-             ! { [ "${{ github.base_ref }}" = "android_release" ] && \
-                 [ "${{ github.head_ref }}" = "release-reconcile-driver" ]; }; then
+          if [ "${{ github.head_ref }}" != "dev" ]; then
             echo "PRs into ${{ github.base_ref }} must come from 'dev'. Got: ${{ github.head_ref }}"
             exit 1
           fi

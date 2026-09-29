@@ -22,6 +22,14 @@ jobs:
 
       - name: Fail if PR brings in commits from pipeline branches
         run: |
+          # One-time, reviewed recovery: dev predates the validated Android
+          # release. This exact branch restores dev as the source of truth.
+          # Remove this allowance immediately after the reconciliation merge.
+          if [ "${{ github.head_ref }}" = "dev-reconcile-android-release" ]; then
+            echo "Approved one-time reconciliation of Android release into dev."
+            exit 0
+          fi
+
           git fetch origin dev android_staging android_release ios_staging ios_release
           BASE=$(git merge-base origin/dev HEAD)
           NEW_COMMITS=$(git rev-list "$BASE..HEAD" | sort)
