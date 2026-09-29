@@ -38,28 +38,38 @@ void main() {
     NotificationService.clearPendingOrder();
     NotificationService.setOrderAlertOpen(false);
 
-    when(() => locationService.getCurrentPosition())
-        .thenAnswer((_) async => const LocationResult(status: LocationStatus.granted));
-    when(() => signalRService.onOrderCancelled)
-        .thenAnswer((_) => cancelController.stream);
+    when(() => locationService.getCurrentPosition()).thenAnswer(
+      (_) async => const LocationResult(status: LocationStatus.granted),
+    );
+    when(
+      () => travelLocalRepository.getActiveTravel(),
+    ).thenAnswer((_) async => null);
+    when(
+      () => signalRService.onOrderCancelled,
+    ).thenAnswer((_) => cancelController.stream);
     when(() => signalRService.isConnected(any())).thenReturn(true);
-    when(() => signalRService.connect(any(), any(), any())).thenAnswer((_) async {});
+    when(
+      () => signalRService.connect(any(), any(), any()),
+    ).thenAnswer((_) async {});
     when(() => signalRService.disconnect(any())).thenAnswer((_) async {});
     when(() => signalRService.denyOrder(any())).thenAnswer((_) async {});
     when(() => authStorage.getToken()).thenAnswer((_) async => 'token');
   });
 
   PushTestModule buildModule() => PushTestModule(
-        dio: dio,
-        authStorage: authStorage,
-        authRepository: authRepository,
-        signOutService: signOutService,
-        signalRService: signalRService,
-        travelLocalRepository: travelLocalRepository,
-        locationService: locationService,
-      );
+    dio: dio,
+    authStorage: authStorage,
+    authRepository: authRepository,
+    signOutService: signOutService,
+    signalRService: signalRService,
+    travelLocalRepository: travelLocalRepository,
+    locationService: locationService,
+  );
 
-  void stubOrderFetched({String orderId = 'order-1', String status = 'pending'}) {
+  void stubOrderFetched({
+    String orderId = 'order-1',
+    String status = 'pending',
+  }) {
     when(() => dio.get(any())).thenAnswer(
       (_) async => okResponse(
         pendingOrderPayload(orderId: orderId)..['status'] = status,
@@ -67,7 +77,10 @@ void main() {
     );
   }
 
-  Future<void> pumpPage(WidgetTester tester, {String? orderId = 'order-1'}) async {
+  Future<void> pumpPage(
+    WidgetTester tester, {
+    String? orderId = 'order-1',
+  }) async {
     initTestModule(buildModule(), navigator);
     // Rede de segurança: se o teste falhar no meio, o Modular é destruído
     // (evita ModuleStartedException no teste seguinte).
@@ -75,7 +88,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: OrderAlertPage(orderId: orderId)),
     );
-    await tester.pumpAndSettle();
+    // Não usa pumpAndSettle: o MotoCountdownRing do IncomingOrderSheet anima
+    // por 20s (duração real do prazo de resposta) — pumpAndSettle rodaria
+    // essa animação até o fim e disparava o auto-reject antes da hora.
+    // 1100ms cobre o retry automático de rede (1s) desta página.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1100));
   }
 
   /// Desmonta a árvore (dispose da página → cancela timer/assinaturas).
@@ -85,12 +103,13 @@ void main() {
     destroyTestModule();
   }
 
-  testWidgets('200 → exibe o card do pedido (dados do IncomingOrderSheet)',
-      (tester) async {
+  testWidgets('200 → exibe o card do pedido (dados do IncomingOrderSheet)', (
+    tester,
+  ) async {
     stubOrderFetched();
     await pumpPage(tester);
 
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
     expect(find.text('Av. Paulista, 1000'), findsOneWidget);
     expect(find.text('Av. Faria Lima, 2000'), findsOneWidget);
 
@@ -100,8 +119,9 @@ void main() {
     await disposeTree(tester);
   });
 
-  testWidgets('flag orderAlertOpen setada na abertura e limpa no dispose',
-      (tester) async {
+  testWidgets('flag orderAlertOpen setada na abertura e limpa no dispose', (
+    tester,
+  ) async {
     stubOrderFetched();
     await pumpPage(tester);
 
@@ -113,8 +133,9 @@ void main() {
     destroyTestModule();
   });
 
-  testWidgets('403 → indisponível + Voltar para a Home (limpa pendente)',
-      (tester) async {
+  testWidgets('403 → indisponível + Voltar para a Home (limpa pendente)', (
+    tester,
+  ) async {
     when(() => dio.get(any())).thenThrow(
       DioException(
         requestOptions: RequestOptions(path: ''),
@@ -125,9 +146,12 @@ void main() {
       ),
     );
     when(() => navigator.path).thenReturn('/order-alert');
-    when(() => navigator.pushReplacementNamed(any(),
-            arguments: any(named: 'arguments')))
-        .thenAnswer((_) async => null);
+    when(
+      () => navigator.pushReplacementNamed(
+        any(),
+        arguments: any(named: 'arguments'),
+      ),
+    ).thenAnswer((_) async => null);
 
     NotificationService.setPendingOrder('order-1');
     await pumpPage(tester);
@@ -140,9 +164,14 @@ void main() {
     await tester.tap(find.text('Voltar para a Home'));
     await tester.pump();
 
-    verify(() => navigator.pushReplacementNamed('/home',
-        arguments: any(named: 'arguments'))).called(1);
+    verify(
+      () => navigator.pushReplacementNamed(
+        '/home',
+        arguments: any(named: 'arguments'),
+      ),
+    ).called(1);
     expect(NotificationService.peekPendingOrder(), isNull);
+    expect(await NotificationService.isOrderDismissed('order-1'), isTrue);
 
     await disposeTree(tester);
   });
@@ -165,7 +194,9 @@ void main() {
     await disposeTree(tester);
   });
 
-  testWidgets('status accepted → Pedido não está mais disponível', (tester) async {
+  testWidgets('status accepted → Pedido não está mais disponível', (
+    tester,
+  ) async {
     stubOrderFetched(status: 'accepted');
     await pumpPage(tester);
 
@@ -174,26 +205,29 @@ void main() {
     await disposeTree(tester);
   });
 
-  testWidgets('401 → Sessão expirada (sem retry — token já renovado no fluxo)',
-      (tester) async {
-    when(() => dio.get(any())).thenThrow(
-      DioException(
-        requestOptions: RequestOptions(path: ''),
-        response: Response<dynamic>(
+  testWidgets(
+    '401 → Sessão expirada (sem retry — token já renovado no fluxo)',
+    (tester) async {
+      when(() => dio.get(any())).thenThrow(
+        DioException(
           requestOptions: RequestOptions(path: ''),
-          statusCode: 401,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 401,
+          ),
         ),
-      ),
-    );
-    await pumpPage(tester);
+      );
+      await pumpPage(tester);
 
-    expect(find.text('Sessão expirada.'), findsOneWidget);
+      expect(find.text('Sessão expirada.'), findsOneWidget);
 
-    await disposeTree(tester);
-  });
+      await disposeTree(tester);
+    },
+  );
 
-  testWidgets('erro de rede → retry 1x → Tentar novamente recomeça do zero',
-      (tester) async {
+  testWidgets('erro de rede → retry 1x → Tentar novamente recomeça do zero', (
+    tester,
+  ) async {
     when(() => dio.get(any())).thenThrow(
       DioException(requestOptions: RequestOptions(path: '')),
     );
@@ -207,110 +241,141 @@ void main() {
     // "Tentar novamente" recomeça do zero (attempt reset) → agora 200.
     stubOrderFetched();
     await tester.tap(find.text('Tentar novamente'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
     verify(() => dio.get(any())).called(1); // nova chamada após o tap
 
     await disposeTree(tester);
   });
 
-  testWidgets('aceitar → pushReplacementNamed(/active-travel) + pendente limpo',
-      (tester) async {
-    stubOrderFetched();
-    when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
-      (_) async => okResponse({
-        'travelId': 'travel-1',
-        'routes': <dynamic>[],
-      }),
-    );
-    when(() => travelLocalRepository.saveActiveTravel(any()))
-        .thenAnswer((_) async {});
-    when(() => navigator.pushReplacementNamed(any(),
-            arguments: any(named: 'arguments')))
-        .thenAnswer((_) async => null);
-    NotificationService.setPendingOrder('order-1');
+  testWidgets(
+    'aceitar → pushReplacementNamed(/active-travel) + pendente limpo',
+    (tester) async {
+      stubOrderFetched();
+      when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => okResponse({
+          'travelId': 'travel-1',
+          'routes': <dynamic>[],
+        }),
+      );
+      when(
+        () => travelLocalRepository.saveActiveTravel(any()),
+      ).thenAnswer((_) async {});
+      when(
+        () => navigator.pushReplacementNamed(
+          any(),
+          arguments: any(named: 'arguments'),
+        ),
+      ).thenAnswer((_) async => null);
+      NotificationService.setPendingOrder('order-1');
 
-    await pumpPage(tester);
-    expect(find.text('Nova Viagem'), findsOneWidget);
+      await pumpPage(tester);
+      expect(find.text('Nova viagem'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Aceitar'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('Aceitar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-    final captured = verify(
-      () => navigator.pushReplacementNamed('/active-travel',
-          arguments: captureAny(named: 'arguments')),
-    ).captured;
-    final args = captured.single as Map<String, dynamic>;
-    expect(args['travelId'], 'travel-1');
-    expect(NotificationService.peekPendingOrder(), isNull);
+      final captured = verify(
+        () => navigator.pushReplacementNamed(
+          '/active-travel',
+          arguments: captureAny(named: 'arguments'),
+        ),
+      ).captured;
+      final args = captured.single as Map<String, dynamic>;
+      expect(args['travelId'], 'travel-1');
+      expect(NotificationService.peekPendingOrder(), isNull);
 
-    await disposeTree(tester);
-  });
+      await disposeTree(tester);
+    },
+  );
 
-  testWidgets('recusar → _exitToHome: popUntil + /home + pendente limpo',
-      (tester) async {
+  testWidgets('recusar → _exitToHome: popUntil + /home + pendente limpo', (
+    tester,
+  ) async {
     stubOrderFetched();
     when(() => navigator.path).thenReturn('/order-alert');
-    when(() => navigator.pushReplacementNamed(any(),
-            arguments: any(named: 'arguments')))
-        .thenAnswer((_) async => null);
+    when(
+      () => navigator.pushReplacementNamed(
+        any(),
+        arguments: any(named: 'arguments'),
+      ),
+    ).thenAnswer((_) async => null);
     NotificationService.setPendingOrder('order-1');
 
     await pumpPage(tester);
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Recusar'));
+    await tester.tap(find.text('Recusar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
     verify(() => navigator.popUntil(any())).called(1);
-    verify(() => navigator.pushReplacementNamed('/home',
-        arguments: any(named: 'arguments'))).called(1);
+    verify(
+      () => navigator.pushReplacementNamed(
+        '/home',
+        arguments: any(named: 'arguments'),
+      ),
+    ).called(1);
     expect(NotificationService.peekPendingOrder(), isNull);
 
     await disposeTree(tester);
   });
 
-  testWidgets('RF11: novo pedido durante a página → reexibido após a saída',
-      (tester) async {
+  testWidgets('RF11: novo pedido durante a página → reexibido após a saída', (
+    tester,
+  ) async {
     stubOrderFetched();
     when(() => navigator.path).thenReturn('/order-alert');
-    when(() => navigator.pushReplacementNamed(any(),
-            arguments: any(named: 'arguments')))
-        .thenAnswer((_) async => null);
-    when(() => navigator.pushNamed(any(), arguments: any(named: 'arguments')))
-        .thenAnswer((_) async => null);
+    when(
+      () => navigator.pushReplacementNamed(
+        any(),
+        arguments: any(named: 'arguments'),
+      ),
+    ).thenAnswer((_) async => null);
+    when(
+      () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
+    ).thenAnswer((_) async => null);
     NotificationService.setPendingOrder('order-1');
 
     await pumpPage(tester);
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
     // Segundo clique (outro pedido) enquanto a página está aberta.
     NotificationService.setPendingOrder('order-2');
 
-    await tester.tap(find.byTooltip('Recusar'));
+    await tester.tap(find.text('Recusar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
     // Sair para a home e reabrir o fluxo com o novo pendente.
-    verify(() => navigator.pushReplacementNamed('/home',
-        arguments: any(named: 'arguments'))).called(1);
-    verify(() => navigator.pushNamed('/order-refresh',
-        arguments: {'orderId': 'order-2'})).called(1);
+    verify(
+      () => navigator.pushReplacementNamed(
+        '/home',
+        arguments: any(named: 'arguments'),
+      ),
+    ).called(1);
+    verify(
+      () => navigator.pushNamed(
+        '/order-refresh',
+        arguments: {'orderId': 'order-2'},
+      ),
+    ).called(1);
 
     await disposeTree(tester);
   });
 
-  testWidgets('sem orderId nos args → fallback para o pendente do holder',
-      (tester) async {
+  testWidgets('sem orderId nos args → fallback para o pendente do holder', (
+    tester,
+  ) async {
     stubOrderFetched(orderId: 'order-9');
     NotificationService.setPendingOrder('order-9');
 
     await pumpPage(tester, orderId: null);
 
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
     final captured = verify(() => dio.get(captureAny())).captured;
     expect(captured.single, contains('/api/travels/orders/order-9'));
 
@@ -326,21 +391,23 @@ void main() {
     await disposeTree(tester);
   });
 
-  testWidgets('OrderCancelled (mesmo orderId) → Pedido cancelado pelo passageiro',
-      (tester) async {
-    stubOrderFetched();
-    await pumpPage(tester);
-    expect(find.text('Nova Viagem'), findsOneWidget);
+  testWidgets(
+    'OrderCancelled (mesmo orderId) → Pedido cancelado pelo passageiro',
+    (tester) async {
+      stubOrderFetched();
+      await pumpPage(tester);
+      expect(find.text('Nova viagem'), findsOneWidget);
 
-    cancelController.add({'orderId': 'order-1'});
-    await tester.pump(); // microtask entrega o evento → setState agenda frame
-    await tester.pump(); // frame renderiza o estado indisponível
+      cancelController.add({'orderId': 'order-1'});
+      await tester.pump(); // microtask entrega o evento → setState agenda frame
+      await tester.pump(); // frame renderiza o estado indisponível
 
-    expect(find.text('Pedido cancelado pelo passageiro.'), findsOneWidget);
-    expect(find.text('Voltar para a Home'), findsOneWidget);
+      expect(find.text('Pedido cancelado pelo passageiro.'), findsOneWidget);
+      expect(find.text('Voltar para a Home'), findsOneWidget);
 
-    await disposeTree(tester);
-  });
+      await disposeTree(tester);
+    },
+  );
 
   testWidgets('OrderCancelled (orderId diferente) → ignora', (tester) async {
     stubOrderFetched();
@@ -349,20 +416,22 @@ void main() {
     cancelController.add({'orderId': 'outro-pedido'});
     await tester.pump();
 
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
     await disposeTree(tester);
   });
 
-  testWidgets('hub: não conectado → connect; dispose → disconnect',
-      (tester) async {
+  testWidgets('hub: não conectado → connect; dispose → disconnect', (
+    tester,
+  ) async {
     stubOrderFetched();
     when(() => signalRService.isConnected('travel-orders')).thenReturn(false);
 
     await pumpPage(tester);
 
-    verify(() => signalRService.connect('travel-orders', any(), 'token'))
-        .called(1);
+    verify(
+      () => signalRService.connect('travel-orders', any(), 'token'),
+    ).called(1);
 
     await tester.pumpWidget(const SizedBox.shrink());
     verify(() => signalRService.disconnect('travel-orders')).called(1);
@@ -383,24 +452,26 @@ void main() {
     await disposeTree(tester);
   });
 
-  testWidgets('PopScope canPop:false → gesto de voltar não fecha a página',
-      (tester) async {
+  testWidgets('PopScope canPop:false → gesto de voltar não fecha a página', (
+    tester,
+  ) async {
     stubOrderFetched();
     await pumpPage(tester);
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
     final dynamic widgetsApp = tester.state(find.byType(WidgetsApp));
     await widgetsApp.didPopRoute();
     await tester.pump();
 
     // A página permanece (decisão explícita via Aceitar/Recusar).
-    expect(find.text('Nova Viagem'), findsOneWidget);
+    expect(find.text('Nova viagem'), findsOneWidget);
 
     await disposeTree(tester);
   });
 
-  testWidgets('Posição GPS concedida → body do accept inclui lat/lng',
-      (tester) async {
+  testWidgets('Posição GPS concedida → body do accept inclui lat/lng', (
+    tester,
+  ) async {
     stubOrderFetched();
     when(() => locationService.getCurrentPosition()).thenAnswer(
       (_) async => LocationResult(
@@ -425,14 +496,18 @@ void main() {
         'routes': <dynamic>[],
       }),
     );
-    when(() => travelLocalRepository.saveActiveTravel(any()))
-        .thenAnswer((_) async {});
-    when(() => navigator.pushReplacementNamed(any(),
-            arguments: any(named: 'arguments')))
-        .thenAnswer((_) async => null);
+    when(
+      () => travelLocalRepository.saveActiveTravel(any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => navigator.pushReplacementNamed(
+        any(),
+        arguments: any(named: 'arguments'),
+      ),
+    ).thenAnswer((_) async => null);
 
     await pumpPage(tester);
-    await tester.tap(find.byTooltip('Aceitar'));
+    await tester.tap(find.text('Aceitar'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 

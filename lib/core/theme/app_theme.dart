@@ -7,6 +7,10 @@ class AppColors {
   static const gradientEnd = Color(0xFF3A55BD);
   static const white = Color(0xFFFFFFFF);
   static const secondary = Color(0xFFBBBBBB);
+
+  /// Verde de item cumprido no checklist "estilo gov.br" (política de
+  /// senha) — item começa neutro e vira verde ao ser satisfeito.
+  static const success = Color(0xFF2E7D32);
 }
 
 class AppGradients {

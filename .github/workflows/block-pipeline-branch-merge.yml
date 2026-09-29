@@ -1,0 +1,41 @@
+name: Block pipeline branches merging into dev
+
+# dev is the source of truth for code changes. android_staging and
+# android_release only ever receive merges FROM dev (to trigger their
+# Codemagic pipelines) and must never be merged back into dev — that would
+# let pipeline-only branches diverge and eventually corrupt dev's history.
+# This check fails any PR into dev whose new commits are also reachable
+# from android_staging or android_release.
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  check-no-pipeline-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fail if PR brings in commits from android_staging or android_release
+        run: |
+          git fetch origin dev android_staging android_release
+          BASE=$(git merge-base origin/dev HEAD)
+          NEW_COMMITS=$(git rev-list "$BASE..HEAD" | sort)
+
+          for branch in android_staging android_release; do
+            BRANCH_COMMITS=$(git rev-list "origin/$branch" | sort)
+            LEAKED=$(comm -12 <(echo "$NEW_COMMITS") <(echo "$BRANCH_COMMITS"))
+            if [ -n "$LEAKED" ]; then
+              echo "This PR contains commits that only exist on '$branch'."
+              echo "android_staging and android_release are pipeline-only branches and must never be merged back into dev."
+              echo "Offending commits:"
+              echo "$LEAKED"
+              exit 1
+            fi
+          done
+
+          echo "OK — no pipeline-branch commits detected."

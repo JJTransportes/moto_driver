@@ -29,6 +29,7 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
       event.email,
       event.password,
       deviceType,
+      expectedRole: 'Driver',
     );
 
     if (result.isSuccess()) {

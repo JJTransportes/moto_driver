@@ -1,5 +1,6 @@
 import 'dart:developer' show log;
 
+import 'package:moto_driver/core/models/password_policy.dart';
 import 'package:moto_driver/core/notifications/inotification_service.dart';
 import 'package:moto_driver/modules/auth/data/datasources/i_auth_datasource.dart';
 import 'package:moto_driver/modules/auth/data/models/refresh_token_response_model.dart';
@@ -17,11 +18,17 @@ class AuthRepository implements IAuthRepository {
   Future<Result<UserEntity>> signIn(
     String email,
     String password,
-    String device,
-  ) async {
+    String device, {
+    String? expectedRole,
+  }) async {
     final UserEntity user;
     try {
-      final model = await _datasource.signIn(email, password, device);
+      final model = await _datasource.signIn(
+        email,
+        password,
+        device,
+        expectedRole: expectedRole,
+      );
       user = model.toEntity();
     } on Exception catch (e) {
       return Failure(e);
@@ -61,18 +68,36 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
+  Future<Result<String>> verifyResetCode({required String email, required String code}) async {
+    try {
+      final resetToken = await _datasource.verifyResetCode(email: email, code: code);
+      return Success(resetToken);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  @override
   Future<Result<Unit>> confirmPasswordReset({
-    required String email,
-    required String code,
+    required String resetToken,
     required String newPassword,
   }) async {
     try {
       await _datasource.confirmPasswordReset(
-        email: email,
-        code: code,
+        resetToken: resetToken,
         newPassword: newPassword,
       );
       return Success(unit);
+    } on Exception catch (e) {
+      return Failure(e);
+    }
+  }
+
+  @override
+  Future<Result<PasswordPolicy>> getPasswordPolicy() async {
+    try {
+      final policy = await _datasource.getPasswordPolicy();
+      return Success(policy);
     } on Exception catch (e) {
       return Failure(e);
     }
