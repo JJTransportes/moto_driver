@@ -2,7 +2,7 @@ name: moto_driver
 description: "Moto Driver app."
 publish_to: 'none'
 
-version: 1.0.0+40
+version: 2.0.0+40
 
 environment:
   sdk: ^3.12.0
@@ -31,6 +31,7 @@ dependencies:
   url_launcher: ^6.3.0
   image_picker: ^1.1.2
   onesignal_flutter: ^5.1.2
+  in_app_update: ^5.0.0
 
 dev_dependencies:
   flutter_test:
