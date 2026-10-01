@@ -54,7 +54,7 @@ workflows:
         echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
 
     - name: Build App Bundle
-      script: flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER
+      script: flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER --dart-define=FORCE_PLAY_UPDATE=true
 
     artifacts:
     - build/**/outputs/**/*.aab
