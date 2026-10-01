@@ -123,12 +123,6 @@ workflows:
     - /tmp/xcodebuild_logs/*.log
     - flutter_drive.log
     publishing:
-      email:
-        recipients:
-        - comercialpepiviagens@gmail.com
-        notify:
-          success: false
-          failure: true
       app_store_connect:
         auth: integration
         beta_groups:
@@ -192,12 +186,6 @@ workflows:
     - /tmp/xcodebuild_logs/*.log
     - flutter_drive.log
     publishing:
-      email:
-        recipients:
-        - dev.jr.s.engineer@gmail.com
-        notify:
-          success: false
-          failure: true
       app_store_connect:
         auth: integration
         beta_groups:
