@@ -54,7 +54,7 @@ workflows:
         echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
 
     - name: Build App Bundle
-      script: flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER
+      script: flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER --dart-define=FORCE_PLAY_UPDATE=true
 
     artifacts:
     - build/**/outputs/**/*.aab
@@ -62,15 +62,6 @@ workflows:
     - flutter_drive.log
 
     publishing:
-      email:
-        recipients:
-        - comercialpepiviagens@gmail.com
-        - igoralmeidarossi@gmail.com
-        - marcospl.nascimento12@gmail.com
-        notify:
-          success: true
-          failure: true
-
       google_play:
         credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
         track: production
@@ -132,12 +123,6 @@ workflows:
     - /tmp/xcodebuild_logs/*.log
     - flutter_drive.log
     publishing:
-      email:
-        recipients:
-        - comercialpepiviagens@gmail.com
-        notify:
-          success: false
-          failure: true
       app_store_connect:
         auth: integration
         beta_groups:
@@ -201,12 +186,6 @@ workflows:
     - /tmp/xcodebuild_logs/*.log
     - flutter_drive.log
     publishing:
-      email:
-        recipients:
-        - dev.jr.s.engineer@gmail.com
-        notify:
-          success: false
-          failure: true
       app_store_connect:
         auth: integration
         beta_groups:

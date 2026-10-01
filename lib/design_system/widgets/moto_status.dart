@@ -27,7 +27,12 @@ enum TripStatus {
 }
 
 class MotoStatusBadge extends StatelessWidget {
-  const MotoStatusBadge({super.key, required this.label, this.tone = MotoTone.info, this.live = false});
+  const MotoStatusBadge({
+    super.key,
+    required this.label,
+    this.tone = MotoTone.info,
+    this.live = false,
+  });
 
   factory MotoStatusBadge.trip(TripStatus s, {Key? key}) =>
       MotoStatusBadge(key: key, label: s.label, tone: s.tone, live: s.live);
@@ -47,8 +52,8 @@ class MotoStatusBadge extends StatelessWidget {
       MotoTone.neutral => (c.textSecondary, c.borderSubtle, c.textTertiary),
     };
     return Container(
-      height: 28,
-      padding: const EdgeInsets.only(left: 10, right: 12),
+      constraints: const BoxConstraints(minHeight: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: MotoRadius.brPill,
@@ -59,9 +64,19 @@ class MotoStatusBadge extends StatelessWidget {
         children: [
           _Dot(color: dot, live: live),
           const SizedBox(width: 7),
-          Text(
-            label,
-            style: TextStyle(fontFamily: MotoFont.ui, fontSize: 12, fontWeight: FontWeight.w600, color: fg, height: 1),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: MotoFont.ui,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: fg,
+                height: 1,
+              ),
+            ),
           ),
         ],
       ),
@@ -78,7 +93,10 @@ class _Dot extends StatefulWidget {
 }
 
 class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800));
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  );
 
   @override
   void initState() {
@@ -104,7 +122,10 @@ class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
             color: widget.color,
             shape: BoxShape.circle,
             boxShadow: [
-              BoxShadow(color: widget.color.withValues(alpha: .22), spreadRadius: 3),
+              BoxShadow(
+                color: widget.color.withValues(alpha: .22),
+                spreadRadius: 3,
+              ),
               if (widget.live)
                 BoxShadow(
                   color: widget.color.withValues(alpha: (1 - t) * .55),
