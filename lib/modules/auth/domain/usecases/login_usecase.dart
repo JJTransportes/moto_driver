@@ -9,7 +9,12 @@ class LoginUsecase implements ILoginUsecase {
   LoginUsecase(this._repository);
 
   @override
-  Future<Result<UserEntity>> call(String email, String password, String device) {
-    return _repository.signIn(email, password, device);
+  Future<Result<UserEntity>> call(
+    String email,
+    String password,
+    String device, {
+    String? expectedRole,
+  }) {
+    return _repository.signIn(email, password, device, expectedRole: expectedRole);
   }
 }

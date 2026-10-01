@@ -1,12 +1,21 @@
 import 'dart:developer' show log;
 
 class NotificationService {
+  static const _dismissedOrderTtl = Duration(hours: 6);
+  static final Map<String, int> _dismissedOrders = {};
+
   static bool _sheetVisible = false;
 
   static bool setSheetVisible(bool visible) {
     _sheetVisible = visible;
     return _sheetVisible;
   }
+
+  /// True enquanto o `IncomingOrderSheet` já está na tela — usada pra evitar
+  /// abrir um segundo sheet por cima do primeiro se o backend reenviar o
+  /// mesmo evento `NewOrder` (reconexão do hub, retry) antes do motorista
+  /// decidir aceitar/recusar o pedido atual.
+  static bool get sheetVisible => _sheetVisible;
 
   // ── Pedido pendente (push notification) ──────────────────────────────
 
@@ -27,6 +36,36 @@ class NotificationService {
   /// Limpa o pedido pendente (saídas da página de pedido, logout).
   static void clearPendingOrder() {
     _pendingOrderId = null;
+  }
+
+  /// Registra uma oferta que este motorista já recusou, deixou expirar ou
+  /// descobriu estar indisponível. A memória bloqueia imediatamente um evento
+  /// SignalR duplicado ou um clique tardio no push da mesma sessão.
+  static void dismissOrder(String orderId) {
+    if (orderId.isEmpty) return;
+    _dismissedOrders[orderId] = DateTime.now().millisecondsSinceEpoch;
+    if (_pendingOrderId == orderId) _pendingOrderId = null;
+    _trimDismissedOrders();
+  }
+
+  static Future<bool> isOrderDismissed(String orderId) async {
+    if (orderId.isEmpty) return false;
+    _trimDismissedOrders();
+    return _dismissedOrders.containsKey(orderId);
+  }
+
+  static void _trimDismissedOrders() {
+    final cutoff = DateTime.now()
+        .subtract(_dismissedOrderTtl)
+        .millisecondsSinceEpoch;
+    _dismissedOrders.removeWhere((_, timestamp) => timestamp < cutoff);
+    if (_dismissedOrders.length > 100) {
+      final oldest = _dismissedOrders.entries.toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      for (final entry in oldest.take(_dismissedOrders.length - 100)) {
+        _dismissedOrders.remove(entry.key);
+      }
+    }
   }
 
   // ── Página de pedido aberta ──────────────────────────────────────────

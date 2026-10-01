@@ -18,113 +18,104 @@ void main() {
     registerFallbackValue('');
   });
 
-  PasswordResetBloc build() => PasswordResetBloc(usecase, email: 'joao@moto.com');
+  PasswordResetBloc build() => PasswordResetBloc(usecase, resetToken: 'reset-tok-1');
 
   group('PasswordResetBloc', () {
     blocTest<PasswordResetBloc, PasswordResetState>(
       'emite [Submitting, Success] em 200',
       build: () {
         when(() => usecase.call(
-              email: any(named: 'email'),
-              code: any(named: 'code'),
+              resetToken: any(named: 'resetToken'),
               newPassword: any(named: 'newPassword'),
             )).thenAnswer((_) async => Success(unit));
         return build();
       },
-      act: (bloc) => bloc.add(const ResetConfirmSubmitted(code: '123456', newPassword: 'NovaSenha@1')),
+      act: (bloc) => bloc.add(const ResetConfirmSubmitted(newPassword: 'NovaSenha@1')),
       expect: () => [
         const PasswordResetSubmitting(),
         const PasswordResetSuccess(),
       ],
       verify: (_) {
         verify(() => usecase.call(
-              email: 'joao@moto.com',
-              code: '123456',
+              resetToken: 'reset-tok-1',
               newPassword: 'NovaSenha@1',
             )).called(1);
       },
     );
 
-    // 400 cobre código inválido/expirado E senha fora da política com o
-    // mesmo status — a mensagem do servidor é repassada como está, sem CTA
-    // de "pedir novo código" (não dá pra saber qual dos dois motivos foi).
+    // 400 no novo contrato é quase sempre token inválido/expirado (a senha já
+    // foi validada client-side antes do submit) — oferece "pedir novo código".
     blocTest<PasswordResetBloc, PasswordResetState>(
-      'em 400, expõe a mensagem do servidor sem marcar o código como consumido',
+      'em 400, expõe a mensagem do servidor e habilita pedir novo código',
       build: () {
         when(() => usecase.call(
-              email: any(named: 'email'),
-              code: any(named: 'code'),
+              resetToken: any(named: 'resetToken'),
               newPassword: any(named: 'newPassword'),
             )).thenAnswer(
-          (_) async => Failure(const ValidationException('Código inválido ou expirado.')),
+          (_) async => Failure(const ValidationException('Token inválido ou expirado.')),
         );
         return build();
       },
-      act: (bloc) => bloc.add(const ResetConfirmSubmitted(code: '000000', newPassword: 'x')),
+      act: (bloc) => bloc.add(const ResetConfirmSubmitted(newPassword: 'x')),
       expect: () => [
         const PasswordResetSubmitting(),
         isA<PasswordResetState>()
-            .having((s) => (s as PasswordResetError).message, 'message', 'Código inválido ou expirado.')
-            .having((s) => (s as PasswordResetError).codeConsumed, 'codeConsumed', isFalse),
+            .having((s) => (s as PasswordResetError).message, 'message', 'Token inválido ou expirado.')
+            .having((s) => (s as PasswordResetError).canRequestNewCode, 'canRequestNewCode', isTrue),
       ],
     );
 
-    // 409 é o único caso em que o status HTTP sozinho garante a causa
-    // (código já utilizado) — por isso oferece a ação de pedir um novo código.
+    // 409 (token já usado) também habilita a ação de pedir um novo código.
     blocTest<PasswordResetBloc, PasswordResetState>(
-      'em 409, marca o código como consumido',
+      'em 409, habilita pedir novo código',
       build: () {
         when(() => usecase.call(
-              email: any(named: 'email'),
-              code: any(named: 'code'),
+              resetToken: any(named: 'resetToken'),
               newPassword: any(named: 'newPassword'),
             )).thenAnswer(
           (_) async => Failure(const ConflictException('Este código já foi utilizado.')),
         );
         return build();
       },
-      act: (bloc) => bloc.add(const ResetConfirmSubmitted(code: '123456', newPassword: 'NovaSenha@1')),
+      act: (bloc) => bloc.add(const ResetConfirmSubmitted(newPassword: 'NovaSenha@1')),
       expect: () => [
         const PasswordResetSubmitting(),
         isA<PasswordResetState>()
-            .having((s) => (s as PasswordResetError).codeConsumed, 'codeConsumed', isTrue),
+            .having((s) => (s as PasswordResetError).canRequestNewCode, 'canRequestNewCode', isTrue),
       ],
     );
 
     blocTest<PasswordResetBloc, PasswordResetState>(
-      'em 429, expõe a mensagem de rate limit',
+      'em 429, expõe a mensagem de rate limit sem oferecer novo código',
       build: () {
         when(() => usecase.call(
-              email: any(named: 'email'),
-              code: any(named: 'code'),
+              resetToken: any(named: 'resetToken'),
               newPassword: any(named: 'newPassword'),
             )).thenAnswer(
           (_) async => Failure(const RateLimitedException()),
         );
         return build();
       },
-      act: (bloc) => bloc.add(const ResetConfirmSubmitted(code: '123456', newPassword: 'NovaSenha@1')),
+      act: (bloc) => bloc.add(const ResetConfirmSubmitted(newPassword: 'NovaSenha@1')),
       expect: () => [
         const PasswordResetSubmitting(),
-        isA<PasswordResetError>().having((e) => e.codeConsumed, 'codeConsumed', isFalse),
+        isA<PasswordResetError>().having((e) => e.canRequestNewCode, 'canRequestNewCode', isFalse),
       ],
     );
 
     blocTest<PasswordResetBloc, PasswordResetState>(
-      'usa o email fixo do bloc, não um vindo do evento',
+      'usa o resetToken fixo do bloc, não um vindo do evento',
       build: () {
         when(() => usecase.call(
-              email: any(named: 'email'),
-              code: any(named: 'code'),
+              resetToken: any(named: 'resetToken'),
               newPassword: any(named: 'newPassword'),
             )).thenAnswer((_) async => Success(unit));
         return build();
       },
-      act: (bloc) => bloc.add(const ResetConfirmSubmitted(code: '123456', newPassword: 'NovaSenha@1')),
+      act: (bloc) => bloc.add(const ResetConfirmSubmitted(newPassword: 'NovaSenha@1')),
       verify: (_) {
         verify(() => usecase.call(
-              email: 'joao@moto.com',
-              code: any(named: 'code'),
+              resetToken: 'reset-tok-1',
               newPassword: any(named: 'newPassword'),
             )).called(1);
       },
