@@ -177,21 +177,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         builder: (context) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                MotoStatusBadge(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final useStackedControls =
+                    constraints.maxWidth < 300 ||
+                    MediaQuery.textScalerOf(context).scale(12) > 14;
+                final badge = MotoStatusBadge(
                   label: isActive ? 'Recebendo corridas' : 'Modo indisponível',
                   tone: isActive ? MotoTone.success : MotoTone.neutral,
                   live: isActive,
-                ),
-                const Spacer(),
-                Switch(
+                );
+                final availabilitySwitch = Switch(
                   value: isActive,
                   onChanged: _isTogglingAvailability || _hasVehicle == false
                       ? null
                       : _onAvailabilityToggled,
-                ),
-              ],
+                );
+
+                if (useStackedControls) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      badge,
+                      const SizedBox(height: MotoSpace.s2),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: availabilitySwitch,
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    badge,
+                    const Spacer(),
+                    availabilitySwitch,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: MotoSpace.s4),
             Text(
@@ -772,7 +796,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (value && _hasVehicle == false) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vincule um veículo ao seu cadastro para ficar online.'),
+          content: Text(
+            'Vincule um veículo ao seu cadastro para ficar online.',
+          ),
         ),
       );
       return;
