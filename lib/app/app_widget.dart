@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
+import 'package:moto_driver/core/update/mandatory_update_gate.dart';
 import 'package:moto_driver/design_system/design_system.dart';
 
 class AppWidget extends StatefulWidget {
@@ -89,6 +90,7 @@ class _AppWidgetState extends State<AppWidget> with WidgetsBindingObserver {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      builder: (context, child) => MandatoryUpdateGate(child: child!),
     );
   }
 }

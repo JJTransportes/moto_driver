@@ -50,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _userId;
   String? _userPhotoUrl;
   String? _userName;
+  bool? _hasVehicle;
 
   final Set<String> _deniedOrderIds = {};
 
@@ -153,6 +154,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
+              if (_hasVehicle == false) ...[
+                const SizedBox(height: MotoSpace.s4),
+                _buildVehicleRequiredCard(),
+              ],
             ],
           ),
         ),
@@ -172,21 +177,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         builder: (context) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                MotoStatusBadge(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final useStackedControls =
+                    constraints.maxWidth < 300 ||
+                    MediaQuery.textScalerOf(context).scale(12) > 14;
+                final badge = MotoStatusBadge(
                   label: isActive ? 'Recebendo corridas' : 'Modo indisponível',
                   tone: isActive ? MotoTone.success : MotoTone.neutral,
                   live: isActive,
-                ),
-                const Spacer(),
-                Switch(
+                );
+                final availabilitySwitch = Switch(
                   value: isActive,
-                  onChanged: _isTogglingAvailability
+                  onChanged: _isTogglingAvailability || _hasVehicle == false
                       ? null
                       : _onAvailabilityToggled,
-                ),
-              ],
+                );
+
+                if (useStackedControls) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      badge,
+                      const SizedBox(height: MotoSpace.s2),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: availabilitySwitch,
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    badge,
+                    const Spacer(),
+                    availabilitySwitch,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: MotoSpace.s4),
             Text(
@@ -195,6 +224,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleRequiredCard() {
+    return Container(
+      padding: const EdgeInsets.all(MotoSpace.s4),
+      decoration: BoxDecoration(
+        color: context.moto.warning.withValues(alpha: 0.14),
+        borderRadius: MotoRadius.brLg,
+        border: Border.all(color: context.moto.warning.withValues(alpha: 0.55)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: context.moto.warning),
+          const SizedBox(width: MotoSpace.s3),
+          Expanded(
+            child: Text(
+              'Você precisa ter um veículo vinculado para ficar online e receber corridas.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.moto.textPrimary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -282,8 +337,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _checkActiveTravelHttp();
     _connectSignalR();
 
-    _checkAvailability();
-
     // Rede de segurança: re-consulta o estado canônico periodicamente,
     // cobrindo eventos SignalR perdidos (não há replay para o motorista).
     _startActiveTravelPolling();
@@ -342,10 +395,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _loadUserId() async {
     final authStorage = Modular.get<AuthStorage>();
     final userId = await authStorage.getUserId();
+    if (!mounted) return;
     setState(() => _userId = userId);
     if (userId != null) {
       await _loadUserName(userId);
     }
+    if (mounted) _checkAvailability();
   }
 
   Future<void> _loadUserName(String userId) async {
@@ -357,6 +412,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       if (response.statusCode == 200 && response.data != null) {
         final name = response.data['name'] as String?;
+        final hasVehicle = response.data['vehicle'] != null;
         var photoUrl = response.data['photoUrl'] as String?;
         if (photoUrl != null &&
             photoUrl.isNotEmpty &&
@@ -367,7 +423,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         setState(() {
           if (name != null && name.isNotEmpty) _userName = name;
           _userPhotoUrl = photoUrl;
+          _hasVehicle = hasVehicle;
         });
+        if (!hasVehicle) _checkAvailability();
       }
     } catch (_) {
       // Silently fallback — name stays null, ProfileHeader handles gracefully
@@ -696,7 +754,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       setState(() => _availability = availability);
 
-      if (availability.isActive) {
+      if (_hasVehicle == false) {
+        _stopAvailabilityTimer();
+      } else if (availability.isActive) {
         _startAvailabilityTimer();
       } else if (!AvailabilitySheet.isOpen) {
         final result = await AvailabilitySheet.show(
@@ -733,6 +793,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _onAvailabilityToggled(bool value) async {
+    if (value && _hasVehicle == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vincule um veículo ao seu cadastro para ficar online.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final datasource = Modular.get<AvailabilityDatasource>();
     setState(() => _isTogglingAvailability = true);
 

@@ -39,10 +39,14 @@ void main() {
     navigator = MockModularNavigator();
 
     newOrderController = StreamController<Map<String, dynamic>>.broadcast();
-    orderCancelledController = StreamController<Map<String, dynamic>>.broadcast();
-    travelCancelledController = StreamController<Map<String, dynamic>>.broadcast();
-    travelStartedController = StreamController<Map<String, dynamic>>.broadcast();
-    travelCompletedController = StreamController<Map<String, dynamic>>.broadcast();
+    orderCancelledController =
+        StreamController<Map<String, dynamic>>.broadcast();
+    travelCancelledController =
+        StreamController<Map<String, dynamic>>.broadcast();
+    travelStartedController =
+        StreamController<Map<String, dynamic>>.broadcast();
+    travelCompletedController =
+        StreamController<Map<String, dynamic>>.broadcast();
     reconnectingController = StreamController<void>.broadcast();
     reconnectedController = StreamController<void>.broadcast();
     closedController = StreamController<void>.broadcast();
@@ -55,26 +59,49 @@ void main() {
     when(() => authStorage.getUserId()).thenAnswer((_) async => 'user-1');
     when(() => authStorage.getToken()).thenAnswer((_) async => 'token');
 
-    when(() => signalRService.onNewOrder).thenAnswer((_) => newOrderController.stream);
-    when(() => signalRService.onOrderCancelled).thenAnswer((_) => orderCancelledController.stream);
-    when(() => signalRService.onTravelCancelled).thenAnswer((_) => travelCancelledController.stream);
-    when(() => signalRService.onTravelStarted).thenAnswer((_) => travelStartedController.stream);
-    when(() => signalRService.onTravelCompleted).thenAnswer((_) => travelCompletedController.stream);
-    when(() => signalRService.onReconnecting).thenAnswer((_) => reconnectingController.stream);
-    when(() => signalRService.onReconnected).thenAnswer((_) => reconnectedController.stream);
-    when(() => signalRService.onClosed).thenAnswer((_) => closedController.stream);
+    when(
+      () => signalRService.onNewOrder,
+    ).thenAnswer((_) => newOrderController.stream);
+    when(
+      () => signalRService.onOrderCancelled,
+    ).thenAnswer((_) => orderCancelledController.stream);
+    when(
+      () => signalRService.onTravelCancelled,
+    ).thenAnswer((_) => travelCancelledController.stream);
+    when(
+      () => signalRService.onTravelStarted,
+    ).thenAnswer((_) => travelStartedController.stream);
+    when(
+      () => signalRService.onTravelCompleted,
+    ).thenAnswer((_) => travelCompletedController.stream);
+    when(
+      () => signalRService.onReconnecting,
+    ).thenAnswer((_) => reconnectingController.stream);
+    when(
+      () => signalRService.onReconnected,
+    ).thenAnswer((_) => reconnectedController.stream);
+    when(
+      () => signalRService.onClosed,
+    ).thenAnswer((_) => closedController.stream);
     when(() => signalRService.isConnected(any())).thenReturn(true);
-    when(() => signalRService.connect(any(), any(), any())).thenAnswer((_) async {});
+    when(
+      () => signalRService.connect(any(), any(), any()),
+    ).thenAnswer((_) async {});
     when(() => signalRService.disconnect(any())).thenAnswer((_) async {});
     when(() => signalRService.disconnectAll()).thenAnswer((_) async {});
-    when(() => signalRService.reportLocation(any(), any())).thenAnswer((_) async {});
+    when(
+      () => signalRService.reportLocation(any(), any()),
+    ).thenAnswer((_) async {});
 
-    when(() => travelLocalRepository.getActiveTravel()).thenAnswer((_) async => null);
+    when(
+      () => travelLocalRepository.getActiveTravel(),
+    ).thenAnswer((_) async => null);
     when(() => travelLocalRepository.clearTravels()).thenAnswer((_) async {});
 
     when(() => signOutService.signOut()).thenAnswer((_) async {});
-    when(() => locationService.getCurrentPosition())
-        .thenAnswer((_) async => const LocationResult(status: LocationStatus.denied));
+    when(() => locationService.getCurrentPosition()).thenAnswer(
+      (_) async => const LocationResult(status: LocationStatus.denied),
+    );
   });
 
   tearDown(() async {
@@ -89,13 +116,13 @@ void main() {
   });
 
   HomeTestModule buildModule() => HomeTestModule(
-        dio: dio,
-        authStorage: authStorage,
-        signOutService: signOutService,
-        signalRService: signalRService,
-        travelLocalRepository: travelLocalRepository,
-        locationService: locationService,
-      );
+    dio: dio,
+    authStorage: authStorage,
+    signOutService: signOutService,
+    signalRService: signalRService,
+    travelLocalRepository: travelLocalRepository,
+    locationService: locationService,
+  );
 
   /// Stub genérico do GET /api/drivers/{userId} (nome/foto do motorista) e
   /// GET /api/drivers/availability — ambos disparados no initState, mas
@@ -117,11 +144,30 @@ void main() {
     });
   }
 
-  Future<void> pumpHome(WidgetTester tester, {Response<dynamic>? activeTravelResponse}) async {
+  Future<void> pumpHome(
+    WidgetTester tester, {
+    Response<dynamic>? activeTravelResponse,
+    Size? surfaceSize,
+    double textScaleFactor = 1,
+  }) async {
     stubBackgroundCalls(activeTravelResponse: activeTravelResponse);
     initTestModule(buildModule(), navigator);
     addTearDown(destroyTestModule);
-    await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
+    if (surfaceSize != null) {
+      await tester.binding.setSurfaceSize(surfaceSize);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+    }
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(textScaleFactor),
+          ),
+          child: child!,
+        ),
+        home: const HomeScreen(),
+      ),
+    );
     // Não usa pumpAndSettle: o badge "Em andamento" (MotoStatusBadge.trip com
     // live: true) anima em loop infinito (pulso do ponto) — pumpAndSettle
     // nunca converge e estoura timeout sempre que a viagem está InProgress.
@@ -130,77 +176,129 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  testWidgets('sem viagem ativa (204) → mostra "Aguardando novas viagens..."', (tester) async {
+  testWidgets('sem viagem ativa (204) → mostra "Aguardando novas viagens..."', (
+    tester,
+  ) async {
     await pumpHome(tester);
 
     expect(find.text('Aguardando novas viagens...'), findsOneWidget);
     expect(find.text('Viagem ativa'), findsNothing);
   });
 
-  testWidgets('com viagem ativa Accepted → mostra card com nome do passageiro e badge "Aceita"', (tester) async {
-    await pumpHome(
-      tester,
-      activeTravelResponse: okResponse(activeTravelPayload(status: 'Accepted')),
+  for (final viewport in <({String name, Size size, double textScale})>[
+    (name: 'iPhone SE', size: const Size(320, 568), textScale: 1.3),
+    (name: 'iPhone moderno', size: const Size(390, 844), textScale: 1.0),
+    (name: 'Android grande', size: const Size(430, 932), textScale: 1.0),
+  ]) {
+    testWidgets(
+      'motorista sem veículo não causa overflow em ${viewport.name}',
+      (tester) async {
+        await pumpHome(
+          tester,
+          surfaceSize: viewport.size,
+          textScaleFactor: viewport.textScale,
+        );
+
+        expect(
+          find.text(
+            'Você precisa ter um veículo vinculado para ficar online e receber corridas.',
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
     );
+  }
 
-    expect(find.text('Viagem ativa'), findsOneWidget);
-    expect(find.text('Maria Passageira'), findsOneWidget);
-    expect(find.text('Aceita · aguardando'), findsOneWidget);
-  });
+  testWidgets(
+    'com viagem ativa Accepted → mostra card com nome do passageiro e badge "Aceita"',
+    (tester) async {
+      await pumpHome(
+        tester,
+        activeTravelResponse: okResponse(
+          activeTravelPayload(status: 'Accepted'),
+        ),
+      );
 
-  testWidgets('com viagem ativa InProgress → badge "Em andamento"', (tester) async {
+      expect(find.text('Viagem ativa'), findsOneWidget);
+      expect(find.text('Maria Passageira'), findsOneWidget);
+      expect(find.text('Aceita · aguardando'), findsOneWidget);
+    },
+  );
+
+  testWidgets('com viagem ativa InProgress → badge "Em andamento"', (
+    tester,
+  ) async {
     await pumpHome(
       tester,
-      activeTravelResponse: okResponse(activeTravelPayload(status: 'InProgress')),
+      activeTravelResponse: okResponse(
+        activeTravelPayload(status: 'InProgress'),
+      ),
     );
 
     expect(find.text('Em andamento'), findsWidgets);
   });
 
-  testWidgets('tap "Abrir Viagem" → navega para /active-travel com o travelId', (tester) async {
-    when(() => navigator.pushNamed(any(), arguments: any(named: 'arguments')))
-        .thenAnswer((_) async => null);
+  testWidgets(
+    'tap "Abrir Viagem" → navega para /active-travel com o travelId',
+    (tester) async {
+      when(
+        () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
+      ).thenAnswer((_) async => null);
 
-    await pumpHome(
-      tester,
-      activeTravelResponse: okResponse(activeTravelPayload(travelId: 'travel-42')),
-    );
+      await pumpHome(
+        tester,
+        activeTravelResponse: okResponse(
+          activeTravelPayload(travelId: 'travel-42'),
+        ),
+      );
 
-    await tester.tap(find.text('Abrir viagem'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Abrir viagem'));
+      await tester.pumpAndSettle();
 
-    final captured = verify(
-      () => navigator.pushNamed('/active-travel', arguments: captureAny(named: 'arguments')),
-    ).captured;
-    expect(captured.single, {'travelId': 'travel-42'});
-  });
+      final captured = verify(
+        () => navigator.pushNamed(
+          '/active-travel',
+          arguments: captureAny(named: 'arguments'),
+        ),
+      ).captured;
+      expect(captured.single, {'travelId': 'travel-42'});
+    },
+  );
 
-  testWidgets('TravelCancelled (mesmo travelId) → limpa o card e mostra snackbar', (tester) async {
-    await pumpHome(
-      tester,
-      activeTravelResponse: okResponse(activeTravelPayload(travelId: 'travel-1')),
-    );
-    expect(find.text('Viagem ativa'), findsOneWidget);
+  testWidgets(
+    'TravelCancelled (mesmo travelId) → limpa o card e mostra snackbar',
+    (tester) async {
+      await pumpHome(
+        tester,
+        activeTravelResponse: okResponse(
+          activeTravelPayload(travelId: 'travel-1'),
+        ),
+      );
+      expect(find.text('Viagem ativa'), findsOneWidget);
 
-    // O handler de TravelCancelled também re-consulta o estado canônico
-    // (_checkActiveTravelHttp) — sem atualizar o stub, a próxima chamada
-    // devolveria a mesma viagem "ativa" de antes e ressuscitaria o card.
-    stubBackgroundCalls(activeTravelResponse: noContentResponse());
-    travelCancelledController.add({'travelId': 'travel-1'});
-    await tester.pump();
-    await tester.pump();
-    await tester.pump();
+      // O handler de TravelCancelled também re-consulta o estado canônico
+      // (_checkActiveTravelHttp) — sem atualizar o stub, a próxima chamada
+      // devolveria a mesma viagem "ativa" de antes e ressuscitaria o card.
+      stubBackgroundCalls(activeTravelResponse: noContentResponse());
+      travelCancelledController.add({'travelId': 'travel-1'});
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.text('Viagem ativa'), findsNothing);
-    expect(find.text('Aguardando novas viagens...'), findsOneWidget);
-    expect(find.text('Viagem cancelada'), findsOneWidget);
-    verify(() => travelLocalRepository.clearTravels()).called(1);
-  });
+      expect(find.text('Viagem ativa'), findsNothing);
+      expect(find.text('Aguardando novas viagens...'), findsOneWidget);
+      expect(find.text('Viagem cancelada'), findsOneWidget);
+      verify(() => travelLocalRepository.clearTravels()).called(1);
+    },
+  );
 
   testWidgets('TravelCancelled (travelId diferente) → ignora', (tester) async {
     await pumpHome(
       tester,
-      activeTravelResponse: okResponse(activeTravelPayload(travelId: 'travel-1')),
+      activeTravelResponse: okResponse(
+        activeTravelPayload(travelId: 'travel-1'),
+      ),
     );
 
     travelCancelledController.add({'travelId': 'outro'});
@@ -210,15 +308,21 @@ void main() {
     expect(find.text('Viagem ativa'), findsOneWidget);
   });
 
-  testWidgets('TravelStarted → status muda para "Em andamento"', (tester) async {
+  testWidgets('TravelStarted → status muda para "Em andamento"', (
+    tester,
+  ) async {
     await pumpHome(
       tester,
-      activeTravelResponse: okResponse(activeTravelPayload(travelId: 'travel-1', status: 'Accepted')),
+      activeTravelResponse: okResponse(
+        activeTravelPayload(travelId: 'travel-1', status: 'Accepted'),
+      ),
     );
     expect(find.text('Aceita · aguardando'), findsOneWidget);
 
     stubBackgroundCalls(
-      activeTravelResponse: okResponse(activeTravelPayload(travelId: 'travel-1', status: 'InProgress')),
+      activeTravelResponse: okResponse(
+        activeTravelPayload(travelId: 'travel-1', status: 'InProgress'),
+      ),
     );
     travelStartedController.add({'travelId': 'travel-1'});
     await tester.pump();
@@ -228,25 +332,32 @@ void main() {
     expect(find.text('Em andamento'), findsWidgets);
   });
 
-  testWidgets('TravelCompleted (mesmo travelId) → limpa o card e mostra snackbar', (tester) async {
-    await pumpHome(
-      tester,
-      activeTravelResponse: okResponse(activeTravelPayload(travelId: 'travel-1', status: 'InProgress')),
-    );
-    expect(find.text('Viagem ativa'), findsOneWidget);
+  testWidgets(
+    'TravelCompleted (mesmo travelId) → limpa o card e mostra snackbar',
+    (tester) async {
+      await pumpHome(
+        tester,
+        activeTravelResponse: okResponse(
+          activeTravelPayload(travelId: 'travel-1', status: 'InProgress'),
+        ),
+      );
+      expect(find.text('Viagem ativa'), findsOneWidget);
 
-    stubBackgroundCalls(activeTravelResponse: noContentResponse());
-    travelCompletedController.add({'travelId': 'travel-1'});
-    await tester.pump();
-    await tester.pump();
-    await tester.pump();
+      stubBackgroundCalls(activeTravelResponse: noContentResponse());
+      travelCompletedController.add({'travelId': 'travel-1'});
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
 
-    expect(find.text('Viagem ativa'), findsNothing);
-    expect(find.text('Viagem concluída'), findsOneWidget);
-    verify(() => travelLocalRepository.clearTravels()).called(1);
-  });
+      expect(find.text('Viagem ativa'), findsNothing);
+      expect(find.text('Viagem concluída'), findsOneWidget);
+      verify(() => travelLocalRepository.clearTravels()).called(1);
+    },
+  );
 
-  testWidgets('NewOrder sem viagem ativa → exibe o IncomingOrderSheet', (tester) async {
+  testWidgets('NewOrder sem viagem ativa → exibe o IncomingOrderSheet', (
+    tester,
+  ) async {
     // Viewport maior que o padrão do teste (800x600) — o sheet usa 80% da
     // altura da tela; no padrão, o conteúdo do IncomingOrderSheet estoura
     // (RenderFlex overflow), só por causa do tamanho de tela do teste.
@@ -265,53 +376,64 @@ void main() {
     expect(find.text('Nova viagem'), findsOneWidget);
   });
 
-  testWidgets('NewOrder com viagem ativa já carregada → ignora (não mostra o sheet)', (tester) async {
-    await pumpHome(
-      tester,
-      activeTravelResponse: okResponse(activeTravelPayload()),
-    );
+  testWidgets(
+    'NewOrder com viagem ativa já carregada → ignora (não mostra o sheet)',
+    (tester) async {
+      await pumpHome(
+        tester,
+        activeTravelResponse: okResponse(activeTravelPayload()),
+      );
 
-    newOrderController.add(newOrderPayload());
-    await tester.pump();
-    await tester.pumpAndSettle();
+      newOrderController.add(newOrderPayload());
+      await tester.pump();
+      await tester.pumpAndSettle();
 
-    expect(find.text('Nova viagem'), findsNothing);
-  });
+      expect(find.text('Nova viagem'), findsNothing);
+    },
+  );
 
-  testWidgets('onReconnecting → mostra banner; onReconnected → esconde banner', (tester) async {
-    await pumpHome(tester);
-    expect(find.text('Reconectando...'), findsNothing);
+  testWidgets(
+    'onReconnecting → mostra banner; onReconnected → esconde banner',
+    (tester) async {
+      await pumpHome(tester);
+      expect(find.text('Reconectando...'), findsNothing);
 
-    reconnectingController.add(null);
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Reconectando...'), findsOneWidget);
+      reconnectingController.add(null);
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Reconectando...'), findsOneWidget);
 
-    reconnectedController.add(null);
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Reconectando...'), findsNothing);
-  });
+      reconnectedController.add(null);
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Reconectando...'), findsNothing);
+    },
+  );
 
-  testWidgets('sign out: menu → Sair → confirmar → chama SignOutService.signOut()', (tester) async {
-    await pumpHome(tester);
+  testWidgets(
+    'sign out: menu → Sair → confirmar → chama SignOutService.signOut()',
+    (tester) async {
+      await pumpHome(tester);
 
-    await tester.tap(find.byType(PopupMenuButton<String>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Sair'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sair'));
+      await tester.pumpAndSettle();
 
-    // Diálogo de confirmação
-    expect(find.text('Deseja realmente sair?'), findsOneWidget);
-    await tester.tap(find.widgetWithText(TextButton, 'Sair'));
-    await tester.pumpAndSettle();
+      // Diálogo de confirmação
+      expect(find.text('Deseja realmente sair?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Sair'));
+      await tester.pumpAndSettle();
 
-    verify(() => signOutService.signOut()).called(1);
-    verify(() => signalRService.disconnectAll()).called(1);
-    verify(() => travelLocalRepository.clearTravels()).called(1);
-  });
+      verify(() => signOutService.signOut()).called(1);
+      verify(() => signalRService.disconnectAll()).called(1);
+      verify(() => travelLocalRepository.clearTravels()).called(1);
+    },
+  );
 
-  testWidgets('sign out: cancelar no diálogo → não chama signOut', (tester) async {
+  testWidgets('sign out: cancelar no diálogo → não chama signOut', (
+    tester,
+  ) async {
     await pumpHome(tester);
 
     await tester.tap(find.byType(PopupMenuButton<String>));
