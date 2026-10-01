@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/widgets/app_button.dart';
 
 class ConfirmationPage extends StatelessWidget {
@@ -10,7 +10,6 @@ class ConfirmationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -19,17 +18,17 @@ class ConfirmationPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               spacing: 24,
               children: [
-                const Icon(
+                Icon(
                   Icons.check_circle_outline,
                   size: 80,
-                  color: AppColors.primary,
+                  color: context.moto.accent,
                 ),
                 Text(
                   'Cadastro enviado com sucesso!\nAguardando aprovação do administrador.',
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
+                    color: context.moto.accent,
                   ),
                   textAlign: TextAlign.center,
                 ),

@@ -18,7 +18,12 @@ class ProfileUpdateLoading extends ProfileConfigurationState {
 
 class ProfileUpdateSuccess extends ProfileConfigurationState {
   final ProfileEntity profile;
-  ProfileUpdateSuccess({required this.profile});
+
+  /// True quando o e-mail salvo difere do e-mail carregado antes da edição —
+  /// o backend invalida a sessão nesse caso, então o app precisa forçar logout.
+  final bool emailChanged;
+
+  ProfileUpdateSuccess({required this.profile, this.emailChanged = false});
 }
 
 class ProfileUpdateFailure extends ProfileConfigurationState {

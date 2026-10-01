@@ -4,5 +4,10 @@ formatter:
   trailing_commas: preserve
 linter:
   rules:
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
 
 

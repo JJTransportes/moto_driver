@@ -54,17 +54,27 @@ class ProfileConfigurationBloc extends Bloc<ProfileConfigurationEvent, ProfileCo
     final profile = _lastLoadedProfile;
     if (profile == null) return;
 
+    final emailChanged = event.email.trim().toLowerCase() != profile.email.trim().toLowerCase();
+
     emit(ProfileUpdateLoading(profile: profile));
+
+    // O backend rejeita com 403 se o {userId} da URL não for o dono do
+    // token — e o `id` que volta no GET do perfil pode não ser o mesmo
+    // (mesma ressalva já tratada em _onUploadImage). Usa sempre o userId
+    // autenticado, nunca o `profile.id`.
+    final authStorage = Modular.get<AuthStorage>();
+    final authUserId = await authStorage.getUserId();
     final updated = profile.copyWith(
+      id: authUserId ?? profile.id,
       name: event.name,
       email: event.email,
       phone: event.phone,
     );
-    final result = await _updateProfile(updated);
+    final result = await _updateProfile(updated, password: event.password);
     result.fold(
       (profile) {
         _lastLoadedProfile = profile;
-        emit(ProfileUpdateSuccess(profile: profile));
+        emit(ProfileUpdateSuccess(profile: profile, emailChanged: emailChanged));
       },
       (error) => emit(ProfileUpdateFailure(profile: profile, error: error)),
     );

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:moto_driver/core/errors/exceptions.dart';
+import 'package:moto_driver/core/utils/masks.dart';
 import 'package:moto_driver/modules/driver_registration/data/datasources/i_registration_datasource.dart';
 import 'package:moto_driver/modules/driver_registration/domain/usecases/register_params.dart';
 
@@ -15,17 +16,18 @@ class RegistrationDatasource implements IRegistrationDatasource {
       final body = <String, dynamic>{
         'role': 'Driver',
         'fullName': params.fullName,
-        'cpf': params.cpf,
-        'rg': params.rg,
+        // CPF e RG chegam aqui formatados pela máscara do formulário
+        // (ex.: "123.456.789-09", "12.345.678-9"). O backend rejeita
+        // qualquer pontuação nesses dois campos — precisa ir só o valor
+        // "limpo" (unmaskDigits/unmaskRg), nunca o texto exibido no input.
+        'cpf': unmaskDigits(params.cpf),
+        'rg': unmaskRg(params.rg),
         'birthdate': DateFormat('yyyy-MM-dd').format(params.birthdate),
         'email': params.email.trim().toLowerCase(),
         'initialPassword': params.initialPassword,
         'cnh': params.cnh,
+        'registration': params.registration.trim(),
       };
-
-      if (params.registration != null && params.registration!.trim().isNotEmpty) {
-        body['registration'] = params.registration!.trim();
-      }
 
       if (params.department != null && params.department!.trim().isNotEmpty) {
         body['department'] = params.department!.trim();

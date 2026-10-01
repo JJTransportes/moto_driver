@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
+import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/errors/exceptions.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/user_deletion/presentation/blocs/delete_account_bloc.dart';
 import 'package:moto_driver/modules/user_deletion/presentation/blocs/delete_account_event.dart';
 import 'package:moto_driver/modules/user_deletion/presentation/blocs/delete_account_state.dart';
@@ -15,45 +17,59 @@ class DeleteAccountPage extends StatefulWidget {
 }
 
 class _DeleteAccountPageState extends State<DeleteAccountPage> {
-  int _step = 0; // 0 = warning, 1 = password
-  final _passwordController = TextEditingController();
-  bool _isPasswordValid = false;
+  Future<void> _onContinueTapped() async {
+    final password = await _askPasswordToConfirm();
+    if (password == null || password.isEmpty) return;
+    if (!mounted) return;
 
-  @override
-  void initState() {
-    super.initState();
-    _passwordController.addListener(_onPasswordChanged);
-  }
-
-  @override
-  void dispose() {
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  void _onPasswordChanged() {
-    final isValid = _passwordController.text.isNotEmpty;
-    if (isValid != _isPasswordValid) {
-      setState(() => _isPasswordValid = isValid);
-    }
-  }
-
-  void _advanceToPasswordStep() {
-    setState(() => _step = 1);
-  }
-
-  void _goBack() {
-    if (_step == 0) {
-      Navigator.of(context).pop();
-    } else {
-      setState(() => _step = 0);
-    }
-  }
-
-  void _onConfirmDelete() {
     context.read<DeleteAccountBloc>().add(
-          DeleteAccountRequested(password: _passwordController.text),
+          DeleteAccountRequested(password: password),
         );
+  }
+
+  Future<String?> _askPasswordToConfirm() {
+    final passwordController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirme sua senha'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Esta ação é irreversível. Digite sua senha atual para confirmar '
+                'a exclusão da sua conta.',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Senha',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lock_outline),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: context.moto.danger, foregroundColor: context.moto.textOnAccent),
+              onPressed: () => Navigator.of(dialogContext).pop(passwordController.text),
+              child: const Text('Confirmar exclusão'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _handleSuccess() async {
@@ -68,7 +84,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: context.moto.danger,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -86,186 +102,104 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => context.read<DeleteAccountBloc>(),
-      child: PopScope(
-        canPop: _step == 0,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop && _step == 1) {
-            _goBack();
-          }
-        },
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(_step == 0 ? 'Excluir conta' : 'Confirme sua senha'),
-            backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFF4E4E4E),
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _goBack,
-            ),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Excluir conta'),
+          foregroundColor: context.moto.textPrimary,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
           ),
-          backgroundColor: Colors.white,
-          body: BlocListener<DeleteAccountBloc, DeleteAccountState>(
-            listener: (context, state) {
-              if (state is DeleteAccountSuccess) {
-                _handleSuccess();
-              }
-              if (state is DeleteAccountFailure) {
-                _showError(state.error);
-              }
-            },
-            child: Padding(
+        ),
+        body: BlocConsumer<DeleteAccountBloc, DeleteAccountState>(
+          listener: (context, state) {
+            if (state is DeleteAccountSuccess) {
+              _handleSuccess();
+            }
+            if (state is DeleteAccountFailure) {
+              _showError(state.error);
+            }
+          },
+          builder: (context, state) {
+            final isLoading = state is DeleteAccountLoading;
+
+            return Padding(
               padding: const EdgeInsets.all(24),
-              child: _step == 0 ? _buildWarningStep() : _buildPasswordStep(),
-            ),
-          ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: context.moto.danger, size: 32),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Tem certeza que deseja excluir sua conta?',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: context.moto.danger,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Esta ação é irreversível e todos os seus dados, incluindo '
+                    'histórico de viagens, serão perdidos.',
+                    style: TextStyle(fontSize: 16, color: context.moto.textPrimary),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isLoading ? null : _onContinueTapped,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.moto.danger,
+                        foregroundColor: context.moto.textOnAccent,
+                        disabledBackgroundColor: context.moto.borderStrong,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: isLoading
+                          ? SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: context.moto.textOnAccent),
+                            )
+                          : const Text(
+                              'Continuar',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancelar',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
-    );
-  }
-
-  Widget _buildWarningStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 32),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Tem certeza que deseja excluir sua conta?',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.red,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Esta ação é irreversível e todos os seus dados, incluindo '
-          'histórico de viagens, serão perdidos.',
-          style: TextStyle(fontSize: 16, color: Color(0xFF4E4E4E)),
-        ),
-        const SizedBox(height: 32),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _advanceToPasswordStep,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'Continuar',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(fontSize: 16),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPasswordStep() {
-    return BlocBuilder<DeleteAccountBloc, DeleteAccountState>(
-      builder: (context, state) {
-        final isLoading = state is DeleteAccountLoading;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Esta ação é irreversível. Digite sua senha atual '
-              'para confirmar a exclusão da sua conta.',
-              style: TextStyle(fontSize: 16, color: Color(0xFF4E4E4E)),
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              enabled: !isLoading,
-              decoration: const InputDecoration(
-                labelText: 'Senha',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock_outline),
-              ),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: (!_isPasswordValid || isLoading)
-                    ? null
-                    : _onConfirmDelete,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey.shade300,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: isLoading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Confirmar exclusão',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: isLoading ? null : _goBack,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Cancelar',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }

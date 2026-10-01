@@ -98,9 +98,9 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     emit(NotificationServiceConfigurationState());
     try {
       final appId = AppConfig.getOneSignalAppId();
+      // F11: a espera pelo playerId do OneSignal (com teto de 8s como
+      // fallback, não incondicional) já acontece dentro de initialize().
       await _notificationService.initialize(appId);
-
-      await Future.delayed(const Duration(seconds: 8));
     } on Exception catch (e) {
       emit(NotificationServiceFailureState(message: e.toString()));
     }

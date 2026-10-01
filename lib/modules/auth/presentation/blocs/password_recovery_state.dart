@@ -10,9 +10,7 @@ class PasswordRecoveryLoading extends PasswordRecoveryState {
   const PasswordRecoveryLoading();
 }
 
-/// Sempre emitido em caso de sucesso da requisição — inclusive quando o
-/// e-mail não está cadastrado (404), de propósito: a tela não pode revelar
-/// se um e-mail existe ou não na base.
+/// Emitido em caso de sucesso da requisição (202).
 class PasswordRecoverySent extends PasswordRecoveryState {
   final String email;
 
@@ -25,8 +23,8 @@ class PasswordRecoverySent extends PasswordRecoveryState {
   int get hashCode => email.hashCode;
 }
 
-/// Só chega aqui em falha real (rate limit, rede, servidor) — nunca por
-/// e-mail não encontrado.
+/// Erro exibido na própria tela, sem navegar — inclui e-mail não
+/// cadastrado (404), rate limit, rede e servidor.
 class PasswordRecoveryError extends PasswordRecoveryState {
   final String message;
 

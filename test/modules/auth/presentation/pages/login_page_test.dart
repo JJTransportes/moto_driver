@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moto_driver/modules/auth/domain/entities/user_entity.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/login_bloc.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/auth/presentation/pages/login_page.dart';
 
 void main() {
@@ -18,6 +19,7 @@ void main() {
     routes: {
       '/home': (_) => const Scaffold(body: Text('Home')),
       '/recovery': (_) => const Scaffold(body: Text('Recovery')),
+      '/terms': (_) => const Scaffold(body: Text('Terms')),
     },
     home: BlocProvider<LoginBloc>.value(
       value: mockBloc,
@@ -30,7 +32,8 @@ void main() {
 
     await tester.pumpWidget(buildWidget());
 
-    expect(find.text('App Motorista'), findsOneWidget);
+    expect(find.text('APP MOTORISTA'), findsOneWidget);
+    expect(find.text('Bom te ver de novo.'), findsOneWidget);
   });
 
   testWidgets('shows email and password fields', (tester) async {
@@ -58,18 +61,21 @@ void main() {
     expect(find.text('Esqueci minha senha'), findsOneWidget);
   });
 
-  testWidgets('validates empty email', (tester) async {
+  // Regra de negócio: o botão "Entrar" fica desabilitado enquanto o
+  // formulário não estiver completo (ver _isFormComplete em login_page.dart)
+  // — por isso não dá pra "tocar no botão vazio" para revelar as mensagens
+  // de campo obrigatório; o teste correto é verificar que o botão continua
+  // desabilitado nesses cenários.
+  testWidgets('Entrar button stays disabled with empty email', (tester) async {
     when(() => mockBloc.state).thenReturn(const LoginInitial());
 
     await tester.pumpWidget(buildWidget());
 
-    await tester.tap(find.text('Entrar'));
-    await tester.pump();
-
-    expect(find.text('E-mail obrigatório'), findsOneWidget);
+    final button = tester.widget<MotoButton>(find.widgetWithText(MotoButton, 'Entrar'));
+    expect(button.onPressed, isNull);
   });
 
-  testWidgets('validates empty password', (tester) async {
+  testWidgets('Entrar button stays disabled with empty password', (tester) async {
     when(() => mockBloc.state).thenReturn(const LoginInitial());
 
     await tester.pumpWidget(buildWidget());
@@ -78,10 +84,10 @@ void main() {
       find.widgetWithText(TextField, 'Informe seu e-mail'),
       'driver@moto.com',
     );
-    await tester.tap(find.text('Entrar'));
     await tester.pump();
 
-    expect(find.text('Senha obrigatória'), findsOneWidget);
+    final button = tester.widget<MotoButton>(find.widgetWithText(MotoButton, 'Entrar'));
+    expect(button.onPressed, isNull);
   });
 
   testWidgets('adds LoginSubmitted event on form submit', (tester) async {
@@ -93,11 +99,15 @@ void main() {
       find.widgetWithText(TextField, 'Informe seu e-mail'),
       'driver@moto.com',
     );
+    await tester.pump();
     await tester.enterText(
       find.widgetWithText(TextField, 'Informe sua senha'),
       'secret123',
     );
-    await tester.tap(find.text('Entrar'));
+    await tester.pump();
+    final entrarButton = find.text('Entrar');
+    await tester.ensureVisible(entrarButton);
+    await tester.tap(entrarButton);
     await tester.pump();
 
     verify(
@@ -112,7 +122,10 @@ void main() {
 
     await tester.pumpWidget(buildWidget());
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    final button = tester
+        .widgetList<MotoButton>(find.byType(MotoButton))
+        .firstWhere((b) => b.label == 'Entrar');
+    expect(button.loading, isTrue);
   });
 
   testWidgets('shows error message on failure', (tester) async {
@@ -123,22 +136,29 @@ void main() {
     expect(find.text('E-mail ou senha inválidos'), findsOneWidget);
   });
 
-  testWidgets('navigates to home on success', (tester) async {
-    when(() => mockBloc.state).thenReturn(const LoginInitial());
-
-    await tester.pumpWidget(buildWidget());
-
-    // Simulate Bloc emitting LoginSuccess
+  testWidgets('navigates to terms on success', (tester) async {
+    // Simulate Bloc emitting LoginSuccess via the stream — BlocListener
+    // reacts to stream emissions, not to the `.state` getter, so setting
+    // `.state` and calling the mock's `.add()` (a no-op on a mock) never
+    // triggers navigation. `whenListen` (bloc_test) stubs the stream
+    // properly, matching the pattern MockBloc expects.
+    // LoginPage navigates to /terms (not /home) on success — the terms
+    // acceptance flow decides the final destination from there.
     const successUser = UserEntity(
       id: 'u1',
       token: 'tok',
       roles: ['Driver'],
     );
-    when(() => mockBloc.state).thenReturn(LoginSuccess(successUser));
-    mockBloc.add(LoginSubmitted(email: '', password: ''));
+    whenListen(
+      mockBloc,
+      Stream.fromIterable([LoginSuccess(successUser)]),
+      initialState: const LoginInitial(),
+    );
+
+    await tester.pumpWidget(buildWidget());
     await tester.pumpAndSettle();
 
-    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Terms'), findsOneWidget);
   });
 
   testWidgets('navigates to recovery screen on forgot password tap', (tester) async {

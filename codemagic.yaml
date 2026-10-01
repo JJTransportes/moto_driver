@@ -1,18 +1,17 @@
 workflows:
-  android_staging:
+  android_pre_release:
     name: Moto Android Pre Release
     instance_type: mac_mini_m2
     max_build_duration: 30
 
     triggering:
       events: []
-      # push trigger temporarily disabled while the release/pre-release pipelines
-      # are being reconstructed — re-add "- push" under events when ready to
-      # resume automatic builds/publishing on this branch.
+      # Builds and publishing are started manually in Codemagic.
       branch_patterns:
       - pattern: "android_pre_release"
-      - include: false
-      - source: false
+        include: true
+        source: true
+      cancel_previous_builds: true
 
     environment:
       flutter: 3.44.8
@@ -20,6 +19,10 @@ workflows:
       - pre_release
       android_signing:
       - moto_keystore
+
+    cache:
+      cache_paths:
+      - $HOME/.pub-cache
 
     scripts:
     - name: Set up local.properties
@@ -34,8 +37,20 @@ workflows:
         API_BASE_URL=$API_BASE_URL
         ONE_SIGNAL_ID=$ONE_SIGNAL_ID
         EOF
+
+    - name: Run tests
+      script: flutter test
+
+    - name: Determine next build number
+      script: |
+        LATEST_BUILD_NUMBER=$(google-play get-latest-build-number \
+          --package-name "br.com.rockservicos.moto_driver" \
+          --credentials "@env:GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS")
+        NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+        echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
+
     - name: Build App Bundle
-      script: flutter build appbundle --release
+      script: flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER
 
     artifacts:
     - build/**/outputs/**/*.aab
@@ -43,13 +58,6 @@ workflows:
     - flutter_drive.log
 
     publishing:
-      email:
-        recipients:
-        - dev.jr.s.engineer@gmail.com
-        notify:
-          success: false
-          failure: true
-
       google_play:
         credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
         track: "Pre Release"

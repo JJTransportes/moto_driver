@@ -9,13 +9,11 @@ class ConfirmPasswordResetUsecase implements IConfirmPasswordResetUsecase {
 
   @override
   Future<Result<Unit>> call({
-    required String email,
-    required String code,
+    required String resetToken,
     required String newPassword,
   }) {
     return _repository.confirmPasswordReset(
-      email: email,
-      code: code,
+      resetToken: resetToken,
       newPassword: newPassword,
     );
   }

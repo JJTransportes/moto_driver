@@ -20,11 +20,11 @@ class ProfileRepository implements IProfileRepository {
   }
 
   @override
-  Future<Result<ProfileEntity>> updateProfile(ProfileEntity profile) async {
+  Future<Result<ProfileEntity>> updateProfile(ProfileEntity profile, {String? password}) async {
     try {
       final model = await _datasource.updateProfile(
         profile.id,
-        _toModel(profile),
+        _toModel(profile, password: password),
       );
       return Success(model.toEntity());
     } on Exception catch (e) {
@@ -42,13 +42,14 @@ class ProfileRepository implements IProfileRepository {
     }
   }
 
-  ProfileModel _toModel(ProfileEntity entity) {
+  ProfileModel _toModel(ProfileEntity entity, {String? password}) {
     return ProfileModel(
       id: entity.id,
       name: entity.name,
       email: entity.email,
       phone: entity.phone,
       photoUrl: entity.photoUrl,
+      password: password,
     );
   }
 }
