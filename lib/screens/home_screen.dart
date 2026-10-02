@@ -59,9 +59,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _availabilityTimer;
   bool _isTogglingAvailability = false;
 
-  static const _locationReportInterval = Duration(seconds: 30);
-  static const _locationHeartbeatInterval = Duration(minutes: 5);
-  static const _minimumDisplacementMeters = 20.0;
+  static const _locationReportInterval = Duration(seconds: 10);
+  static const _locationHeartbeatInterval = Duration(seconds: 30);
+  static const _minimumDisplacementMeters = 5.0;
 
   @override
   Widget build(BuildContext context) {
@@ -818,11 +818,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (!mounted || result == null) return; // cancelou no sheet
         setState(() => _availability = result);
         _startAvailabilityTimer();
+        await _reportIdleLocation(
+          Modular.get<SignalRService>(),
+          force: true,
+        );
       } else {
         final result = await datasource.deactivate();
         if (!mounted) return;
         setState(() => _availability = result);
         _stopAvailabilityTimer();
+        _lastReportedPosition = null;
+        _lastLocationReportAt = null;
       }
     } catch (e) {
       developer.log('[AVAILABILITY] toggle failed: $e', name: 'availability');
@@ -854,6 +860,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     bool force = false,
   }) async {
     if (!_isAppActive ||
+        _availability?.isActive != true ||
         _currentTravelStatus == 'InProgress' ||
         _locationReportInFlight) {
       return;
