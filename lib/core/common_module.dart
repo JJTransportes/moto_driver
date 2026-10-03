@@ -9,9 +9,12 @@ import 'package:moto_driver/core/local_db/repositories/notifications_local_repos
 import 'package:moto_driver/core/local_db/repositories/profile_local_repository.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
+import 'package:moto_driver/core/location/background_location_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/inotification_service.dart';
+import 'package:moto_driver/core/notifications/notification_channel_service.dart';
 import 'package:moto_driver/core/notifications/one_signal_notification_service.dart';
+import 'package:moto_driver/core/notifications/ride_alerts_channel_notification_service.dart';
 import 'package:moto_driver/modules/auth/data/datasources/auth_datasource.dart';
 import 'package:moto_driver/modules/auth/data/datasources/i_auth_datasource.dart';
 import 'package:moto_driver/modules/auth/data/repositories/auth_repository.dart';
@@ -32,8 +35,20 @@ class CommonModule extends Module {
     i.addSingleton<SignOutService>(SignOutService.new);
     i.addSingleton<SignalRService>(SignalRService.new);
     i.addSingleton<LocationService>(LocationService.new);
-    i.addSingleton<NotificationsLocalRepository>(NotificationsLocalRepository.new);
-    i.addSingleton<INotificationService>(OneSignalNotificationService.new);
+    i.addSingleton<BackgroundLocationService>(BackgroundLocationService.new);
+    i.addSingleton<NotificationsLocalRepository>(
+      NotificationsLocalRepository.new,
+    );
+    // Push (spec push-notification-sounds): o canal dos avisos de corrida, com o som do Moto,
+    // é criado antes de o OneSignal inicializar. O decorador mantém o resto do serviço igual.
+    i.addSingleton<INotificationChannelService>(() => NotificationChannelService());
+    i.addSingleton<OneSignalNotificationService>(OneSignalNotificationService.new);
+    i.addSingleton<INotificationService>(
+      () => RideAlertsChannelNotificationService(
+        Modular.get<OneSignalNotificationService>(),
+        Modular.get<INotificationChannelService>(),
+      ),
+    );
     i.add<IAuthDatasource>(AuthDatasource.new);
     i.add<IAuthRepository>(AuthRepository.new);
     // Compartilhado com o cadastro de motorista (design D4) — CommonModule é

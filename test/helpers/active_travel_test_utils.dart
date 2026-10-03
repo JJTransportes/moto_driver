@@ -4,6 +4,10 @@ import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/modules/chat/data/datasources/phone_dialer.dart';
+import 'package:moto_driver/modules/chat/domain/usecases/i_get_passenger_phone_usecase.dart';
+import 'package:moto_driver/modules/chat/presentation/session/chat_session.dart';
+import '../modules/chat/chat_test_doubles.dart';
 import 'package:moto_driver/screens/active_travel_page.dart';
 
 export 'push_test_utils.dart'
@@ -28,6 +32,9 @@ class ActiveTravelTestModule extends Module {
   final push.MockSignalRService signalRService;
   final push.MockTravelLocalRepository travelLocalRepository;
   final push.MockLocationService locationService;
+  final ChatSession chatSession;
+  final IGetPassengerPhoneUsecase getPassengerPhone;
+  final IPhoneDialer dialer;
 
   ActiveTravelTestModule({
     required this.dio,
@@ -35,7 +42,12 @@ class ActiveTravelTestModule extends Module {
     required this.signalRService,
     required this.travelLocalRepository,
     required this.locationService,
-  });
+    ChatSession? chatSession,
+    IGetPassengerPhoneUsecase? getPassengerPhone,
+    IPhoneDialer? dialer,
+  })  : chatSession = chatSession ?? buildQuietChatSession(),
+        getPassengerPhone = getPassengerPhone ?? MockGetPassengerPhoneUsecase(),
+        dialer = dialer ?? MockPhoneDialer();
 
   @override
   void binds(Injector i) {
@@ -44,6 +56,9 @@ class ActiveTravelTestModule extends Module {
     i.addInstance<SignalRService>(signalRService);
     i.addInstance<TravelLocalRepository>(travelLocalRepository);
     i.addInstance<LocationService>(locationService);
+    i.addInstance<ChatSession>(chatSession);
+    i.addInstance<IGetPassengerPhoneUsecase>(getPassengerPhone);
+    i.addInstance<IPhoneDialer>(dialer);
   }
 
   @override
@@ -74,9 +89,11 @@ Map<String, dynamic> travelPayload({
   String? passengerId = 'passenger-1',
   String? passengerName = 'Maria Passageira',
   List<Map<String, dynamic>>? routes,
+  String? pickupProximity,
 }) =>
     {
       'status': status,
+      if (pickupProximity != null) 'pickupProximity': pickupProximity,
       'passengerId': passengerId,
       'passengerName': passengerName,
       'createdAt': '2026-01-01T10:00:00Z',

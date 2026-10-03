@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
+import 'package:moto_driver/core/location/background_location_service.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
@@ -46,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Position? _lastReportedPosition;
   DateTime? _lastLocationReportAt;
   bool _locationReportInFlight = false;
+  bool _backgroundPermissionPromptOpen = false;
   bool _isAppActive = true;
   String? _userId;
   String? _userPhotoUrl;
@@ -59,9 +61,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _availabilityTimer;
   bool _isTogglingAvailability = false;
 
-  static const _locationReportInterval = Duration(seconds: 30);
-  static const _locationHeartbeatInterval = Duration(minutes: 5);
-  static const _minimumDisplacementMeters = 20.0;
+  static const _locationReportInterval = Duration(seconds: 5);
+  static const _locationHeartbeatInterval = Duration(seconds: 5);
+  static const _minimumDisplacementMeters = 5.0;
 
   @override
   Widget build(BuildContext context) {
@@ -756,8 +758,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       if (_hasVehicle == false) {
         _stopAvailabilityTimer();
+        await Modular.get<BackgroundLocationService>().stop();
       } else if (availability.isActive) {
         _startAvailabilityTimer();
+        await _ensureBackgroundLocation();
       } else if (!AvailabilitySheet.isOpen) {
         final result = await AvailabilitySheet.show(
           context,
@@ -766,6 +770,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (!mounted || result == null) return; // cancelou — permanece inactive
         setState(() => _availability = result);
         _startAvailabilityTimer();
+        await _ensureBackgroundLocation();
       }
     } catch (e) {
       // RF06: falha silenciosa — re-tenta na próxima entrada do app
@@ -783,6 +788,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {}); // recalcula a contagem regressiva
       if (availability.isExpired) {
         _stopAvailabilityTimer(); // indicador passa a exibir ramo inativo
+        unawaited(Modular.get<BackgroundLocationService>().stop());
       }
     });
   }
@@ -818,11 +824,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if (!mounted || result == null) return; // cancelou no sheet
         setState(() => _availability = result);
         _startAvailabilityTimer();
+        await _ensureBackgroundLocation();
+        await _reportIdleLocation(
+          Modular.get<SignalRService>(),
+          force: true,
+        );
       } else {
         final result = await datasource.deactivate();
         if (!mounted) return;
         setState(() => _availability = result);
         _stopAvailabilityTimer();
+        await Modular.get<BackgroundLocationService>().stop();
+        _lastReportedPosition = null;
+        _lastLocationReportAt = null;
       }
     } catch (e) {
       developer.log('[AVAILABILITY] toggle failed: $e', name: 'availability');
@@ -836,6 +850,78 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } finally {
       if (mounted) setState(() => _isTogglingAvailability = false);
     }
+  }
+
+  Future<void> _ensureBackgroundLocation() async {
+    if (_availability?.isActive != true || _hasVehicle == false) return;
+    final service = Modular.get<BackgroundLocationService>();
+    final permission = await service.requestPermissions();
+    if (!mounted) return;
+
+    if (permission == BackgroundLocationPermissionStatus.granted) {
+      await service.start();
+      return;
+    }
+    if (_backgroundPermissionPromptOpen) return;
+
+    String title = 'Permissão de localização necessária';
+    String message =
+        'Ative a localização para compartilhar sua posição durante o atendimento.';
+    bool openAppSettings = false;
+    bool openLocationSettings = false;
+
+    switch (permission) {
+      case BackgroundLocationPermissionStatus.backgroundLocationRequired:
+        title = 'Permita a localização o tempo todo';
+        message =
+            'Para continuar sendo acompanhado com a tela bloqueada ou com o Motô em segundo plano, abra as configurações, toque em Permissões, depois em Localização e selecione “Permitir o tempo todo”.';
+        openAppSettings = true;
+      case BackgroundLocationPermissionStatus.locationDeniedForever:
+        message =
+            'A permissão foi bloqueada. Abra as configurações do aplicativo e permita o acesso à localização.';
+        openAppSettings = true;
+      case BackgroundLocationPermissionStatus.notificationsDenied:
+        title = 'Permita as notificações';
+        message =
+            'O Android exige uma notificação fixa enquanto a localização é compartilhada em segundo plano. Ative as notificações nas configurações.';
+        openAppSettings = true;
+      case BackgroundLocationPermissionStatus.serviceDisabled:
+        title = 'Ative o GPS';
+        message = 'O serviço de localização do aparelho está desligado.';
+        openLocationSettings = true;
+      case BackgroundLocationPermissionStatus.locationDenied:
+      case BackgroundLocationPermissionStatus.unsupported:
+      case BackgroundLocationPermissionStatus.granted:
+        break;
+    }
+
+    _backgroundPermissionPromptOpen = true;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Agora não'),
+          ),
+          if (openAppSettings || openLocationSettings)
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                if (openLocationSettings) {
+                  await Geolocator.openLocationSettings();
+                } else {
+                  await Geolocator.openAppSettings();
+                }
+              },
+              child: const Text('Abrir configurações'),
+            ),
+        ],
+      ),
+    );
+    _backgroundPermissionPromptOpen = false;
   }
 
   void _startLocationReporting(SignalRService signalR) {
@@ -854,6 +940,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     bool force = false,
   }) async {
     if (!_isAppActive ||
+        _availability?.isActive != true ||
         _currentTravelStatus == 'InProgress' ||
         _locationReportInFlight) {
       return;
@@ -861,7 +948,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _locationReportInFlight = true;
     try {
       // F04: enquanto a viagem está InProgress, o ActiveTravelPage já
-      // reporta a posição via SignalR a cada 10s (canal mais frequente e
+      // reporta a posição via SignalR a cada 5s (canal mais frequente e
       // mais relevante nesse momento) — pausar este canal da Home evita
       // dois canais de localização simultâneos, ao mesmo tempo, para o
       // mesmo motorista. Retoma sozinho no próximo tick assim que a

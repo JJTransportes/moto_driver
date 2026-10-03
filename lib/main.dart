@@ -4,12 +4,16 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/app/app_module.dart';
 import 'package:moto_driver/app/app_widget.dart';
 import 'package:moto_driver/core/config/app_config.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:moto_driver/core/location/background_location_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load();
   await AppConfig.loadEnv();
+  FlutterForegroundTask.initCommunicationPort();
+  BackgroundLocationService.initialize();
 
   runApp(
     ModularApp(

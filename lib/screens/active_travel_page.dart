@@ -11,6 +11,12 @@ import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/design_system/design_system.dart';
+import 'package:moto_driver/modules/chat/data/datasources/phone_dialer.dart';
+import 'package:moto_driver/modules/chat/domain/usecases/i_get_passenger_phone_usecase.dart';
+import 'package:moto_driver/modules/chat/presentation/session/chat_session.dart';
+import 'package:moto_driver/modules/chat/presentation/widgets/call_passenger_button.dart';
+import 'package:moto_driver/modules/chat/presentation/widgets/chat_action_button.dart';
+import 'package:moto_driver/widgets/pickup_proximity_banner.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ActiveTravelPage extends StatefulWidget {
@@ -22,7 +28,8 @@ class ActiveTravelPage extends StatefulWidget {
   State<ActiveTravelPage> createState() => _ActiveTravelPageState();
 }
 
-class _ActiveTravelPageState extends State<ActiveTravelPage> {
+class _ActiveTravelPageState extends State<ActiveTravelPage>
+    with WidgetsBindingObserver {
   bool _isLoading = true;
   String? _error;
 
@@ -52,6 +59,13 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   int _locationFailureStreak = 0;
   bool _locationUnavailable = false;
   StreamSubscription<Map<String, dynamic>>? _travelCancelledSub;
+  StreamSubscription<Map<String, dynamic>>? _driverNearbySub;
+  StreamSubscription<Map<String, dynamic>>? _driverArrivedSub;
+  StreamSubscription<void>? _reconnectedSub;
+
+  // Spec pickup-arrival-alerts: só faz sentido em Accepted; nunca regride
+  // (arrived não volta a nearby se um evento atrasado chegar fora de ordem).
+  PickupProximity _pickupProximity = PickupProximity.none;
 
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
@@ -91,6 +105,69 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
           );
           _goHome();
         });
+
+    WidgetsBinding.instance.addObserver(this);
+    final signalR = Modular.get<SignalRService>();
+    _driverNearbySub = signalR.onDriverNearby.listen(_onProximityAlert);
+    _driverArrivedSub = signalR.onDriverArrived.listen(_onProximityAlert);
+    // Um alerta emitido com o hub fora do ar não é reenviado: ao reconectar,
+    // reidrata pelo estado da viagem.
+    _reconnectedSub = signalR.onReconnected.listen((_) => _refreshPickupProximity());
+  }
+
+  /// Abre o chat temporário da viagem (spec pickup-chat-call).
+  void _openChat() {
+    Modular.to.pushNamed(
+      '/chat/',
+      arguments: {'travelId': widget.travelId, 'title': 'Chat com o passageiro'},
+    );
+  }
+
+  /// `DriverNearby` / `DriverArrived` do hub `travel-management`.
+  /// `data` = `{travelId, kind: "Nearby"|"Arrived", occurredAt}`.
+  void _onProximityAlert(Map<String, dynamic> data) {
+    if (!mounted || _status != 'Accepted') return;
+    if (data['travelId'] != widget.travelId) return;
+
+    final next = PickupProximity.parse(data['kind'] as String?);
+    if (next.index <= _pickupProximity.index) return;
+    setState(() => _pickupProximity = next);
+  }
+
+  static PickupProximity _maxProximity(PickupProximity a, PickupProximity b) =>
+      b.index > a.index ? b : a;
+
+  /// Reidrata só a indicação de proximidade pelo estado atual da viagem —
+  /// para o app que volta do segundo plano ou reconecta o hub e perdeu um
+  /// alerta. Best-effort: falha silenciosa, não derruba a tela.
+  Future<void> _refreshPickupProximity() async {
+    if (!mounted || _status != 'Accepted') return;
+    try {
+      final response = await Modular.get<Dio>().get(
+        '${AppConfig.getBaseUrl()}/api/travels/${widget.travelId}',
+      );
+      if (!mounted) return;
+
+      final data = response.data as Map<String, dynamic>;
+      if (data['status'] != 'Accepted') return;
+
+      final next = _maxProximity(
+        _pickupProximity,
+        PickupProximity.parse(data['pickupProximity'] as String?),
+      );
+      if (next != _pickupProximity) {
+        setState(() => _pickupProximity = next);
+      }
+    } catch (_) {
+      // Best-effort — o próximo evento ou resume tenta de novo.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshPickupProximity();
+    }
   }
 
   void _extractRouteArgs() {
@@ -110,6 +187,15 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
   void dispose() {
     _locationTimer?.cancel();
     _travelCancelledSub?.cancel();
+    _driverNearbySub?.cancel();
+    _driverArrivedSub?.cancel();
+    _reconnectedSub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    try {
+      Modular.get<ChatSession>().stop();
+    } catch (_) {
+      // Módulo já descartado: nada a parar.
+    }
     // F07: NÃO desconectar 'travel-management' aqui — é a mesma conexão que
     // a HomeScreen usa (reportLocation em modo idle, eventos de viagem) e
     // continua montada por baixo desta página. Desconectar deixava a Home
@@ -139,6 +225,12 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
         _passengerName = data['passengerName'] as String?;
         _passengerPhotoUrl = data['passengerPhotoUrl'] as String?;
         _requestedAt = DateTime.tryParse(data['createdAt']?.toString() ?? '');
+        _pickupProximity = _status == 'Accepted'
+            ? _maxProximity(
+                _pickupProximity,
+                PickupProximity.parse(data['pickupProximity'] as String?),
+              )
+            : PickupProximity.none;
 
         // Parse routes from API response (fallback if not passed via args)
         if (_pickupRoute == null && routes.isNotEmpty) {
@@ -178,6 +270,14 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
       });
 
       _updateMapMarkers();
+
+      // Chat temporário (spec pickup-chat-call): só existe em Accepted.
+      final chatSession = Modular.get<ChatSession>();
+      if (_status == 'Accepted') {
+        chatSession.start(widget.travelId);
+      } else {
+        chatSession.stop();
+      }
 
       final authStorage = Modular.get<AuthStorage>();
       _authToken = await authStorage.getToken();
@@ -259,7 +359,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
     _locationTimer?.cancel();
     _reportTravelLocation();
     _locationTimer = Timer.periodic(
-      const Duration(seconds: 10),
+      const Duration(seconds: 5),
       (_) => _reportTravelLocation(),
     );
   }
@@ -776,6 +876,31 @@ class _ActiveTravelPageState extends State<ActiveTravelPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (isAccepted)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: CallPassengerButton(
+                            travelId: widget.travelId,
+                            getPassengerPhone: Modular.get<IGetPassengerPhoneUsecase>(),
+                            dialer: Modular.get<IPhoneDialer>(),
+                            onOpenChat: _openChat,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ChatActionButton(
+                            session: Modular.get<ChatSession>(),
+                            onPressed: _openChat,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (isAccepted)
+                  PickupProximityBanner(proximity: _pickupProximity),
                 if (_requestedAt != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
