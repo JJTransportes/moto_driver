@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'dart:developer' show log;
 
@@ -11,6 +10,7 @@ import 'package:moto_driver/core/local_db/repositories/profile_local_repository.
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/modules/driver_availability/data/datasources/availability_datasource.dart';
+import 'package:moto_driver/core/location/background_location_service.dart';
 
 class SignOutService {
   final AuthStorage _authStorage;
@@ -20,6 +20,7 @@ class SignOutService {
   final TravelLocalRepository _travelLocal;
   final TermsStorage _termsStorage;
   final AvailabilityDatasource _availability;
+  final BackgroundLocationService _backgroundLocation;
 
   SignOutService(
     this._authStorage,
@@ -29,6 +30,7 @@ class SignOutService {
     this._travelLocal,
     this._termsStorage,
     this._availability,
+    this._backgroundLocation,
   );
 
   /// Limpa a sessão e volta para o login.
@@ -38,10 +40,17 @@ class SignOutService {
   /// o caminho de recuperação de sessão inválida, então a navegação para
   /// `/login` tem que acontecer mesmo que alguma limpeza falhe.
   Future<void> signOut() async {
+    await _runSafely(
+      'serviço de localização em segundo plano',
+      _backgroundLocation.stop,
+    );
     try {
       await _availability.deactivate();
     } catch (e) {
-      log('[AVAILABILITY] deactivate failed on signOut: $e', name: 'availability');
+      log(
+        '[AVAILABILITY] deactivate failed on signOut: $e',
+        name: 'availability',
+      );
     }
 
     // Device binding: libera a sessão no backend (device=NULL nos tokens

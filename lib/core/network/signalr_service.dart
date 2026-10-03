@@ -10,6 +10,10 @@ class SignalRService {
   final _travelStartedController = StreamController<Map<String, dynamic>>.broadcast();
   final _travelCompletedController = StreamController<Map<String, dynamic>>.broadcast();
   final _travelCancelledController = StreamController<Map<String, dynamic>>.broadcast();
+  final _driverNearbyController = StreamController<Map<String, dynamic>>.broadcast();
+  final _driverArrivedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _chatMessageController = StreamController<Map<String, dynamic>>.broadcast();
+  final _chatClosedController = StreamController<Map<String, dynamic>>.broadcast();
   final _reconnectingController = StreamController<void>.broadcast();
   final _reconnectedController = StreamController<void>.broadcast();
   final _closedController = StreamController<void>.broadcast();
@@ -22,6 +26,10 @@ class SignalRService {
   Stream<Map<String, dynamic>> get onTravelCancelled => _travelCancelledController.stream;
   Stream<Map<String, dynamic>> get onTravelCompleted => _travelCompletedController.stream;
   Stream<Map<String, dynamic>> get onTravelStarted => _travelStartedController.stream;
+  Stream<Map<String, dynamic>> get onDriverNearby => _driverNearbyController.stream;
+  Stream<Map<String, dynamic>> get onDriverArrived => _driverArrivedController.stream;
+  Stream<Map<String, dynamic>> get onChatMessageReceived => _chatMessageController.stream;
+  Stream<Map<String, dynamic>> get onChatClosed => _chatClosedController.stream;
 
   /// Conecta a um hub específico, identificado por [hubName].
   /// Se já existir uma conexão com o mesmo nome, ela é recriada.
@@ -94,6 +102,10 @@ class SignalRService {
     _travelStartedController.close();
     _travelCompletedController.close();
     _travelCancelledController.close();
+    _driverNearbyController.close();
+    _driverArrivedController.close();
+    _chatMessageController.close();
+    _chatClosedController.close();
     _reconnectingController.close();
     _reconnectedController.close();
     _closedController.close();
@@ -160,6 +172,29 @@ class SignalRService {
         connection.on('TravelCancelled', (args) {
           if (args != null && args.isNotEmpty) {
             _travelCancelledController.add(args.first as Map<String, dynamic>);
+          }
+        });
+        // Spec pickup-arrival-alerts: o backend avisa motorista e passageiro quando o
+        // motorista está próximo do embarque e quando chegou (viagem em Accepted).
+        connection.on('DriverNearby', (args) {
+          if (args != null && args.isNotEmpty) {
+            _driverNearbyController.add(args.first as Map<String, dynamic>);
+          }
+        });
+        connection.on('DriverArrived', (args) {
+          if (args != null && args.isNotEmpty) {
+            _driverArrivedController.add(args.first as Map<String, dynamic>);
+          }
+        });
+        // Spec pickup-chat-call: chat temporário (só em Accepted), sem push.
+        connection.on('ChatMessageReceived', (args) {
+          if (args != null && args.isNotEmpty) {
+            _chatMessageController.add(args.first as Map<String, dynamic>);
+          }
+        });
+        connection.on('ChatClosed', (args) {
+          if (args != null && args.isNotEmpty) {
+            _chatClosedController.add(args.first as Map<String, dynamic>);
           }
         });
         break;

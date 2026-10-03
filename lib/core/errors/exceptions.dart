@@ -95,3 +95,11 @@ class UnapprovedAccountException implements Exception {
   @override
   String toString() => message;
 }
+
+/// 403: o usuário não participa da viagem (chat do trecho de busca).
+class ForbiddenException implements Exception {
+  final String message;
+  const ForbiddenException([this.message = 'Ação não permitida.']);
+  @override
+  String toString() => message;
+}
