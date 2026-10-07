@@ -14,7 +14,7 @@ import 'package:flutter/services.dart';
 class RideAlertsChannel {
   RideAlertsChannel._();
 
-  static const String id = 'moto_ride_alerts_v1';
+  static const String id = 'moto_ride_alerts_v2';
 
   /// Nome visível ao usuário nas configurações do sistema.
   static const String name = 'Avisos de corrida';
@@ -32,7 +32,9 @@ abstract class INotificationChannelService {
 }
 
 class NotificationChannelService implements INotificationChannelService {
-  static const MethodChannel _channel = MethodChannel('moto/notification_channel');
+  static const MethodChannel _channel = MethodChannel(
+    'moto/notification_channel',
+  );
 
   final bool Function() _isAndroid;
   final void Function(String message) _log;
@@ -40,8 +42,10 @@ class NotificationChannelService implements INotificationChannelService {
   NotificationChannelService({
     bool Function()? isAndroid,
     void Function(String message)? log,
-  })  : _isAndroid = isAndroid ?? (() => !kIsWeb && Platform.isAndroid),
-        _log = log ?? ((message) => developer.log(message, name: 'push', level: 900));
+  }) : _isAndroid = isAndroid ?? (() => !kIsWeb && Platform.isAndroid),
+       _log =
+           log ??
+           ((message) => developer.log(message, name: 'push', level: 900));
 
   @override
   Future<void> ensureRideAlertsChannel() async {

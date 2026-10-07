@@ -46,7 +46,9 @@ class ChatDatasource implements IChatDatasource {
   @override
   Future<Map<String, dynamic>> getPassengerContact(String travelId) async {
     try {
-      final response = await _dio.get('/api/travels/$travelId/passenger-contact');
+      final response = await _dio.get(
+        '/api/travels/$travelId/passenger-contact',
+      );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       throw _mapDioException(e);
@@ -80,7 +82,8 @@ class ChatDatasource implements IChatDatasource {
         );
       case var code when code != null && code >= 500:
         return ServerException(
-          serverMessage ?? 'Não foi possível enviar a mensagem. Tente novamente.',
+          serverMessage ??
+              'Não foi possível enviar a mensagem. Tente novamente.',
         );
       default:
         if (e.type == DioExceptionType.connectionTimeout ||

@@ -128,8 +128,9 @@ class _ChatPageState extends State<ChatPage> {
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () =>
-                  BlocProvider.of<ChatBloc>(context).add(ChatStarted(widget.travelId)),
+              onPressed: () => BlocProvider.of<ChatBloc>(
+                context,
+              ).add(ChatStarted(widget.travelId)),
               child: const Text('Tentar novamente'),
             ),
           ],
@@ -223,9 +224,7 @@ class _Bubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final failed = item.status == ChatItemStatus.failed;
-    final bubbleColor = item.mine
-        ? context.moto.accent
-        : context.moto.bgRaised;
+    final bubbleColor = item.mine ? context.moto.accent : context.moto.bgRaised;
     final textColor = item.mine ? Colors.white : context.moto.textPrimary;
 
     return Align(

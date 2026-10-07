@@ -151,6 +151,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       _cpfController.text.trim().isNotEmpty &&
       _rgController.text.trim().isNotEmpty &&
       _registrationController.text.trim().isNotEmpty &&
+      validators.validatePhone(_phoneController.text) == null &&
       _birthdate != null &&
       validators.validateEmailFormat(_emailController.text.trim()) == null &&
       _confirmEmailController.text.trim().toLowerCase() ==
@@ -290,10 +291,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
         valid = false;
       }
 
-      if (_phoneController.text.trim().isNotEmpty) {
-        _phoneError = validators.validatePhone(_phoneController.text);
-        if (_phoneError != null) valid = false;
-      }
+      _phoneError = validators.validatePhone(_phoneController.text);
+      if (_phoneError != null) valid = false;
 
       if (_cnhController.text.trim().isEmpty) {
         _cnhError = 'Campo obrigatório';
@@ -317,9 +316,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       birthdate: _birthdate!,
       email: _emailController.text.trim(),
       initialPassword: _passwordController.text,
-      phone: _phoneController.text.trim().isEmpty
-          ? null
-          : _phoneController.text.trim(),
+      phone: _phoneController.text.trim(),
       cnh: _cnhController.text.trim(),
     );
 
@@ -461,7 +458,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     maxLength: 30,
                   ),
                   AppTextField(
-                    label: 'Telefone',
+                    label: 'Telefone *',
                     hint: '(12) 91234-5678',
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,

@@ -77,29 +77,42 @@ class ProfileDatasource implements IProfileDatasource {
     switch (e.response?.statusCode) {
       case 400:
         return ValidationException(
-          _extractErrorMessage(e) ?? 'Dados inválidos. Verifique as informações e tente novamente.',
+          _extractErrorMessage(e) ??
+              'Dados inválidos. Verifique as informações e tente novamente.',
         );
       case 401:
-        return const UnauthorizedException('Sessão expirada. Faça login novamente.');
+        return const UnauthorizedException(
+          'Sessão expirada. Faça login novamente.',
+        );
       case 403:
-        return const UnauthorizedException('Você só pode editar o próprio perfil.');
+        return const UnauthorizedException(
+          'Você só pode editar o próprio perfil.',
+        );
       case 404:
         return const NotFoundException('Perfil não encontrado.');
       case 413:
-        return const ValidationException('Arquivo muito grande. Envie uma imagem menor.');
+        return const ValidationException(
+          'Arquivo muito grande. Envie uma imagem menor.',
+        );
       case 415:
-        return const ValidationException('Formato de arquivo não suportado. Use JPEG ou PNG.');
+        return const ValidationException(
+          'Formato de arquivo não suportado. Use JPEG ou PNG.',
+        );
       case var code when code != null && code >= 500:
         return const ServerException(
           'Erro interno do servidor. Tente novamente mais tarde.',
         );
       default:
-        if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout || e.type == DioExceptionType.connectionError) {
+        if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError) {
           return const NetworkException(
             'Erro de conexão. Verifique sua internet e tente novamente.',
           );
         }
-        return NetworkException(e.message ?? 'Erro inesperado. Tente novamente.');
+        return NetworkException(
+          e.message ?? 'Erro inesperado. Tente novamente.',
+        );
     }
   }
 
@@ -108,7 +121,8 @@ class ProfileDatasource implements IProfileDatasource {
   String? _extractErrorMessage(DioException e) {
     final data = e.response?.data;
     if (data is Map) {
-      final raw = data['error'] ?? data['message'] ?? data['detail'] ?? data['title'];
+      final raw =
+          data['error'] ?? data['message'] ?? data['detail'] ?? data['title'];
       if (raw is String && raw.isNotEmpty) return raw;
     }
     if (data is String && data.isNotEmpty) return data;

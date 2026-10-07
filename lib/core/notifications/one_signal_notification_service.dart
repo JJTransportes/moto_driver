@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/local_db/repositories/notifications_local_repository.dart';
 import 'package:moto_driver/core/notifications/inotification_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
@@ -20,6 +21,7 @@ class OneSignalNotificationService implements INotificationService {
   final Dio _dio;
   final NotificationsLocalRepository _notificationsLocalRepository;
   bool _initialized = false;
+  bool _openingNotification = false;
 
   @override
   Future<void> initialize(String appId) async {
@@ -147,9 +149,99 @@ class OneSignalNotificationService implements INotificationService {
       return;
     }
 
+    // Uma notificação de oferta pode continuar na bandeja depois que ela já
+    // foi aceita. Ao tocá-la durante uma viagem, abrir /order-refresh em
+    // paralelo com a restauração da viagem criava duas navegações no mesmo
+    // frame e corrompia a árvore do Navigator. Nesse caso, a viagem ativa é a
+    // fonte canônica e o toque apenas deve levá-la para a frente.
+    final activeTravelId = await _loadCanonicalActiveTravelId();
+    if (activeTravelId != null) {
+      try {
+        NotificationService.clearPendingOrder();
+        unawaited(dismissNewOrder(orderId));
+        if (Modular.to.path != '/active-travel' && !_openingNotification) {
+          _openingNotification = true;
+          Modular.to.navigate(
+            '/active-travel',
+            arguments: {'travelId': activeTravelId},
+          );
+        }
+      } catch (error, stackTrace) {
+        NotificationService.setPendingOrder(orderId);
+        log(
+          '[PUSH] Active travel navigation is not ready.',
+          name: 'push',
+          error: error,
+          stackTrace: stackTrace,
+          level: 900,
+        );
+      } finally {
+        _openingNotification = false;
+      }
+      return;
+    }
+
     NotificationService.setPendingOrder(orderId);
 
-    Modular.to.pushNamed('/order-refresh', arguments: {'orderId': orderId});
+    // Durante login/termos/bootstrap o Navigator ainda está sendo montado.
+    // Conserva o pedido para a Home consumi-lo depois, sem disputar navegação.
+    try {
+      final path = Modular.to.path;
+      if (path == '/' ||
+          path == '/login' ||
+          path == '/terms' ||
+          path == '/bootstrap') {
+        return;
+      }
+      if (await Modular.get<AuthStorage>().getRefreshToken() == null) return;
+      if (_openingNotification || path == '/order-refresh') return;
+    } catch (error, stackTrace) {
+      log(
+        '[PUSH] Navigation is not ready; order kept pending.',
+        name: 'push',
+        error: error,
+        stackTrace: stackTrace,
+        level: 900,
+      );
+      return;
+    }
+
+    _openingNotification = true;
+    try {
+      await Modular.to.pushNamed(
+        '/order-refresh',
+        arguments: {'orderId': orderId},
+      );
+    } catch (error, stackTrace) {
+      log(
+        '[PUSH] Could not open order; order kept pending.',
+        name: 'push',
+        error: error,
+        stackTrace: stackTrace,
+        level: 900,
+      );
+    } finally {
+      _openingNotification = false;
+    }
+  }
+
+  /// O cache local pode conter uma viagem já encerrada. Só impede a abertura
+  /// de uma oferta quando o backend confirmar uma viagem realmente ativa.
+  Future<String?> _loadCanonicalActiveTravelId() async {
+    try {
+      final response = await _dio.get('/api/travels/active');
+      if (response.statusCode != 200 || response.data is! Map) return null;
+      final data = Map<String, dynamic>.from(response.data as Map);
+      final travelId = data['travelId'];
+      return travelId is String && travelId.isNotEmpty ? travelId : null;
+    } catch (e) {
+      log(
+        '[PUSH] Could not confirm active travel; opening the order instead.',
+        name: 'push',
+        level: 900,
+      );
+      return null;
+    }
   }
 
   @override

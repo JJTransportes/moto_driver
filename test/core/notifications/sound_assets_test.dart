@@ -9,6 +9,8 @@ const _name = 'moto_notification.wav';
 const _android = 'android/app/src/main/res/raw/$_name';
 const _ios = 'ios/Runner/$_name';
 const _pbxproj = 'ios/Runner.xcodeproj/project.pbxproj';
+const _entitlements = 'ios/Runner/Runner.entitlements';
+const _infoPlist = 'ios/Runner/Info.plist';
 
 void main() {
   late Uint8List androidBytes;
@@ -29,9 +31,12 @@ void main() {
     expect(iosBytes, androidBytes);
   });
 
-  test('o nome é minúsculo, com _ e extensão .wav (exigência do Android e do OneSignal)', () {
-    expect(_name, matches(RegExp(r'^[a-z0-9_]+\.wav$')));
-  });
+  test(
+    'o nome é minúsculo, com _ e extensão .wav (exigência do Android e do OneSignal)',
+    () {
+      expect(_name, matches(RegExp(r'^[a-z0-9_]+\.wav$')));
+    },
+  );
 
   group('formato do arquivo', () {
     late ByteData header;
@@ -48,16 +53,19 @@ void main() {
       expect(header.getUint32(4, Endian.little) + 8, androidBytes.length);
     });
 
-    test('tem duração entre 3 e 6 segundos (som repetido 2 vezes) e bem abaixo de 30 s', () {
-      final channels = header.getUint16(22, Endian.little);
-      final rate = header.getUint32(24, Endian.little);
-      final bits = header.getUint16(34, Endian.little);
-      final dataSize = header.getUint32(40, Endian.little);
-      final seconds = dataSize / (rate * channels * bits / 8);
+    test(
+      'tem duração entre 20 e 30 segundos (bloco repetido 11 vezes) e bem abaixo de 30 s',
+      () {
+        final channels = header.getUint16(22, Endian.little);
+        final rate = header.getUint32(24, Endian.little);
+        final bits = header.getUint16(34, Endian.little);
+        final dataSize = header.getUint32(40, Endian.little);
+        final seconds = dataSize / (rate * channels * bits / 8);
 
-      expect(seconds, inInclusiveRange(3.0, 6.0));
-      expect(seconds, lessThan(30));
-    });
+        expect(seconds, inInclusiveRange(20.0, 29.9));
+        expect(seconds, lessThan(30));
+      },
+    );
   });
 
   test('o iOS referencia o som no projeto e o inclui nos recursos do app', () {
@@ -67,13 +75,22 @@ void main() {
     expect(project, contains('$_name in Resources'));
   });
 
+  test('o iOS declara APNs e execução para notificação remota', () {
+    expect(File(_entitlements).readAsStringSync(), contains('aps-environment'));
+    expect(
+      File(_infoPlist).readAsStringSync(),
+      contains('remote-notification'),
+    );
+  });
+
   test('o app não carrega outro áudio de terceiros além do som registrado', () {
     final audio = <String>[];
     for (final root in ['android/app/src/main/res', 'ios/Runner', 'assets']) {
       final dir = Directory(root);
       if (!dir.existsSync()) continue;
       for (final entity in dir.listSync(recursive: true)) {
-        if (entity is File && RegExp(r'\.(wav|mp3|ogg|aiff|caf|m4a)$').hasMatch(entity.path)) {
+        if (entity is File &&
+            RegExp(r'\.(wav|mp3|ogg|aiff|caf|m4a)$').hasMatch(entity.path)) {
           audio.add(entity.path.replaceAll('\\', '/').split('/').last);
         }
       }

@@ -53,7 +53,8 @@ String? validateAlphanumericFormat(
 /// curta) a 12 caracteres (casos raros com 11 dígitos + verificador, ou
 /// legados com dígito verificador alfanumérico). Mesma faixa usada no
 /// backend, já limpo de pontuação: ^[0-9A-Za-z]{7,12}$
-String? validateRg(String rg) => validateAlphanumericFormat(rg, 'RG', 12, minLength: 7);
+String? validateRg(String rg) =>
+    validateAlphanumericFormat(rg, 'RG', 12, minLength: 7);
 
 /// Telefone é opcional. Quando preenchido, precisa ter DDD + número (fixo
 /// de 8 dígitos ou celular de 9) — 10 ou 11 dígitos ao todo. O backend não
@@ -118,11 +119,17 @@ final RegExp _specialCharPattern = RegExp(r'[^A-Za-z0-9\s]');
 /// habilitados — mesmas 5 regras e labels do checklist "estilo gov.br" do
 /// painel web. Se um requisito vier desabilitado na policy (ex.: backend
 /// desliga `requireSpecialChar`), ele simplesmente não aparece na lista.
-List<PasswordRequirement> evaluatePasswordPolicy(String password, PasswordPolicy policy) {
+List<PasswordRequirement> evaluatePasswordPolicy(
+  String password,
+  PasswordPolicy policy,
+) {
   return [
     PasswordRequirement(
-      label: 'Mínimo ${policy.minLength} e máximo ${policy.maxLength} caracteres',
-      satisfied: password.length >= policy.minLength && password.length <= policy.maxLength,
+      label:
+          'Mínimo ${policy.minLength} e máximo ${policy.maxLength} caracteres',
+      satisfied:
+          password.length >= policy.minLength &&
+          password.length <= policy.maxLength,
     ),
     if (policy.requireUppercase)
       PasswordRequirement(

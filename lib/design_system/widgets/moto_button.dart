@@ -22,7 +22,15 @@ enum MotoButtonVariant { primary, glass, ink, danger, signal }
 
 /// Receita de vidro de cada variante.
 class _Glass {
-  const _Glass(this.top, this.bottom, this.caustic, this.highlight, this.text, this.glow, {this.edge});
+  const _Glass(
+    this.top,
+    this.bottom,
+    this.caustic,
+    this.highlight,
+    this.text,
+    this.glow, {
+    this.edge,
+  });
   final Color top, bottom, caustic, text;
   final double highlight; // opacidade do reflexo de cima
   final List<BoxShadow> glow;
@@ -72,12 +80,22 @@ class _MotoButtonState extends State<MotoButton> with TickerProviderStateMixin {
     duration: MotoMotion.instant,
     reverseDuration: const Duration(milliseconds: 640),
   );
-  late final Animation<double> _scale = Tween(
-    begin: 1.0,
-    end: MotoMotion.pressScale,
-  ).animate(CurvedAnimation(parent: _press, curve: Curves.easeOut, reverseCurve: MotoMotion.liquidCurve.flipped));
+  late final Animation<double> _scale =
+      Tween(
+        begin: 1.0,
+        end: MotoMotion.pressScale,
+      ).animate(
+        CurvedAnimation(
+          parent: _press,
+          curve: Curves.easeOut,
+          reverseCurve: MotoMotion.liquidCurve.flipped,
+        ),
+      );
   // gota de luz que se espalha do toque
-  late final AnimationController _drop = AnimationController(vsync: this, duration: const Duration(milliseconds: 720));
+  late final AnimationController _drop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 720),
+  );
   Offset _dropAt = Offset.zero;
 
   bool get _enabled => widget.onPressed != null && !widget.loading;
@@ -102,8 +120,17 @@ class _MotoButtonState extends State<MotoButton> with TickerProviderStateMixin {
         .34,
         Colors.white,
         const [
-          BoxShadow(color: Color(0x1F0B1B55), blurRadius: 2, offset: Offset(0, 1)),
-          BoxShadow(color: Color(0x8C1F4FE0), blurRadius: 24, offset: Offset(0, 10), spreadRadius: -10),
+          BoxShadow(
+            color: Color(0x1F0B1B55),
+            blurRadius: 2,
+            offset: Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Color(0x8C1F4FE0),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+            spreadRadius: -10,
+          ),
         ],
         edge: const Color(0x59132CA0),
       ),
@@ -114,8 +141,17 @@ class _MotoButtonState extends State<MotoButton> with TickerProviderStateMixin {
         .9,
         MotoRaw.tinta900,
         const [
-          BoxShadow(color: Color(0x1A0B1B55), blurRadius: 2, offset: Offset(0, 1)),
-          BoxShadow(color: Color(0x470B1B55), blurRadius: 24, offset: Offset(0, 8), spreadRadius: -10),
+          BoxShadow(
+            color: Color(0x1A0B1B55),
+            blurRadius: 2,
+            offset: Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Color(0x470B1B55),
+            blurRadius: 24,
+            offset: Offset(0, 8),
+            spreadRadius: -10,
+          ),
         ],
       ),
       MotoButtonVariant.ink => _Glass(
@@ -124,7 +160,14 @@ class _MotoButtonState extends State<MotoButton> with TickerProviderStateMixin {
         const Color(0x597896E6),
         .22,
         Colors.white,
-        const [BoxShadow(color: Color(0xA60A1633), blurRadius: 24, offset: Offset(0, 12), spreadRadius: -12)],
+        const [
+          BoxShadow(
+            color: Color(0xA60A1633),
+            blurRadius: 24,
+            offset: Offset(0, 12),
+            spreadRadius: -12,
+          ),
+        ],
         edge: const Color(0x80000000),
       ),
       MotoButtonVariant.danger => _Glass(
@@ -133,7 +176,14 @@ class _MotoButtonState extends State<MotoButton> with TickerProviderStateMixin {
         const Color(0x40FF8CA0),
         .9,
         c.danger,
-        const [BoxShadow(color: Color(0x4DBE2A45), blurRadius: 22, offset: Offset(0, 10), spreadRadius: -12)],
+        const [
+          BoxShadow(
+            color: Color(0x4DBE2A45),
+            blurRadius: 22,
+            offset: Offset(0, 10),
+            spreadRadius: -12,
+          ),
+        ],
         edge: const Color(0x2EBE2A45),
       ),
       MotoButtonVariant.signal => _Glass(
@@ -142,7 +192,14 @@ class _MotoButtonState extends State<MotoButton> with TickerProviderStateMixin {
         const Color(0xB3ECFFAA),
         .5,
         const Color(0xFF1C2A00),
-        const [BoxShadow(color: Color(0x9978AA0A), blurRadius: 22, offset: Offset(0, 10), spreadRadius: -10)],
+        const [
+          BoxShadow(
+            color: Color(0x9978AA0A),
+            blurRadius: 22,
+            offset: Offset(0, 10),
+            spreadRadius: -10,
+          ),
+        ],
         edge: const Color(0x66507800),
       ),
     };
@@ -153,7 +210,14 @@ class _MotoButtonState extends State<MotoButton> with TickerProviderStateMixin {
     final c = context.moto;
     final disabled = widget.onPressed == null;
     final g = disabled
-        ? const _Glass(Color(0x80FFFFFF), Color(0x8CEAF0FA), Color(0x00FFFFFF), .9, MotoRaw.tinta300, [])
+        ? const _Glass(
+            Color(0x80FFFFFF),
+            Color(0x8CEAF0FA),
+            Color(0x00FFFFFF),
+            .9,
+            MotoRaw.tinta300,
+            [],
+          )
         : _recipe(c);
     final h = widget.large ? 58.0 : 52.0;
 
@@ -182,7 +246,13 @@ class _MotoButtonState extends State<MotoButton> with TickerProviderStateMixin {
                     letterSpacing: -0.16,
                     color: g.text,
                     shadows: g.text == Colors.white
-                        ? const [Shadow(color: Color(0x66081870), blurRadius: 1, offset: Offset(0, 1))]
+                        ? const [
+                            Shadow(
+                              color: Color(0x66081870),
+                              blurRadius: 1,
+                              offset: Offset(0, 1),
+                            ),
+                          ]
                         : null,
                   ),
                 ),
@@ -270,7 +340,10 @@ class _MotoButtonState extends State<MotoButton> with TickerProviderStateMixin {
                 padding: const EdgeInsets.symmetric(horizontal: MotoSpace.s6),
                 child: AnimatedSwitcher(
                   duration: MotoMotion.fast,
-                  child: KeyedSubtree(key: ValueKey(widget.loading), child: content),
+                  child: KeyedSubtree(
+                    key: ValueKey(widget.loading),
+                    child: content,
+                  ),
                 ),
               ),
             ],
@@ -389,8 +462,10 @@ class _Drops extends StatefulWidget {
 }
 
 class _DropsState extends State<_Drops> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))
-    ..repeat();
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1000),
+  )..repeat();
 
   @override
   void dispose() {

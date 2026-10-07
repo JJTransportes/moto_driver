@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:moto_driver/core/errors/exceptions.dart';
+import 'package:moto_driver/core/errors/user_error_message.dart';
 import 'package:moto_driver/modules/chat/data/datasources/i_chat_realtime_datasource.dart';
 import 'package:moto_driver/modules/chat/data/repositories/chat_repository.dart';
 import 'package:moto_driver/modules/chat/domain/client_message_id.dart';
@@ -96,7 +97,12 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         emit(const ChatClosed());
       } else if (firstLoad) {
         emit(
-          ChatFailure(error?.toString() ?? 'Não foi possível carregar o chat.'),
+          ChatFailure(
+            userErrorMessage(
+              error,
+              fallback: 'Não foi possível carregar o chat.',
+            ),
+          ),
         );
       }
       return;
@@ -204,7 +210,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         ..[index] = current.items[index].copyWith(
           status: ChatItemStatus.failed,
         );
-      emit(current.copyWith(items: items, notice: error.toString()));
+      emit(
+        current.copyWith(
+          items: items,
+          notice: userErrorMessage(
+            error,
+            fallback: 'Não foi possível enviar a mensagem.',
+          ),
+        ),
+      );
       return;
     }
 

@@ -12,6 +12,21 @@ const _serviceId = 7305;
 const _baseUrlKey = 'background_location_base_url';
 const _driverIdKey = 'background_location_driver_id';
 const _tokenKey = 'background_location_token';
+const _travelStatusKey = 'background_location_travel_status';
+
+/// Texto persistente exibido pelo serviço de localização no Android.
+/// Mantido puro para que a regra possa ser validada sem depender do plugin.
+String backgroundTravelNotificationText(
+  String? status, {
+  String? updatedAt,
+}) {
+  final suffix = updatedAt == null ? '' : ' • atualizado às $updatedAt';
+  return switch (status) {
+    'Accepted' => 'A caminho do local de embarque$suffix',
+    'InProgress' => 'Viagem em andamento$suffix',
+    _ => 'Compartilhando sua localização com segurança$suffix',
+  };
+}
 
 @pragma('vm:entry-point')
 void backgroundLocationStartCallback() {
@@ -105,9 +120,15 @@ class BackgroundLocationTaskHandler extends TaskHandler {
       final time = _lastSentAt!;
       final formattedTime =
           '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:${time.second.toString().padLeft(2, '0')}';
+      final travelStatus = await FlutterForegroundTask.getData<String>(
+        key: _travelStatusKey,
+      );
       await FlutterForegroundTask.updateService(
         notificationTitle: 'Motô em atendimento',
-        notificationText: 'Localização atualizada às $formattedTime',
+        notificationText: backgroundTravelNotificationText(
+          travelStatus,
+          updatedAt: formattedTime,
+        ),
       );
       FlutterForegroundTask.sendDataToMain({
         'type': 'location_sent',
@@ -255,6 +276,28 @@ class BackgroundLocationService {
     return result is ServiceRequestSuccess;
   }
 
+  /// Atualiza imediatamente a notificação fixa e persiste o estado para o
+  /// isolate de localização (inclusive após o app sair do primeiro plano).
+  Future<void> setTravelStatus(String? status) async {
+    if (!Platform.isAndroid) return;
+    if (status == null || status == 'Completed' || status == 'Cancelled') {
+      await FlutterForegroundTask.removeData(key: _travelStatusKey);
+      status = null;
+    } else {
+      await FlutterForegroundTask.saveData(
+        key: _travelStatusKey,
+        value: status,
+      );
+    }
+
+    if (await FlutterForegroundTask.isRunningService) {
+      await FlutterForegroundTask.updateService(
+        notificationTitle: 'Motô em atendimento',
+        notificationText: backgroundTravelNotificationText(status),
+      );
+    }
+  }
+
   Future<void> stop() async {
     if (!Platform.isAndroid) return;
     if (await FlutterForegroundTask.isRunningService) {
@@ -263,6 +306,7 @@ class BackgroundLocationService {
     await Future.wait([
       FlutterForegroundTask.removeData(key: _driverIdKey),
       FlutterForegroundTask.removeData(key: _tokenKey),
+      FlutterForegroundTask.removeData(key: _travelStatusKey),
     ]);
   }
 

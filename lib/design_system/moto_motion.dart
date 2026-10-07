@@ -21,13 +21,26 @@ class MotoPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    final inCurve = CurvedAnimation(parent: animation, curve: MotoMotion.easeOut, reverseCurve: MotoMotion.easeIn);
-    final outCurve = CurvedAnimation(parent: secondaryAnimation, curve: MotoMotion.easeOut);
+    final inCurve = CurvedAnimation(
+      parent: animation,
+      curve: MotoMotion.easeOut,
+      reverseCurve: MotoMotion.easeIn,
+    );
+    final outCurve = CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: MotoMotion.easeOut,
+    );
     return FadeTransition(
       opacity: inCurve,
       child: SlideTransition(
-        position: Tween(begin: const Offset(0, .03), end: Offset.zero).animate(inCurve),
-        child: ScaleTransition(scale: Tween(begin: 1.0, end: .97).animate(outCurve), child: child),
+        position: Tween(
+          begin: const Offset(0, .03),
+          end: Offset.zero,
+        ).animate(inCurve),
+        child: ScaleTransition(
+          scale: Tween(begin: 1.0, end: .97).animate(outCurve),
+          child: child,
+        ),
       ),
     );
   }
@@ -44,14 +57,25 @@ class MotoEnter extends StatefulWidget {
   State<MotoEnter> createState() => _MotoEnterState();
 }
 
-class _MotoEnterState extends State<MotoEnter> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: MotoMotion.slow);
-  late final Animation<double> _a = CurvedAnimation(parent: _c, curve: MotoMotion.easeOut);
+class _MotoEnterState extends State<MotoEnter>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: MotoMotion.slow,
+  );
+  late final Animation<double> _a = CurvedAnimation(
+    parent: _c,
+    curve: MotoMotion.easeOut,
+  );
 
   @override
   void initState() {
     super.initState();
-    final reduce = SchedulerBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations;
+    final reduce = SchedulerBinding
+        .instance
+        .platformDispatcher
+        .accessibilityFeatures
+        .disableAnimations;
     if (reduce) {
       _c.value = 1;
     } else {
@@ -72,7 +96,10 @@ class _MotoEnterState extends State<MotoEnter> with SingleTickerProviderStateMix
     opacity: _a,
     child: AnimatedBuilder(
       animation: _a,
-      builder: (_, child) => Transform.translate(offset: Offset(0, 14 * (1 - _a.value)), child: child),
+      builder: (_, child) => Transform.translate(
+        offset: Offset(0, 14 * (1 - _a.value)),
+        child: child,
+      ),
       child: widget.child,
     ),
   );
@@ -81,7 +108,12 @@ class _MotoEnterState extends State<MotoEnter> with SingleTickerProviderStateMix
 /// Encolhe 3% enquanto pressionado. Envolva qualquer coisa tocável
 /// (cards, itens de lista). Os botões do sistema já fazem isso.
 class MotoPressable extends StatefulWidget {
-  const MotoPressable({super.key, required this.child, this.onTap, this.scale = MotoMotion.pressScale});
+  const MotoPressable({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.scale = MotoMotion.pressScale,
+  });
   final Widget child;
   final VoidCallback? onTap;
   final double scale;
@@ -137,12 +169,21 @@ Future<T?> showMotoDialog<T>(
     barrierLabel: 'Fechar',
     barrierColor: context.moto.scrim,
     transitionDuration: MotoMotion.slow,
-    pageBuilder: (ctx, animation, secondary) => SafeArea(child: Center(child: builder(ctx))),
+    pageBuilder: (ctx, animation, secondary) =>
+        SafeArea(child: Center(child: builder(ctx))),
     transitionBuilder: (ctx, a, secondary, child) {
-      final curve = CurvedAnimation(parent: a, curve: MotoMotion.spring, reverseCurve: MotoMotion.easeIn);
+      final curve = CurvedAnimation(
+        parent: a,
+        curve: MotoMotion.spring,
+        reverseCurve: MotoMotion.easeIn,
+      );
       return FadeTransition(
         opacity: CurvedAnimation(parent: a, curve: const Interval(0, .6)),
-        child: ScaleTransition(scale: Tween(begin: .3, end: 1.0).animate(curve), alignment: origin, child: child),
+        child: ScaleTransition(
+          scale: Tween(begin: .3, end: 1.0).animate(curve),
+          alignment: origin,
+          child: child,
+        ),
       );
     },
   );
@@ -151,12 +192,17 @@ Future<T?> showMotoDialog<T>(
 /// Troca de conteúdo com direção (abas, passos): o novo entra pelo lado para
 /// onde o usuário foi. Mude [index] a cada troca.
 class MotoDirectionalSwitcher extends StatefulWidget {
-  const MotoDirectionalSwitcher({super.key, required this.index, required this.child});
+  const MotoDirectionalSwitcher({
+    super.key,
+    required this.index,
+    required this.child,
+  });
   final int index;
   final Widget child;
 
   @override
-  State<MotoDirectionalSwitcher> createState() => _MotoDirectionalSwitcherState();
+  State<MotoDirectionalSwitcher> createState() =>
+      _MotoDirectionalSwitcherState();
 }
 
 class _MotoDirectionalSwitcherState extends State<MotoDirectionalSwitcher> {

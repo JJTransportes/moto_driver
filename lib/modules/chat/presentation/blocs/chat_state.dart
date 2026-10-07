@@ -58,12 +58,11 @@ class ChatReady extends ChatState {
     bool? connected,
     String? notice,
     bool clearNotice = false,
-  }) =>
-      ChatReady(
-        items: items ?? this.items,
-        connected: connected ?? this.connected,
-        notice: clearNotice ? null : (notice ?? this.notice),
-      );
+  }) => ChatReady(
+    items: items ?? this.items,
+    connected: connected ?? this.connected,
+    notice: clearNotice ? null : (notice ?? this.notice),
+  );
 }
 
 class ChatFailure extends ChatState {

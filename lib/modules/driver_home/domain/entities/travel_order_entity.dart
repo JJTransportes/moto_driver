@@ -36,6 +36,7 @@ class TravelOrderEntity {
 
   /// Rota pré-calculada (String JSON ou Map) — campo hub-only; ausente no GET REST.
   final dynamic routeJson;
+  final DateTime? offerExpiresAt;
 
   const TravelOrderEntity({
     required this.orderId,
@@ -61,6 +62,7 @@ class TravelOrderEntity {
     this.destinationAddress,
     this.encodedPolyline,
     this.routeJson,
+    this.offerExpiresAt,
   });
 
   factory TravelOrderEntity.fromJson(Map<String, dynamic> json) {
@@ -68,7 +70,10 @@ class TravelOrderEntity {
       final value = json[key];
       if (value is num) return value.toDouble();
       if (value != null) {
-        log('[TRAVEL-ORDER] Campo $key ausente ou inválido — usando 0.0', name: 'travel-order');
+        log(
+          '[TRAVEL-ORDER] Campo $key ausente ou inválido — usando 0.0',
+          name: 'travel-order',
+        );
       }
       return 0.0;
     }
@@ -85,16 +90,22 @@ class TravelOrderEntity {
       customerId: json['customerId'] as String? ?? '',
       driverId: json['driverId'] as String?,
       status: json['status'] as String? ?? '',
-      distanceToPassengerInMeters: (json['distanceToPassengerInMeters'] as num?)?.toInt() ?? 0,
-      distanceToDestinationInMeters: (json['distanceToDestinationInMeters'] as num?)?.toInt() ?? 0,
-      averageTravelTimeInHours: (json['averageTravelTimeInHours'] as num?)?.toInt() ?? 0,
-      averageTravelTimeInMinutes: (json['averageTravelTimeInMinutes'] as num?)?.toInt() ?? 0,
+      distanceToPassengerInMeters:
+          (json['distanceToPassengerInMeters'] as num?)?.toInt() ?? 0,
+      distanceToDestinationInMeters:
+          (json['distanceToDestinationInMeters'] as num?)?.toInt() ?? 0,
+      averageTravelTimeInHours:
+          (json['averageTravelTimeInHours'] as num?)?.toInt() ?? 0,
+      averageTravelTimeInMinutes:
+          (json['averageTravelTimeInMinutes'] as num?)?.toInt() ?? 0,
       passengerLatitude: asDouble('passengerLatitude'),
       passengerLongitude: asDouble('passengerLongitude'),
       destinationLatitude: asDouble('destinationLatitude'),
       destinationLongitude: asDouble('destinationLongitude'),
       routes: json['routes'] as List? ?? const [],
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
       startedAt: asDateTime('startedAt'),
       finishedAt: asDateTime('finishedAt'),
       cancelledAt: asDateTime('cancelledAt'),
@@ -103,33 +114,36 @@ class TravelOrderEntity {
       destinationAddress: json['destinationAddress'] as String?,
       encodedPolyline: json['encodedPolyline'] as String?,
       routeJson: json['routeJson'],
+      offerExpiresAt:
+          asDateTime('expiresAt') ?? asDateTime('contactedDriverExpiresAt'),
     );
   }
 
   /// Round-trip com as mesmas chaves camelCase consumidas pelo [IncomingOrderSheet].
   Map<String, dynamic> toJson() => {
-        'orderId': orderId,
-        'travelId': travelId,
-        'customerId': customerId,
-        'driverId': driverId,
-        'status': status,
-        'distanceToPassengerInMeters': distanceToPassengerInMeters,
-        'distanceToDestinationInMeters': distanceToDestinationInMeters,
-        'averageTravelTimeInHours': averageTravelTimeInHours,
-        'averageTravelTimeInMinutes': averageTravelTimeInMinutes,
-        'passengerLatitude': passengerLatitude,
-        'passengerLongitude': passengerLongitude,
-        'destinationLatitude': destinationLatitude,
-        'destinationLongitude': destinationLongitude,
-        'routes': routes,
-        'createdAt': createdAt.toIso8601String(),
-        'startedAt': startedAt?.toIso8601String(),
-        'finishedAt': finishedAt?.toIso8601String(),
-        'cancelledAt': cancelledAt?.toIso8601String(),
-        'cancellationReason': cancellationReason,
-        'departureAddress': departureAddress,
-        'destinationAddress': destinationAddress,
-        'encodedPolyline': encodedPolyline,
-        'routeJson': routeJson,
-      };
+    'orderId': orderId,
+    'travelId': travelId,
+    'customerId': customerId,
+    'driverId': driverId,
+    'status': status,
+    'distanceToPassengerInMeters': distanceToPassengerInMeters,
+    'distanceToDestinationInMeters': distanceToDestinationInMeters,
+    'averageTravelTimeInHours': averageTravelTimeInHours,
+    'averageTravelTimeInMinutes': averageTravelTimeInMinutes,
+    'passengerLatitude': passengerLatitude,
+    'passengerLongitude': passengerLongitude,
+    'destinationLatitude': destinationLatitude,
+    'destinationLongitude': destinationLongitude,
+    'routes': routes,
+    'createdAt': createdAt.toIso8601String(),
+    'startedAt': startedAt?.toIso8601String(),
+    'finishedAt': finishedAt?.toIso8601String(),
+    'cancelledAt': cancelledAt?.toIso8601String(),
+    'cancellationReason': cancellationReason,
+    'departureAddress': departureAddress,
+    'destinationAddress': destinationAddress,
+    'encodedPolyline': encodedPolyline,
+    'routeJson': routeJson,
+    'expiresAt': offerExpiresAt?.toUtc().toIso8601String(),
+  };
 }

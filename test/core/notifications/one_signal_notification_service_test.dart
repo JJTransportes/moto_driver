@@ -1,6 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:moto_driver/core/local_db/models/local_data_models.dart';
 import 'package:moto_driver/core/local_db/repositories/auth_local_repository.dart';
 import 'package:moto_driver/core/local_db/repositories/notifications_local_repository.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
@@ -37,6 +37,9 @@ void main() {
     NotificationService.setOrderAlertOpen(false);
 
     when(() => navigator.path).thenReturn('/home');
+    when(
+      () => authStorage.getRefreshToken(),
+    ).thenAnswer((_) async => 'refresh-token');
     when(
       () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
     ).thenAnswer((_) async => null);
@@ -146,17 +149,6 @@ void main() {
     destroyTestModule();
   });
 
-  // Os quatro testes abaixo cobrem guardas de segurança (fluxo de sessão,
-  // sessão ausente, viagem ativa, navegação instável em cold start) que
-  // existiam em handleNotificationClick e foram removidas no commit
-  // 0eb9429 ("fix: adjusts multi order and login screen blinking issues")
-  // para resolver um bug de tela piscando. Desde então, um clique em
-  // notificação de novo pedido sempre navega para /order-refresh, mesmo
-  // sem sessão, no meio do fluxo de termos, ou com viagem em andamento.
-  // Decisão de reintroduzir as guardas (arriscando o bug de blinking
-  // voltar) vs. aceitar o comportamento atual está em standby — ver
-  // PIPELINES-CI-CD.md. Mantidos como skip (não apagados) para não perder
-  // a especificação do comportamento esperado.
   testWidgets(
     'fluxo de sessão (path /terms) → não navega; pendente mantido',
     (tester) async {
@@ -172,7 +164,6 @@ void main() {
       );
       destroyTestModule();
     },
-    skip: true, // Guarda removida em 0eb9429 — reintrodução em standby
   );
 
   testWidgets(
@@ -190,7 +181,6 @@ void main() {
       );
       destroyTestModule();
     },
-    skip: true, // Guarda removida em 0eb9429 — reintrodução em standby
   );
 
   testWidgets(
@@ -199,25 +189,30 @@ void main() {
       when(
         () => authStorage.getRefreshToken(),
       ).thenAnswer((_) async => 'refresh-token');
-      when(() => travelLocalRepository.getActiveTravel()).thenAnswer(
-        (_) async => TravelLocalData(
-          travelId: 'travel-1',
-          status: 'Accepted',
-          createdAt: DateTime.now(),
+      when(() => dio.get('/api/travels/active')).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/travels/active'),
+          statusCode: 200,
+          data: {'travelId': 'travel-1', 'status': 'Accepted'},
         ),
       );
+      when(
+        () => navigator.navigate(any(), arguments: any(named: 'arguments')),
+      ).thenReturn(null);
       initTestModule(buildModule(), navigator);
       final service = buildService();
 
       await service.handleNotificationClick(pushData('order-1'));
 
       expect(NotificationService.peekPendingOrder(), isNull);
-      verifyNever(
-        () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
-      );
+      verify(
+        () => navigator.navigate(
+          '/active-travel',
+          arguments: {'travelId': 'travel-1'},
+        ),
+      ).called(1);
       destroyTestModule();
     },
-    skip: true, // Guarda removida em 0eb9429 — reintrodução em standby
   );
 
   testWidgets(
@@ -235,6 +230,5 @@ void main() {
       );
       destroyTestModule();
     },
-    skip: true, // Guarda removida em 0eb9429 — reintrodução em standby
   );
 }

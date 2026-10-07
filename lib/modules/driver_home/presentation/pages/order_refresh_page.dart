@@ -45,8 +45,10 @@ class _OrderRefreshPageState extends State<OrderRefreshPage> {
         await authStorage.saveToken(success.accessToken, success.userId);
         await authStorage.saveRefreshToken(success.refreshToken);
         if (!mounted) return;
-        Modular.to.pushReplacementNamed('/order-alert',
-            arguments: {'orderId': widget.orderId});
+        Modular.to.pushReplacementNamed(
+          '/order-alert',
+          arguments: {'orderId': widget.orderId},
+        );
       },
       (_) async {
         await signOutService.signOut();

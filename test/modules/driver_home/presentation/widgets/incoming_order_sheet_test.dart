@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -53,14 +55,14 @@ void main() {
   });
 
   PushTestModule buildModule() => PushTestModule(
-        dio: dio,
-        authStorage: authStorage,
-        authRepository: authRepository,
-        signOutService: signOutService,
-        signalRService: signalRService,
-        travelLocalRepository: travelLocalRepository,
-        locationService: locationService,
-      );
+    dio: dio,
+    authStorage: authStorage,
+    authRepository: authRepository,
+    signOutService: signOutService,
+    signalRService: signalRService,
+    travelLocalRepository: travelLocalRepository,
+    locationService: locationService,
+  );
 
   void stubAcceptOrder() {
     when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
@@ -69,8 +71,9 @@ void main() {
         'routes': <dynamic>[],
       }),
     );
-    when(() => travelLocalRepository.saveActiveTravel(any()))
-        .thenAnswer((_) async {});
+    when(
+      () => travelLocalRepository.saveActiveTravel(any()),
+    ).thenAnswer((_) async {});
     when(() => signalRService.denyOrder(any())).thenAnswer((_) async {});
   }
 
@@ -79,96 +82,130 @@ void main() {
     destroyTestModule();
   }
 
-  testWidgets('modo embutido: aceitar → onDecision(accepted, result) sem navegar',
-      (tester) async {
-    stubAcceptOrder();
-    initTestModule(buildModule(), navigator);
+  testWidgets(
+    'modo embutido: aceitar → onDecision(accepted, result) sem navegar',
+    (tester) async {
+      stubAcceptOrder();
+      initTestModule(buildModule(), navigator);
 
-    OrderDecision? decision;
-    Map<String, dynamic>? result;
+      OrderDecision? decision;
+      Map<String, dynamic>? result;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: IncomingOrderSheet(
-            order: pendingOrderPayload(),
-            onDecision: (d, r) {
-              decision = d;
-              result = r;
-            },
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: IncomingOrderSheet(
+              order: pendingOrderPayload(),
+              onDecision: (d, r) {
+                decision = d;
+                result = r;
+              },
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
-    // Não usa pumpAndSettle: o MotoCountdownRing anima por 20s (duração real
-    // do prazo de resposta) — pumpAndSettle rodaria essa animação até o fim
-    // e disparava o auto-reject antes mesmo do teste interagir com o sheet.
-    await tester.pump(const Duration(milliseconds: 50));
+      );
+      await tester.pump();
+      // Não usa pumpAndSettle: o MotoCountdownRing anima por 20s (duração real
+      // do prazo de resposta) — pumpAndSettle rodaria essa animação até o fim
+      // e disparava o auto-reject antes mesmo do teste interagir com o sheet.
+      await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Nova viagem'), findsOneWidget);
+      expect(find.text('Nova viagem'), findsOneWidget);
 
-    await tester.tap(find.text('Aceitar'));
-    // Estado 'accepting' mostra spinner infinito — pumps limitados bastam
-    // para os futures (location/dio/persist) completarem.
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('Aceitar'));
+      // Estado 'accepting' mostra spinner infinito — pumps limitados bastam
+      // para os futures (location/dio/persist) completarem.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-    expect(decision, OrderDecision.accepted);
-    expect(result?['travelId'], 'travel-1');
-    // Nenhuma navegação própria no modo embutido.
-    verifyNever(
-      () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
-    );
-    verifyNever(
-      () => navigator.pushReplacementNamed(any(),
-          arguments: any(named: 'arguments')),
-    );
-    // O card permanece montado (sem pop).
-    expect(find.text('Nova viagem'), findsOneWidget);
-    // Aceite persistido localmente.
-    verify(() => travelLocalRepository.saveActiveTravel(any())).called(1);
+      expect(decision, OrderDecision.accepted);
+      expect(result?['travelId'], 'travel-1');
+      // Nenhuma navegação própria no modo embutido.
+      verifyNever(
+        () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
+      );
+      verifyNever(
+        () => navigator.pushReplacementNamed(
+          any(),
+          arguments: any(named: 'arguments'),
+        ),
+      );
+      // O card permanece montado (sem pop).
+      expect(find.text('Nova viagem'), findsOneWidget);
+      // Aceite persistido localmente.
+      verify(() => travelLocalRepository.saveActiveTravel(any())).called(1);
 
-    await teardown(tester);
-  });
+      await teardown(tester);
+    },
+  );
 
-  testWidgets('modo embutido: recusar → onDecision(denied) + deny disparado sem pop',
-      (tester) async {
-    stubAcceptOrder();
-    initTestModule(buildModule(), navigator);
+  testWidgets(
+    'modo embutido: recusar → onDecision(denied) + deny disparado sem pop',
+    (tester) async {
+      stubAcceptOrder();
+      initTestModule(buildModule(), navigator);
 
-    OrderDecision? decision;
+      OrderDecision? decision;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: IncomingOrderSheet(
-            order: pendingOrderPayload(),
-            onDecision: (d, _) => decision = d,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: IncomingOrderSheet(
+              order: pendingOrderPayload(),
+              onDecision: (d, _) => decision = d,
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
-    // Não usa pumpAndSettle: o MotoCountdownRing anima por 20s (duração real
-    // do prazo de resposta) — pumpAndSettle rodaria essa animação até o fim
-    // e disparava o auto-reject antes mesmo do teste interagir com o sheet.
-    await tester.pump(const Duration(milliseconds: 50));
+      );
+      await tester.pump();
+      // Não usa pumpAndSettle: o MotoCountdownRing anima por 20s (duração real
+      // do prazo de resposta) — pumpAndSettle rodaria essa animação até o fim
+      // e disparava o auto-reject antes mesmo do teste interagir com o sheet.
+      await tester.pump(const Duration(milliseconds: 50));
 
-    await tester.tap(find.text('Recusar'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('Recusar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-    expect(decision, OrderDecision.denied);
-    verify(() => signalRService.denyOrder('order-1')).called(1);
-    // Sem pop no modo embutido.
-    expect(find.text('Nova viagem'), findsOneWidget);
+      expect(decision, OrderDecision.denied);
+      verify(() => signalRService.denyOrder('order-1')).called(1);
+      // Sem pop no modo embutido.
+      expect(find.text('Nova viagem'), findsOneWidget);
 
-    await teardown(tester);
-  });
+      await teardown(tester);
+    },
+  );
 
-  testWidgets('modal (SignalR): aceitar → pop + pushNamed(/active-travel)',
-      (tester) async {
+  testWidgets(
+    'carregamento da localização concluído após fechar o card não chama setState',
+    (tester) async {
+      final locationCompleter = Completer<LocationResult>();
+      when(() => locationService.getCurrentPosition()).thenAnswer(
+        (_) => locationCompleter.future,
+      );
+      initTestModule(buildModule(), navigator);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: IncomingOrderSheet(order: pendingOrderPayload()),
+        ),
+      );
+      await tester.pump();
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      locationCompleter.complete(
+        const LocationResult(status: LocationStatus.denied),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      destroyTestModule();
+    },
+  );
+
+  testWidgets('modal (SignalR): aceitar → pop + pushNamed(/active-travel)', (
+    tester,
+  ) async {
     // Viewport maior: o modal usa 0.8 da altura da tela; o conteúdo do card
     // (~500px com a fonte de teste) não cabe em 600px de altura.
     tester.view.physicalSize = const Size(1200, 2400);
@@ -177,14 +214,19 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     stubAcceptOrder();
-    when(() => dio.get(any()))
-        .thenAnswer((_) async => okResponse(pendingOrderPayload()));
-    when(() => signalRService.onOrderCancelled)
-        .thenAnswer((_) => const Stream.empty());
+    when(
+      () => dio.get(any()),
+    ).thenAnswer((_) async => okResponse(pendingOrderPayload()));
+    when(
+      () => signalRService.onOrderCancelled,
+    ).thenAnswer((_) => const Stream.empty());
     when(() => signalRService.isConnected(any())).thenReturn(false);
-    when(() => signalRService.connect(any(), any(), any())).thenAnswer((_) async {});
-    when(() => navigator.pushNamed(any(), arguments: any(named: 'arguments')))
-        .thenAnswer((_) async => null);
+    when(
+      () => signalRService.connect(any(), any(), any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
+    ).thenAnswer((_) async => null);
     initTestModule(buildModule(), navigator);
 
     await tester.pumpWidget(
@@ -226,8 +268,10 @@ void main() {
     ).captured;
     expect(captured.single, contains('/api/travels/orders/order-1/accept'));
     verify(
-      () => navigator.pushNamed('/active-travel',
-          arguments: any(named: 'arguments')),
+      () => navigator.pushNamed(
+        '/active-travel',
+        arguments: any(named: 'arguments'),
+      ),
     ).called(1);
     // Sheet modal fechou (pop).
     expect(find.text('Nova viagem'), findsNothing);

@@ -38,14 +38,18 @@ class RideAlertsChannelNotificationService implements INotificationService {
   }
 
   @override
-  Future<bool> requestNotificationPermission() => _inner.requestNotificationPermission();
+  Future<bool> requestNotificationPermission() =>
+      _inner.requestNotificationPermission();
 
   @override
-  Future<void> login(String subscription, token) => _inner.login(subscription, token);
+  Future<void> login(String subscription, token) =>
+      _inner.login(subscription, token);
 
   @override
-  Future<void> handleForegroundNotification() => _inner.handleForegroundNotification();
+  Future<void> handleForegroundNotification() =>
+      _inner.handleForegroundNotification();
 
   @override
-  Future<void> dismissNewOrder(String orderId) => _inner.dismissNewOrder(orderId);
+  Future<void> dismissNewOrder(String orderId) =>
+      _inner.dismissNewOrder(orderId);
 }

@@ -23,7 +23,10 @@ abstract class IAuthDatasource {
   /// reporting the [device] type for refresh-token device binding.
   ///
   /// Throws a typed exception (e.g. [DeviceMismatchException] on 403) on failure.
-  Future<RefreshTokenResponseModel> refreshToken(String refreshToken, String device);
+  Future<RefreshTokenResponseModel> refreshToken(
+    String refreshToken,
+    String device,
+  );
 
   /// Solicita o código de redefinição de senha para o [email] informado.
   /// Envia `expectedRole: "Driver"` fixo, exigido pelo backend.

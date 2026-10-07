@@ -293,7 +293,7 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
             ],
             TextButton(
               onPressed: _exitToHome,
-              child: const Text('Voltar para a Home'),
+              child: const Text('Voltar para a tela inicial'),
             ),
           ],
         ),

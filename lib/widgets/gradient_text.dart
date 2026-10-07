@@ -10,10 +10,13 @@ class GradientText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShaderMask(
-      shaderCallback: (bounds) => context.moto.accentLiquid.createShader(bounds),
+      shaderCallback: (bounds) =>
+          context.moto.accentLiquid.createShader(bounds),
       child: Text(
         text,
-        style: (style ?? const TextStyle()).copyWith(color: context.moto.textOnAccent),
+        style: (style ?? const TextStyle()).copyWith(
+          color: context.moto.textOnAccent,
+        ),
       ),
     );
   }

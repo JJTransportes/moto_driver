@@ -133,7 +133,7 @@ void main() {
     destroyTestModule();
   });
 
-  testWidgets('403 → indisponível + Voltar para a Home (limpa pendente)', (
+  testWidgets('403 → indisponível + Voltar para a tela inicial (limpa pendente)', (
     tester,
   ) async {
     when(() => dio.get(any())).thenThrow(
@@ -161,7 +161,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Voltar para a Home'));
+    await tester.tap(find.text('Voltar para a tela inicial'));
     await tester.pump();
 
     verify(
@@ -189,7 +189,7 @@ void main() {
     await pumpPage(tester);
 
     expect(find.text('Pedido não encontrado.'), findsOneWidget);
-    expect(find.text('Voltar para a Home'), findsOneWidget);
+    expect(find.text('Voltar para a tela inicial'), findsOneWidget);
 
     await disposeTree(tester);
   });
@@ -386,7 +386,7 @@ void main() {
     await pumpPage(tester, orderId: null);
 
     expect(find.text('Pedido não encontrado.'), findsOneWidget);
-    expect(find.text('Voltar para a Home'), findsOneWidget);
+    expect(find.text('Voltar para a tela inicial'), findsOneWidget);
 
     await disposeTree(tester);
   });
@@ -403,7 +403,7 @@ void main() {
       await tester.pump(); // frame renderiza o estado indisponível
 
       expect(find.text('Pedido cancelado pelo passageiro.'), findsOneWidget);
-      expect(find.text('Voltar para a Home'), findsOneWidget);
+      expect(find.text('Voltar para a tela inicial'), findsOneWidget);
 
       await disposeTree(tester);
     },

@@ -36,7 +36,7 @@ void main() {
 
   group('constantes do canal', () {
     test('o id é versionado (trocar o som exige um id novo)', () {
-      expect(RideAlertsChannel.id, 'moto_ride_alerts_v1');
+      expect(RideAlertsChannel.id, 'moto_ride_alerts_v2');
       expect(RideAlertsChannel.id, matches(RegExp(r'^[a-z0-9_]+_v\d+$')));
     });
 
@@ -64,7 +64,7 @@ void main() {
       final call = calls.single;
       expect(call.method, 'ensureChannel');
       expect(call.arguments, {
-        'id': 'moto_ride_alerts_v1',
+        'id': 'moto_ride_alerts_v2',
         'name': 'Avisos de corrida',
         'description': RideAlertsChannel.description,
         'sound': 'moto_notification',
@@ -80,7 +80,7 @@ void main() {
       await service.ensureRideAlertsChannel();
 
       expect(calls, hasLength(3));
-      expect(calls.map((c) => c.arguments['id']).toSet(), {'moto_ride_alerts_v1'});
+      expect(calls.map((c) => c.arguments['id']).toSet(), {'moto_ride_alerts_v2'});
     });
 
     test('falha do canal nativo não lança e é registrada em log', () async {

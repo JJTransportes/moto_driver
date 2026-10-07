@@ -53,12 +53,16 @@ class ChatRepository implements IChatRepository {
   }
 
   @override
-  Future<Result<PassengerContactEntity>> getPassengerContact(String travelId) async {
+  Future<Result<PassengerContactEntity>> getPassengerContact(
+    String travelId,
+  ) async {
     try {
       final json = await _datasource.getPassengerContact(travelId);
       final phone = (json['phone'] as String?)?.trim();
       return Success(
-        PassengerContactEntity(phone: phone == null || phone.isEmpty ? null : phone),
+        PassengerContactEntity(
+          phone: phone == null || phone.isEmpty ? null : phone,
+        ),
       );
     } on Exception catch (e) {
       return Failure(e);
@@ -74,7 +78,8 @@ ChatMessageEntity chatMessageFromJson(Map<String, dynamic> json) {
     travelId: json['travelId'] as String,
     senderRole: json['senderRole'] as String? ?? '',
     text: json['text'] as String? ?? '',
-    sentAt: DateTime.tryParse(json['sentAt']?.toString() ?? '') ?? DateTime.now(),
+    sentAt:
+        DateTime.tryParse(json['sentAt']?.toString() ?? '') ?? DateTime.now(),
     mine: json['mine'] as bool? ?? false,
   );
 }

@@ -68,7 +68,7 @@ void main() {
       expect(find.text('CPF *'), findsOneWidget);
       expect(find.text('RG *'), findsOneWidget);
       expect(find.text('Matrícula *'), findsOneWidget);
-      expect(find.text('Telefone'), findsOneWidget);
+      expect(find.text('Telefone *'), findsOneWidget);
       expect(find.text('Data de nascimento *'), findsOneWidget);
       expect(find.text('E-mail *'), findsOneWidget);
       expect(find.text('Confirmar E-mail *'), findsOneWidget);

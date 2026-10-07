@@ -74,11 +74,11 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   // checada antes de qualquer `await`, fecha essa janela.
   bool _actionInFlight = false;
 
-  // Alinhado ao prazo de resposta do backend (20s) — passageiro agora vê
+  // Alinhado ao prazo de resposta do backend (40s) — passageiro agora vê
   // esse mesmo prazo via evento DriverContacted, então os dois lados
   // precisam bater. MotoCountdownRing controla a contagem visualmente e
   // dispara _autoReject sozinho ao chegar em zero (onTimeout).
-  static const int _rejectTimeoutSeconds = 20;
+  static const int _rejectTimeoutSeconds = 40;
 
   @override
   Widget build(BuildContext context) {
@@ -121,12 +121,33 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
               ),
               MotoCountdownRing(
                 seconds: _rejectTimeoutSeconds,
+                expiresAt: _offerExpiresAt,
                 size: 52,
                 onTimeout: _autoReject,
               ),
             ],
           ),
           const SizedBox(height: MotoSpace.s4),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(MotoSpace.s3),
+            decoration: BoxDecoration(
+              color: context.moto.infoSoft,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.volume_up_rounded, size: 20),
+                SizedBox(width: MotoSpace.s2),
+                Expanded(
+                  child: Text(
+                    'Mantenha o volume do celular no máximo para não perder os avisos de corrida.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: MotoSpace.s3),
           Flexible(
             child: SingleChildScrollView(
               child: Column(
@@ -249,6 +270,12 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     );
   }
 
+  DateTime? get _offerExpiresAt {
+    final value =
+        widget.order['expiresAt'] ?? widget.order['contactedDriverExpiresAt'];
+    return value is String ? DateTime.tryParse(value)?.toUtc() : null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -268,6 +295,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // Obtain current GPS position to send to backend
       final locationService = Modular.get<LocationService>();
       final locResult = await locationService.getCurrentPosition();
+      if (!mounted) return;
 
       final dio = Modular.get<Dio>();
       final orderId = widget.order['orderId'] as String;
@@ -283,6 +311,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
         '${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/accept',
         data: body.isNotEmpty ? body : null,
       );
+      if (!mounted) return;
 
       // Get travelId and routes from response
       final travelId = response.data['travelId'] as String;
@@ -322,8 +351,9 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // Navigate to active travel with route data
       Modular.to.pushNamed('/active-travel', arguments: acceptResult);
     } on DioException catch (e) {
+      if (!mounted) return;
       // 403: a oferta já passou pro próximo motorista da fila (timeout de
-      // 20s) — é definitivo, não transitório. Não faz sentido deixar o card
+      // 40s) — é definitivo, não transitório. Não faz sentido deixar o card
       // aberto pra um reenvio, então fecha igual ao fluxo de recusa.
       if (e.response?.statusCode == 403) {
         const message = 'Essa corrida não está mais disponível.';
@@ -481,6 +511,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   Future<void> _loadDriverLocation() async {
     final locationService = Modular.get<LocationService>();
     final result = await locationService.getCurrentPosition();
+    if (!mounted) return;
 
     final passLat = (widget.order['passengerLatitude'] as num).toDouble();
     final passLng = (widget.order['passengerLongitude'] as num).toDouble();
@@ -488,7 +519,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     final destLng = (widget.order['destinationLongitude'] as num).toDouble();
 
     setState(() {
-      if (result.isGranted) {
+      if (result.isGranted && result.position != null) {
         _driverLocation = LatLng(
           result.position!.latitude,
           result.position!.longitude,

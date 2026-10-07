@@ -40,8 +40,12 @@ class ChatSession with WidgetsBindingObserver {
           .listen((_) {
             if (!_chatOpen) unread.value = unread.value + 1;
           }),
-      _realtime.onChatClosed.where((d) => d['travelId'] == travelId).listen((_) => stop()),
-      _realtime.onTravelEnded.where((d) => d['travelId'] == travelId).listen((_) => stop()),
+      _realtime.onChatClosed
+          .where((d) => d['travelId'] == travelId)
+          .listen((_) => stop()),
+      _realtime.onTravelEnded
+          .where((d) => d['travelId'] == travelId)
+          .listen((_) => stop()),
       // Um alerta ou mensagem emitido com o hub fora do ar não é reenviado.
       _realtime.onReconnected.listen((_) => refresh()),
     ]);

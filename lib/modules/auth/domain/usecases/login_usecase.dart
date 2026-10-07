@@ -15,6 +15,11 @@ class LoginUsecase implements ILoginUsecase {
     String device, {
     String? expectedRole,
   }) {
-    return _repository.signIn(email, password, device, expectedRole: expectedRole);
+    return _repository.signIn(
+      email,
+      password,
+      device,
+      expectedRole: expectedRole,
+    );
   }
 }

@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/config/app_config.dart';
+import 'package:moto_driver/core/errors/user_error_message.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
+import 'package:moto_driver/core/location/background_location_service.dart';
 import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
@@ -82,6 +85,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage>
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
     // Extract route arguments only after the widget is in the tree
     WidgetsBinding.instance.addPostFrameCallback((_) => _extractRouteArgs());
     _loadTravel();
@@ -112,14 +116,19 @@ class _ActiveTravelPageState extends State<ActiveTravelPage>
     _driverArrivedSub = signalR.onDriverArrived.listen(_onProximityAlert);
     // Um alerta emitido com o hub fora do ar não é reenviado: ao reconectar,
     // reidrata pelo estado da viagem.
-    _reconnectedSub = signalR.onReconnected.listen((_) => _refreshPickupProximity());
+    _reconnectedSub = signalR.onReconnected.listen(
+      (_) => _refreshPickupProximity(),
+    );
   }
 
   /// Abre o chat temporário da viagem (spec pickup-chat-call).
   void _openChat() {
     Modular.to.pushNamed(
       '/chat/',
-      arguments: {'travelId': widget.travelId, 'title': 'Chat com o passageiro'},
+      arguments: {
+        'travelId': widget.travelId,
+        'title': 'Chat com o passageiro',
+      },
     );
   }
 
@@ -185,6 +194,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage>
 
   @override
   void dispose() {
+    WakelockPlus.disable();
     _locationTimer?.cancel();
     _travelCancelledSub?.cancel();
     _driverNearbySub?.cancel();
@@ -269,6 +279,8 @@ class _ActiveTravelPageState extends State<ActiveTravelPage>
         _isLoading = false;
       });
 
+      _syncBackgroundTravelStatus(_status);
+
       _updateMapMarkers();
 
       // Chat temporário (spec pickup-chat-call): só existe em Accepted.
@@ -294,7 +306,10 @@ class _ActiveTravelPageState extends State<ActiveTravelPage>
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = e.toString();
+        _error = userErrorMessage(
+          e,
+          fallback: 'Não foi possível carregar a viagem. Tente novamente.',
+        );
       });
     }
   }
@@ -598,10 +613,21 @@ class _ActiveTravelPageState extends State<ActiveTravelPage>
 
   Future<void> _goHome() async {
     _locationTimer?.cancel();
+    _syncBackgroundTravelStatus(null);
     // F07: ver comentário em dispose() — 'travel-management' é da Home, não
     // desconectar aqui.
     await Modular.get<TravelLocalRepository>().clearTravels();
     Modular.to.navigate('/home');
+  }
+
+  void _syncBackgroundTravelStatus(String? status) {
+    try {
+      unawaited(
+        Modular.get<BackgroundLocationService>().setTravelStatus(status),
+      );
+    } catch (_) {
+      // O serviço é exclusivo do Android e pode não existir em testes/iOS.
+    }
   }
 
   @override
@@ -729,7 +755,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage>
                 ),
                 const SizedBox(height: MotoSpace.s8),
                 MotoButton(
-                  label: 'Voltar para Home',
+                  label: 'Voltar para a tela inicial',
                   large: false,
                   expand: false,
                   onPressed: _goHome,
@@ -756,7 +782,7 @@ class _ActiveTravelPageState extends State<ActiveTravelPage>
               ),
               const SizedBox(height: MotoSpace.s8),
               MotoButton(
-                label: 'Voltar para Home',
+                label: 'Voltar para a tela inicial',
                 variant: MotoButtonVariant.danger,
                 large: false,
                 expand: false,
@@ -881,15 +907,18 @@ class _ActiveTravelPageState extends State<ActiveTravelPage>
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Row(
                       children: [
-                        Expanded(
-                          child: CallPassengerButton(
-                            travelId: widget.travelId,
-                            getPassengerPhone: Modular.get<IGetPassengerPhoneUsecase>(),
-                            dialer: Modular.get<IPhoneDialer>(),
-                            onOpenChat: _openChat,
+                        if (_pickupProximity != PickupProximity.none) ...[
+                          Expanded(
+                            child: CallPassengerButton(
+                              travelId: widget.travelId,
+                              getPassengerPhone:
+                                  Modular.get<IGetPassengerPhoneUsecase>(),
+                              dialer: Modular.get<IPhoneDialer>(),
+                              onOpenChat: _openChat,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
+                          const SizedBox(width: 8),
+                        ],
                         Expanded(
                           child: ChatActionButton(
                             session: Modular.get<ChatSession>(),

@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _travelCompletedSub;
   bool _isReconnecting = false;
   bool _reconnectLoopActive = false;
+  Timer? _reconnectBadgeTimer;
   bool _signalRListenersRegistered = false;
   bool _checkingActiveTravel = false;
   String? _currentTravelStatus;
@@ -327,6 +328,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _travelCompletedSub?.cancel();
     _reconnectingSub?.cancel();
     _reconnectedSub?.cancel();
+    _reconnectBadgeTimer?.cancel();
     _closedSub?.cancel();
     super.dispose();
   }
@@ -457,6 +459,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _currentTravelStatus = data['status'] as String?;
             _currentPassengerName = data['passengerName'] as String?;
           });
+          _syncBackgroundTravelStatus(_currentTravelStatus);
           return;
         }
       }
@@ -466,6 +469,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _currentTravelStatus = null;
         _currentPassengerName = null;
       });
+      _syncBackgroundTravelStatus(null);
     } catch (_) {
       // Falha de rede/erro de servidor — fallback silencioso para cache local
       await _loadActiveTravelFromLocal();
@@ -483,6 +487,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _currentTravelStatus = active.status;
         _currentPassengerName = active.passengerName;
       });
+      _syncBackgroundTravelStatus(active.status);
+    }
+  }
+
+  void _syncBackgroundTravelStatus(String? status) {
+    try {
+      unawaited(
+        Modular.get<BackgroundLocationService>().setTravelStatus(status),
+      );
+    } catch (_) {
+      // Serviço exclusivo do Android; ausente em testes e plataformas iOS.
     }
   }
 
@@ -509,9 +524,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _signalRListenersRegistered = true;
 
     _newOrderSub = signalR.onNewOrder.listen((data) async {
-      print(
-        '[DIAG] NewOrder event received: $data, orderAlertOpen=${NotificationService.orderAlertOpen}, sheetVisible=${NotificationService.sheetVisible}, currentTravelId=$_currentTravelId',
-      );
       if (NotificationService.orderAlertOpen) return;
       // Reenvio do mesmo evento NewOrder (reconexão do hub, retry do
       // backend) enquanto o sheet do pedido atual ainda está na tela —
@@ -519,42 +531,51 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (NotificationService.sheetVisible) return;
       if (_currentTravelId != null) return;
 
+      final orderId = data['orderId'] as String?;
+      if (orderId == null) return;
+
+      // Reserva o direito de abrir o sheet antes do primeiro `await`.
+      // Eventos SignalR repetidos podem chegar no mesmo frame; sem essa
+      // trava síncrona todos passavam pelas validações e empilhavam vários
+      // cards da mesma corrida.
+      NotificationService.setSheetVisible(true);
+
       // `_currentTravelId` só é atualizado por fluxos que passam pela home —
       // um aceite via notificação push (OrderAlertPage → /active-travel)
       // nunca toca essa variável, então sob nenhuma hipótese basta confiar
       // só nela: confere a fonte persistida antes de exibir qualquer oferta.
       final travelRepo = Modular.get<TravelLocalRepository>();
-      final active = await travelRepo.getActiveTravel();
-      print('[DIAG] NewOrder: active local travel=$active, mounted=$mounted');
-      if (active != null || !mounted) return;
-
-      final orderId = data['orderId'] as String?;
-      if (orderId == null) return;
-
-      // If this order was already denied, ignore the re-send
-      if (_deniedOrderIds.contains(orderId) ||
-          await NotificationService.isOrderDismissed(orderId)) {
-        return;
-      }
-      if (!mounted) return;
-
-      // A new (non-denied) order signals a fresh dispatch round — clear old denials
-      if (_deniedOrderIds.isNotEmpty) {
-        _deniedOrderIds.clear();
-      }
-
-      IncomingOrderSheet.show(
-        context,
-        data,
-        onDenied: () {
-          _deniedOrderIds.add(orderId);
-          NotificationService.dismissOrder(orderId);
+      try {
+        final active = await travelRepo.getActiveTravel();
+        if (active != null || !mounted) {
           NotificationService.setSheetVisible(false);
-        },
-      );
+          return;
+        }
 
-      // RF05: Marcar sheet como visível para suprimir foreground dup
-      NotificationService.setSheetVisible(true);
+        // If this order was already denied, ignore the re-send.
+        if (_deniedOrderIds.contains(orderId) ||
+            await NotificationService.isOrderDismissed(orderId)) {
+          NotificationService.setSheetVisible(false);
+          return;
+        }
+        if (!mounted) {
+          NotificationService.setSheetVisible(false);
+          return;
+        }
+
+        IncomingOrderSheet.show(
+          context,
+          data,
+          onDenied: () {
+            _deniedOrderIds.add(orderId);
+            NotificationService.dismissOrder(orderId);
+            NotificationService.setSheetVisible(false);
+          },
+        );
+      } catch (_) {
+        NotificationService.setSheetVisible(false);
+        debugPrint('Falha ao processar nova solicitação de viagem.');
+      }
     });
 
     // Listen for travel cancellations
@@ -619,10 +640,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
 
     _reconnectingSub = signalR.onReconnecting.listen((_) {
-      setState(() => _isReconnecting = true);
+      _scheduleReconnectBadge();
     });
 
     _reconnectedSub = signalR.onReconnected.listen((_) {
+      _reconnectBadgeTimer?.cancel();
       setState(() => _isReconnecting = false);
       // Sem replay de eventos para o motorista: ao reconectar, re-consulta
       // o estado canônico para refletir transições perdidas.
@@ -635,7 +657,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // que nada tirava _isReconnecting de true nesse caso.
     _closedSub = signalR.onClosed.listen((_) {
       if (!mounted) return;
-      setState(() => _isReconnecting = true);
+      _scheduleReconnectBadge();
       _reconnectSignalRWithRetry();
     });
 
@@ -661,6 +683,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _connectHubs(signalR, token);
   }
 
+  void _scheduleReconnectBadge() {
+    _reconnectBadgeTimer?.cancel();
+    _reconnectBadgeTimer = Timer(const Duration(seconds: 3), () {
+      final signalR = Modular.get<SignalRService>();
+      final stillDisconnected =
+          !signalR.isConnected('travel-orders') ||
+          !signalR.isConnected('travel-management');
+      if (mounted && stillDisconnected) {
+        setState(() => _isReconnecting = true);
+      }
+    });
+  }
+
   /// Reconecta após um onClosed, com retry em loop até dar certo.
   ///
   /// `connect()` pode falhar (ex.: handshake do protocolo SignalR cancelado
@@ -678,6 +713,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       while (mounted) {
         try {
           await _connectSignalR();
+          _reconnectBadgeTimer?.cancel();
           if (mounted) setState(() => _isReconnecting = false);
           return;
         } catch (e) {

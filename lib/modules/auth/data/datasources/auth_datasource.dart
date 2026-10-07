@@ -73,13 +73,15 @@ class AuthDatasource implements IAuthDatasource {
     switch (e.response?.statusCode) {
       case 403:
         return UnapprovedAccountException(
-          serverMessage ?? 'Sua conta ainda não foi aprovada. Aguarde a aprovação de um administrador antes de redefinir a senha.',
+          serverMessage ??
+              'Sua conta ainda não foi aprovada. Aguarde a aprovação de um administrador antes de redefinir a senha.',
         );
       case 404:
         return NotFoundException(serverMessage ?? 'Email não cadastrado.');
       case 429:
         return RateLimitedException(
-          serverMessage ?? 'Muitas solicitações de redefinição de senha. Aguarde um pouco antes de tentar novamente.',
+          serverMessage ??
+              'Muitas solicitações de redefinição de senha. Aguarde um pouco antes de tentar novamente.',
         );
       case var code when code != null && code >= 500:
         return const ServerException();
@@ -94,7 +96,10 @@ class AuthDatasource implements IAuthDatasource {
   }
 
   @override
-  Future<String> verifyResetCode({required String email, required String code}) async {
+  Future<String> verifyResetCode({
+    required String email,
+    required String code,
+  }) async {
     try {
       final response = await _dio.post(
         '/api/auth/password-reset/verify-code',
@@ -113,12 +118,17 @@ class AuthDatasource implements IAuthDatasource {
     final serverMessage = _extractErrorMessage(e);
     switch (e.response?.statusCode) {
       case 400:
-        return ValidationException(serverMessage ?? 'Código inválido ou expirado.');
+        return ValidationException(
+          serverMessage ?? 'Código inválido ou expirado.',
+        );
       case 409:
-        return ConflictException(serverMessage ?? 'Este código já foi utilizado.');
+        return ConflictException(
+          serverMessage ?? 'Este código já foi utilizado.',
+        );
       case 429:
         return RateLimitedException(
-          serverMessage ?? 'Muitas tentativas com código incorreto. Aguarde 30 minutos e peça um novo código.',
+          serverMessage ??
+              'Muitas tentativas com código incorreto. Aguarde 30 minutos e peça um novo código.',
         );
       case var code when code != null && code >= 500:
         return const ServerException();
@@ -158,9 +168,14 @@ class AuthDatasource implements IAuthDatasource {
     final serverMessage = _extractErrorMessage(e);
     switch (e.response?.statusCode) {
       case 400:
-        return ValidationException(serverMessage ?? 'Token inválido ou expirado, ou senha não atende aos requisitos.');
+        return ValidationException(
+          serverMessage ??
+              'Token inválido ou expirado, ou senha não atende aos requisitos.',
+        );
       case 409:
-        return ConflictException(serverMessage ?? 'Este código já foi utilizado.');
+        return ConflictException(
+          serverMessage ?? 'Este código já foi utilizado.',
+        );
       case 429:
         return const RateLimitedException();
       case var code when code != null && code >= 500:
@@ -179,7 +194,9 @@ class AuthDatasource implements IAuthDatasource {
   Future<PasswordPolicy> getPasswordPolicy() async {
     try {
       final response = await _dio.get('/api/auth/password-policy');
-      return PasswordPolicyModel.fromJson(response.data as Map<String, dynamic>);
+      return PasswordPolicyModel.fromJson(
+        response.data as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw _mapDioException(e);
     }
@@ -194,7 +211,9 @@ class AuthDatasource implements IAuthDatasource {
       case 401:
         // Corpo com mensagem (ex.: conta pendente de aprovação) prevalece
         // sobre o genérico — senha errada continua vindo sem corpo.
-        return UnauthorizedException(_extractErrorMessage(e) ?? 'E-mail ou senha inválidos');
+        return UnauthorizedException(
+          _extractErrorMessage(e) ?? 'E-mail ou senha inválidos',
+        );
       case 403:
         if (isSignIn) {
           // Sign-in com `expectedRole` informado e conta sem esse role.

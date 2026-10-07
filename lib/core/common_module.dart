@@ -41,8 +41,12 @@ class CommonModule extends Module {
     );
     // Push (spec push-notification-sounds): o canal dos avisos de corrida, com o som do Moto,
     // é criado antes de o OneSignal inicializar. O decorador mantém o resto do serviço igual.
-    i.addSingleton<INotificationChannelService>(() => NotificationChannelService());
-    i.addSingleton<OneSignalNotificationService>(OneSignalNotificationService.new);
+    i.addSingleton<INotificationChannelService>(
+      () => NotificationChannelService(),
+    );
+    i.addSingleton<OneSignalNotificationService>(
+      OneSignalNotificationService.new,
+    );
     i.addSingleton<INotificationService>(
       () => RideAlertsChannelNotificationService(
         Modular.get<OneSignalNotificationService>(),

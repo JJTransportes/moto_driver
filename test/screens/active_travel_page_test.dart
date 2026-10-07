@@ -280,7 +280,7 @@ void main() {
       verify(() => dio.post(any())).called(1);
       // Aparece 2x: no título do AppBar (_statusLabel()) e no corpo do estado terminal.
       expect(find.text('Viagem cancelada'), findsWidgets);
-      expect(find.text('Voltar para Home'), findsOneWidget);
+      expect(find.text('Voltar para a tela inicial'), findsOneWidget);
     },
   );
 
@@ -329,7 +329,7 @@ void main() {
   });
 
   testWidgets(
-    'Completed direto do carregamento → estado terminal com "Voltar para Home"',
+    'Completed direto do carregamento → estado terminal com "Voltar para a tela inicial"',
     (tester) async {
       when(
         () => dio.get(any()),
@@ -339,7 +339,7 @@ void main() {
 
       expect(find.text('Viagem concluída!'), findsOneWidget);
 
-      await tester.tap(find.text('Voltar para Home'));
+      await tester.tap(find.text('Voltar para a tela inicial'));
       await tester.pumpAndSettle();
 
       verify(() => travelLocalRepository.clearTravels()).called(1);
@@ -505,18 +505,29 @@ void main() {
   // ── Spec pickup-chat-call (req 5.x, 6.1, 6.7) ────────────────────────
 
   group('chat e ligação no card', () {
-    void stubTravel(String status) {
+    void stubTravel(String status, {String pickupProximity = 'None'}) {
       when(() => dio.get(any())).thenAnswer((invocation) async {
         final url = invocation.positionalArguments.first as String;
         if (url.contains('/api/passengers/')) {
           return okResponse(passengerProfilePayload());
         }
-        return okResponse(travelPayload(status: status));
+        return okResponse(
+          travelPayload(status: status, pickupProximity: pickupProximity),
+        );
       });
     }
 
-    testWidgets('Accepted mostra o ícone de ligação e a ação de chat', (tester) async {
+    testWidgets('Accepted distante mostra apenas a ação de chat', (tester) async {
       stubTravel('Accepted');
+
+      await pumpPage(tester);
+
+      expect(find.byKey(const Key('call_passenger_button')), findsNothing);
+      expect(find.byKey(const Key('chat_action_button')), findsOneWidget);
+    });
+
+    testWidgets('Accepted próximo mostra ligação e chat', (tester) async {
+      stubTravel('Accepted', pickupProximity: 'Nearby');
 
       await pumpPage(tester);
 
@@ -540,7 +551,9 @@ void main() {
         if (url.contains('/api/passengers/')) {
           return okResponse(passengerProfilePayload());
         }
-        return okResponse(travelPayload(status: status));
+        return okResponse(
+          travelPayload(status: status, pickupProximity: 'Nearby'),
+        );
       });
       when(() => signalRService.startTravel(any())).thenAnswer((_) async {
         status = 'InProgress';
