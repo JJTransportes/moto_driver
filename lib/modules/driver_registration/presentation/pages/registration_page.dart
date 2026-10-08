@@ -67,6 +67,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     'email' => _emailController,
     'cpf' => _cpfController,
     'cnh' => _cnhController,
+    'phone' => _phoneController,
     _ => null,
   };
 
@@ -83,6 +84,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       _passwordController,
       _confirmPasswordController,
       _cnhController,
+      _phoneController,
     ]) {
       controller.addListener(_onFieldsChanged);
     }
@@ -120,6 +122,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
             break;
           case 'cnh':
             _cnhError = null;
+            break;
+          case 'phone':
+            _phoneError = null;
             break;
         }
       }
@@ -365,6 +370,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   break;
                 case 'cnh':
                   _cnhError = state.message;
+                  break;
+                case 'phone':
+                  _phoneError = state.message;
                   break;
               }
             }

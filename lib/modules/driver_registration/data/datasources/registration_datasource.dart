@@ -82,6 +82,7 @@ class RegistrationDatasource implements IRegistrationDatasource {
     if (lowered.contains('e-mail') || lowered.contains('email')) return 'email';
     if (lowered.contains('cpf')) return 'cpf';
     if (lowered.contains('cnh')) return 'cnh';
+    if (lowered.contains('telefone')) return 'phone';
     return null;
   }
 
@@ -94,6 +95,7 @@ class RegistrationDatasource implements IRegistrationDatasource {
       'email' => 'Este e-mail já está cadastrado.',
       'cpf' => 'Este CPF já está cadastrado.',
       'cnh' => 'Esta CNH já está cadastrada.',
+      'phone' => 'Este telefone já está cadastrado.',
       _ => 'Já existe um cadastro com estes dados.',
     };
   }

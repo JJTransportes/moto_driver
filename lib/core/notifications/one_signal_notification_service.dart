@@ -143,6 +143,9 @@ class OneSignalNotificationService implements INotificationService {
     }
 
     log('[PUSH] Notification clicked: orderId=$orderId', name: 'push');
+    // O SO já tocou o áudio da push. Marca antes do primeiro await para que
+    // uma reconexão imediata do SignalR não reproduza o som local novamente.
+    NotificationService.suppressForegroundSound(orderId);
 
     if (NotificationService.orderAlertOpen) {
       NotificationService.setPendingOrder(orderId);

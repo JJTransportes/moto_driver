@@ -90,6 +90,11 @@ class ProfileDatasource implements IProfileDatasource {
         );
       case 404:
         return const NotFoundException('Perfil não encontrado.');
+      case 409:
+        return ValidationException(
+          _extractErrorMessage(e) ??
+              'Este telefone já está cadastrado.',
+        );
       case 413:
         return const ValidationException(
           'Arquivo muito grande. Envie uma imagem menor.',

@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/design_system/design_system.dart';
+import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/modules/chat/domain/entities/chat_entities.dart';
 import 'package:moto_driver/modules/chat/presentation/blocs/chat_bloc.dart';
 import 'package:moto_driver/modules/chat/presentation/blocs/chat_event.dart';
@@ -14,12 +18,14 @@ class ChatPage extends StatefulWidget {
   final String travelId;
   final String title;
   final ChatSession session;
+  final SignalRService? signalR;
 
   const ChatPage({
     super.key,
     required this.travelId,
     required this.title,
     required this.session,
+    this.signalR,
   });
 
   @override
@@ -31,20 +37,53 @@ class _ChatPageState extends State<ChatPage> {
   final _scroll = ScrollController();
   bool _canSend = false;
   bool _closing = false;
+  bool _otherUserTyping = false;
+  Timer? _typingTimer;
+  StreamSubscription<Map<String, dynamic>>? _typingSubscription;
+
+  static const _quickMessages = [
+    'Olá! Estou a caminho.',
+    'Já cheguei ao local de embarque.',
+    'Pode me informar um ponto de referência?',
+  ];
 
   @override
   void initState() {
     super.initState();
     widget.session.setChatOpen(true);
+    final signalR = widget.signalR;
+    _typingSubscription = signalR?.onChatTyping
+        .where((data) => data['travelId'] == widget.travelId)
+        .listen((data) {
+          if (!mounted) return;
+          setState(() => _otherUserTyping = data['isTyping'] == true);
+        });
     _controller.addListener(() {
       final canSend = _controller.text.trim().isNotEmpty;
       if (canSend != _canSend) setState(() => _canSend = canSend);
+      if (signalR != null) {
+        unawaited(signalR.sendChatTyping(widget.travelId, canSend));
+      }
+      _typingTimer?.cancel();
+      if (canSend) {
+        _typingTimer = Timer(const Duration(seconds: 2), () {
+          if (signalR != null) {
+            unawaited(signalR.sendChatTyping(widget.travelId, false));
+          }
+        });
+      }
     });
   }
 
   @override
   void dispose() {
     widget.session.setChatOpen(false);
+    _typingTimer?.cancel();
+    _typingSubscription?.cancel();
+    final signalR = widget.signalR;
+    if (signalR != null) {
+      unawaited(signalR.sendChatTyping(widget.travelId, false));
+    }
     _controller.dispose();
     _scroll.dispose();
     super.dispose();
@@ -154,7 +193,7 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
         Expanded(
-          child: state.items.isEmpty
+          child: state.items.isEmpty && !_otherUserTyping
               ? Center(
                   child: Text(
                     'Nenhuma mensagem ainda. Combine o ponto de encontro por aqui.',
@@ -165,19 +204,46 @@ class _ChatPageState extends State<ChatPage> {
               : ListView.builder(
                   controller: _scroll,
                   padding: const EdgeInsets.all(16),
-                  itemCount: state.items.length,
-                  itemBuilder: (context, index) => _Bubble(
-                    item: state.items[index],
-                    onRetry: () => BlocProvider.of<ChatBloc>(context).add(
-                      ChatSendRetried(state.items[index].clientMessageId),
-                    ),
-                  ),
+                  itemCount: state.items.length + (_otherUserTyping ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == state.items.length) {
+                      return const _TypingBubble();
+                    }
+                    return _Bubble(
+                      item: state.items[index],
+                      onRetry: () => BlocProvider.of<ChatBloc>(context).add(
+                        ChatSendRetried(state.items[index].clientMessageId),
+                      ),
+                    );
+                  },
                 ),
         ),
+        if (state.items.isEmpty) _buildQuickMessages(),
         _buildInput(state),
       ],
     );
   }
+
+  Widget _buildQuickMessages() => SingleChildScrollView(
+    key: const Key('chat-quick-messages'),
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+    child: Row(
+      children: _quickMessages
+          .map(
+            (message) => Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(
+                label: Text(message),
+                onPressed: () => BlocProvider.of<ChatBloc>(
+                  context,
+                ).add(ChatMessageSubmitted(message)),
+              ),
+            ),
+          )
+          .toList(),
+    ),
+  );
 
   Widget _buildInput(ChatReady state) {
     return Padding(
@@ -275,4 +341,63 @@ class _Bubble extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TypingBubble extends StatefulWidget {
+  const _TypingBubble();
+
+  @override
+  State<_TypingBubble> createState() => _TypingBubbleState();
+}
+
+class _TypingBubbleState extends State<_TypingBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Align(
+    key: const Key('chat-typing-indicator'),
+    alignment: Alignment.centerLeft,
+    child: Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: context.moto.bgRaised,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.moto.borderDefault),
+      ),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (index) {
+            final wave = math.sin(
+              (_controller.value * 2 * math.pi) - (index * 0.8),
+            );
+            return Transform.translate(
+              offset: Offset(0, -3 * wave),
+              child: Container(
+                width: 7,
+                height: 7,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: context.moto.textSecondary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    ),
+  );
 }

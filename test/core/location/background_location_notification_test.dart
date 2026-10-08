@@ -2,6 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moto_driver/core/location/background_location_service.dart';
 
 void main() {
+  test('sem conexão informa que está tentando enviar a localização', () {
+    expect(
+      backgroundTravelNotificationText(
+        'InProgress',
+        connectionUnavailable: true,
+      ),
+      'Sem conexão — tentando enviar sua localização',
+    );
+  });
   group('backgroundTravelNotificationText', () {
     test('mostra deslocamento ao embarque em Accepted', () {
       expect(

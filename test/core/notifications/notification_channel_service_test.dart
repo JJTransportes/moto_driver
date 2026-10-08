@@ -22,17 +22,22 @@ void main() {
   });
 
   void mockChannel(Future<Object?>? Function(MethodCall call) handler) {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
-      channel,
-      (call) async {
-        calls.add(call);
-        return handler(call);
-      },
-    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          channel,
+          (call) async {
+            calls.add(call);
+            return handler(call);
+          },
+        );
   }
 
   NotificationChannelService build({bool android = true}) =>
-      NotificationChannelService(isAndroid: () => android, log: logs.add);
+      NotificationChannelService(
+        isAndroid: () => android,
+        canPlaySound: () => android,
+        log: logs.add,
+      );
 
   group('constantes do canal', () {
     test('o id é versionado (trocar o som exige um id novo)', () {
@@ -50,12 +55,32 @@ void main() {
       expect(RideAlertsChannel.soundResource, matches(RegExp(r'^[a-z0-9_]+$')));
     });
 
-    test('o id do canal é diferente do nome (o backend envia o id, nunca o nome)', () {
-      expect(RideAlertsChannel.id, isNot(RideAlertsChannel.name));
-    });
+    test(
+      'o id do canal é diferente do nome (o backend envia o id, nunca o nome)',
+      () {
+        expect(RideAlertsChannel.id, isNot(RideAlertsChannel.name));
+      },
+    );
   });
 
   group('Android', () {
+    test('reproduz localmente o mesmo som quando o card chega', () async {
+      mockChannel((_) async => true);
+
+      await build().playRideAlertSound();
+
+      expect(calls.single.method, 'playRideAlertSound');
+      expect(calls.single.arguments, {'sound': 'moto_notification'});
+    });
+
+    test('interrompe o som quando a oferta é decidida', () async {
+      mockChannel((_) async => true);
+
+      await build().stopRideAlertSound();
+
+      expect(calls.single.method, 'stopRideAlertSound');
+    });
+
     test('registra o canal com id, nome, descrição e som', () async {
       mockChannel((_) async => true);
 
@@ -80,11 +105,18 @@ void main() {
       await service.ensureRideAlertsChannel();
 
       expect(calls, hasLength(3));
-      expect(calls.map((c) => c.arguments['id']).toSet(), {'moto_ride_alerts_v2'});
+      expect(calls.map((c) => c.arguments['id']).toSet(), {
+        'moto_ride_alerts_v2',
+      });
     });
 
     test('falha do canal nativo não lança e é registrada em log', () async {
-      mockChannel((_) => throw PlatformException(code: 'channel_failed', message: 'segredo do erro'));
+      mockChannel(
+        (_) => throw PlatformException(
+          code: 'channel_failed',
+          message: 'segredo do erro',
+        ),
+      );
 
       await expectLater(build().ensureRideAlertsChannel(), completes);
 
@@ -92,14 +124,22 @@ void main() {
       expect(logs.any((l) => l.contains('[PUSH]')), isTrue);
     });
 
-    test('o log da falha traz só o tipo do erro, não o texto da exceção', () async {
-      mockChannel((_) => throw PlatformException(code: 'channel_failed', message: 'segredo do erro'));
+    test(
+      'o log da falha traz só o tipo do erro, não o texto da exceção',
+      () async {
+        mockChannel(
+          (_) => throw PlatformException(
+            code: 'channel_failed',
+            message: 'segredo do erro',
+          ),
+        );
 
-      await build().ensureRideAlertsChannel();
+        await build().ensureRideAlertsChannel();
 
-      expect(logs.any((l) => l.contains('segredo do erro')), isFalse);
-      expect(logs.any((l) => l.contains('PlatformException')), isTrue);
-    });
+        expect(logs.any((l) => l.contains('segredo do erro')), isFalse);
+        expect(logs.any((l) => l.contains('PlatformException')), isTrue);
+      },
+    );
 
     test('canal nativo inexistente (MissingPluginException) não lança', () async {
       // Sem handler registrado, o canal de método lança MissingPluginException.

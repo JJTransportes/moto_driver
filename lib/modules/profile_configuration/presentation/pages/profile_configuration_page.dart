@@ -16,10 +16,12 @@ import 'package:moto_driver/modules/profile_configuration/presentation/widgets/p
 
 class ProfileConfigurationPage extends StatefulWidget {
   final String userId;
+  final bool requirePhone;
 
   const ProfileConfigurationPage({
     super.key,
     required this.userId,
+    this.requirePhone = false,
   });
 
   @override
@@ -31,11 +33,12 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
   final ProfileImagePicker _imagePicker = ProfileImagePicker();
   final GlobalKey<ProfileFormState> _formKey = GlobalKey<ProfileFormState>();
   bool _hasActiveTravel = false;
-  bool _isEditing = false;
+  late bool _isEditing;
 
   @override
   void initState() {
     super.initState();
+    _isEditing = widget.requirePhone;
     context.read<ProfileConfigurationBloc>().add(
       ProfileLoadEvent(userId: widget.userId),
     );
@@ -64,6 +67,12 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
             } else {
               setState(() => _isEditing = false);
               _showSnackbar('Dados atualizados com sucesso!');
+              if (widget.requirePhone &&
+                  (state.profile.phone?.trim().isNotEmpty ?? false)) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) Modular.to.pop();
+                });
+              }
             }
           }
           if (state is ProfileUpdateFailure) {
@@ -95,7 +104,7 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                 ? state
                 : null;
             final isUploading = uploadState != null;
-            final canEdit = !_hasActiveTravel;
+            final canEdit = widget.requirePhone || !_hasActiveTravel;
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -145,7 +154,7 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                     isEditing: _isEditing,
                     onChanged: () => setState(() {}),
                   ),
-                  if (_hasActiveTravel) ...[
+                  if (_hasActiveTravel && !widget.requirePhone) ...[
                     const SizedBox(height: 8),
                     Text(
                       'Não é possível editar o perfil enquanto houver uma viagem em andamento.',

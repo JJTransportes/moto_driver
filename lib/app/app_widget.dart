@@ -7,6 +7,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/location/mandatory_location_gate.dart';
+import 'package:moto_driver/core/network/mandatory_connectivity_gate.dart';
+import 'package:moto_driver/core/profile/mandatory_phone_gate.dart';
 import 'package:moto_driver/core/update/mandatory_update_gate.dart';
 import 'package:moto_driver/design_system/design_system.dart';
 
@@ -92,7 +94,11 @@ class _AppWidgetState extends State<AppWidget> with WidgetsBindingObserver {
         GlobalCupertinoLocalizations.delegate,
       ],
       builder: (context, child) => MandatoryUpdateGate(
-        child: MandatoryLocationGate(child: child!),
+        child: MandatoryConnectivityGate(
+          child: MandatoryLocationGate(
+            child: MandatoryPhoneGate(child: child!),
+          ),
+        ),
       ),
     );
   }

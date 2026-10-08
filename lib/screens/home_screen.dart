@@ -12,6 +12,7 @@ import 'package:moto_driver/core/location/background_location_service.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
+import 'package:moto_driver/core/notifications/notification_channel_service.dart';
 import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/driver_availability/data/datasources/availability_datasource.dart';
 import 'package:moto_driver/modules/driver_availability/domain/entities/driver_availability_entity.dart';
@@ -54,6 +55,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _userPhotoUrl;
   String? _userName;
   bool? _hasVehicle;
+  bool _showDriverReminders = true;
 
   final Set<String> _deniedOrderIds = {};
 
@@ -116,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               const SizedBox(height: MotoSpace.s4),
               if (_currentTravelId != null)
                 _buildActiveTravelCard()
-              else
+              else ...[
                 MotoGlass(
                   painted: true,
                   padding: const EdgeInsets.all(MotoSpace.s5),
@@ -130,6 +132,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
+                const SizedBox(height: MotoSpace.s4),
+                _buildDriverRemindersCard(),
+              ],
               const SizedBox(height: MotoSpace.s4),
               MotoGlass(
                 painted: true,
@@ -165,6 +170,128 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDriverRemindersCard() {
+    return MotoGlass(
+      painted: true,
+      padding: const EdgeInsets.all(MotoSpace.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            key: const ValueKey('driver-reminders-toggle'),
+            borderRadius: MotoRadius.brMd,
+            onTap: () => setState(
+              () => _showDriverReminders = !_showDriverReminders,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: MotoSpace.s1),
+              child: Row(
+                children: [
+                  const MotoTile(icon: Icons.info_outline, size: 36),
+                  const SizedBox(width: MotoSpace.s3),
+                  Expanded(
+                    child: Text(
+                      'Antes de receber corridas',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _showDriverReminders ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: context.moto.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: _showDriverReminders
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: MotoSpace.s4),
+                      _buildReminderItem(
+                        icon: Icons.notifications_active_outlined,
+                        title: 'Mantenha as notificações ativadas',
+                        description:
+                            'Elas são essenciais para avisar imediatamente sobre novas solicitações de corrida.',
+                      ),
+                      const SizedBox(height: MotoSpace.s3),
+                      _buildReminderItem(
+                        icon: Icons.location_on_outlined,
+                        title: 'Permita a localização o tempo todo',
+                        description:
+                            'O acesso contínuo mantém sua posição atualizada, inclusive quando o aplicativo estiver em segundo plano.',
+                        actionLabel: 'Verificar configuração',
+                        onAction: Geolocator.openAppSettings,
+                      ),
+                      const SizedBox(height: MotoSpace.s3),
+                      _buildReminderItem(
+                        icon: Icons.volume_up_outlined,
+                        title: 'Mantenha o volume audível',
+                        description:
+                            'Use um volume adequado para ouvir o alerta e não perder novas oportunidades de corrida.',
+                      ),
+                    ],
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReminderItem({
+    required IconData icon,
+    required String title,
+    required String description,
+    String? actionLabel,
+    Future<bool> Function()? onAction,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 22, color: context.moto.accent),
+        const SizedBox(width: MotoSpace.s3),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: MotoSpace.s1),
+              Text(
+                description,
+                style: TextStyle(
+                  color: context.moto.textSecondary,
+                  fontSize: 13,
+                  height: 1.35,
+                ),
+              ),
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(height: MotoSpace.s1),
+                TextButton.icon(
+                  onPressed: () => unawaited(onAction()),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: Text(actionLabel),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -563,6 +690,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           return;
         }
 
+        // Em primeiro plano o banner/som do OneSignal é bloqueado e o card é
+        // a fonte do alerta. Se a oferta veio de um toque na push, o SO já
+        // tocou o áudio e esta reprodução local é suprimida.
+        if (!NotificationService.shouldSuppressForegroundSound(orderId)) {
+          await Modular.get<INotificationChannelService>().playRideAlertSound();
+        }
+        if (!mounted) {
+          NotificationService.setSheetVisible(false);
+          return;
+        }
+
         IncomingOrderSheet.show(
           context,
           data,
@@ -666,6 +804,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Página de pedido aberta: quem trata o cancelamento é a própria página
       // (RF10) — o popUntil abaixo arrancaria a /order-alert da pilha.
       if (NotificationService.orderAlertOpen) return;
+      unawaited(
+        Modular.get<INotificationChannelService>().stopRideAlertSound(),
+      );
+      NotificationService.setSheetVisible(false);
       // Dismiss any open bottom sheet and notify the driver
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).popUntil((route) => route.isFirst);

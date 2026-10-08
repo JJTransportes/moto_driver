@@ -186,6 +186,27 @@ void main() {
     expect(find.text('Viagem ativa'), findsNothing);
   });
 
+  testWidgets('orientações começam abertas e podem ser recolhidas', (
+    tester,
+  ) async {
+    await pumpHome(tester, surfaceSize: const Size(430, 932));
+
+    final toggle = find.byKey(const ValueKey('driver-reminders-toggle'));
+    expect(find.text('Antes de receber corridas'), findsOneWidget);
+    expect(find.text('Mantenha as notificações ativadas'), findsOneWidget);
+
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Antes de receber corridas'), findsOneWidget);
+    expect(find.text('Mantenha as notificações ativadas'), findsNothing);
+
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(find.text('Mantenha as notificações ativadas'), findsOneWidget);
+  });
+
   for (final viewport in <({String name, Size size, double textScale})>[
     (name: 'iPhone SE', size: const Size(320, 568), textScale: 1.3),
     (name: 'iPhone moderno', size: const Size(390, 844), textScale: 1.0),

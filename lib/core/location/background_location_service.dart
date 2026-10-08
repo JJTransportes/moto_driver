@@ -19,7 +19,11 @@ const _travelStatusKey = 'background_location_travel_status';
 String backgroundTravelNotificationText(
   String? status, {
   String? updatedAt,
+  bool connectionUnavailable = false,
 }) {
+  if (connectionUnavailable) {
+    return 'Sem conexão — tentando enviar sua localização';
+  }
   final suffix = updatedAt == null ? '' : ' • atualizado às $updatedAt';
   return switch (status) {
     'Accepted' => 'A caminho do local de embarque$suffix',
@@ -137,6 +141,17 @@ class BackgroundLocationTaskHandler extends TaskHandler {
         'timestamp': _lastSentAt!.toIso8601String(),
       });
     } catch (error) {
+      try {
+        await FlutterForegroundTask.updateService(
+          notificationTitle: 'Motô em atendimento',
+          notificationText: backgroundTravelNotificationText(
+            null,
+            connectionUnavailable: true,
+          ),
+        );
+      } catch (_) {
+        // O serviço pode estar sendo encerrado; mantém o erro original.
+      }
       FlutterForegroundTask.sendDataToMain({
         'type': 'location_error',
         'message': error.toString(),

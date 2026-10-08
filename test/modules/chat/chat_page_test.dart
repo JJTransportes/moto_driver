@@ -31,7 +31,11 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(
-      const SendChatMessageParams(travelId: 't', text: 'x', clientMessageId: 'c'),
+      const SendChatMessageParams(
+        travelId: 't',
+        text: 'x',
+        clientMessageId: 'c',
+      ),
     );
   });
 
@@ -48,7 +52,12 @@ void main() {
         ChatHistoryEntity(
           messages: [
             chatMessage('m1', 'Estou na portaria'),
-            chatMessage('m2', 'Já estou descendo', mine: true, senderRole: 'Passenger'),
+            chatMessage(
+              'm2',
+              'Já estou descendo',
+              mine: true,
+              senderRole: 'Passenger',
+            ),
           ],
           unreadCount: 0,
         ),
@@ -75,7 +84,9 @@ void main() {
       MaterialApp(
         theme: MotoTheme.claro(),
         home: BlocProvider<ChatBloc>(
-          create: (_) => ChatBloc(send, load, markRead, realtime)..add(const ChatStarted(kTravelId)),
+          create: (_) =>
+              ChatBloc(send, load, markRead, realtime)
+                ..add(const ChatStarted(kTravelId)),
           child: ChatPage(
             travelId: kTravelId,
             title: 'Chat com o passageiro',
@@ -88,7 +99,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
   }
 
-  testWidgets('mostra o título, o histórico e o campo de mensagem', (tester) async {
+  testWidgets('mostra o título, o histórico e o campo de mensagem', (
+    tester,
+  ) async {
     await pumpPage(tester);
 
     expect(find.text('Chat com o passageiro'), findsOneWidget);
@@ -98,7 +111,9 @@ void main() {
     expect(find.byKey(const Key('chat_send_button')), findsOneWidget);
   });
 
-  testWidgets('abrir a conversa zera o selo de não lidas da sessão', (tester) async {
+  testWidgets('abrir a conversa zera o selo de não lidas da sessão', (
+    tester,
+  ) async {
     session.unread.value = 3;
 
     await pumpPage(tester);
@@ -106,34 +121,59 @@ void main() {
     expect(session.unread.value, 0);
   });
 
-  testWidgets('botão de enviar fica desabilitado com o campo vazio', (tester) async {
+  testWidgets('botão de enviar fica desabilitado com o campo vazio', (
+    tester,
+  ) async {
     await pumpPage(tester);
 
-    final button = tester.widget<IconButton>(find.byKey(const Key('chat_send_button')));
+    final button = tester.widget<IconButton>(
+      find.byKey(const Key('chat_send_button')),
+    );
     expect(button.onPressed, isNull);
   });
 
-  testWidgets('digitar habilita o envio, enviar limpa o campo e mostra a mensagem', (tester) async {
-    when(() => send(any())).thenAnswer(
-      (_) async => Success(chatMessage('srv', 'Vou até a recepção', mine: true, senderRole: 'Passenger')),
-    );
-    await pumpPage(tester);
+  testWidgets(
+    'digitar habilita o envio, enviar limpa o campo e mostra a mensagem',
+    (tester) async {
+      when(() => send(any())).thenAnswer(
+        (_) async => Success(
+          chatMessage(
+            'srv',
+            'Vou até a recepção',
+            mine: true,
+            senderRole: 'Passenger',
+          ),
+        ),
+      );
+      await pumpPage(tester);
 
-    await tester.enterText(find.byKey(const Key('chat_input')), 'Vou até a recepção');
-    await tester.pump();
-    expect(
-      tester.widget<IconButton>(find.byKey(const Key('chat_send_button'))).onPressed,
-      isNotNull,
-    );
+      await tester.enterText(
+        find.byKey(const Key('chat_input')),
+        'Vou até a recepção',
+      );
+      await tester.pump();
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(const Key('chat_send_button')))
+            .onPressed,
+        isNotNull,
+      );
 
-    await tester.tap(find.byKey(const Key('chat_send_button')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byKey(const Key('chat_send_button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Vou até a recepção'), findsOneWidget);
-    expect(tester.widget<TextField>(find.byKey(const Key('chat_input'))).controller!.text, isEmpty);
-    verify(() => send(any())).called(1);
-  });
+      expect(find.text('Vou até a recepção'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('chat_input')))
+            .controller!
+            .text,
+        isEmpty,
+      );
+      verify(() => send(any())).called(1);
+    },
+  );
 
   testWidgets('o campo limita a mensagem a 500 caracteres', (tester) async {
     await pumpPage(tester);
@@ -144,7 +184,9 @@ void main() {
     expect(kChatMaxMessageLength, 500);
   });
 
-  testWidgets('mensagem recebida em tempo real aparece ao fim da conversa', (tester) async {
+  testWidgets('mensagem recebida em tempo real aparece ao fim da conversa', (
+    tester,
+  ) async {
     await pumpPage(tester);
 
     realtime.messages.add(realtimeMessage('m3', 'Cheguei no portão'));
@@ -154,35 +196,52 @@ void main() {
     expect(find.text('Cheguei no portão'), findsOneWidget);
   });
 
-  testWidgets('falha de envio mostra "Não enviada" e permite reenviar sem perder o texto', (tester) async {
-    var attempts = 0;
-    when(() => send(any())).thenAnswer((_) async {
-      attempts++;
-      return attempts == 1
-          ? const Failure(ServerException('Não foi possível enviar a mensagem. Tente novamente.'))
-          : Success(chatMessage('srv', 'Texto que não pode sumir', mine: true));
-    });
-    await pumpPage(tester);
+  testWidgets(
+    'falha de envio mostra "Não enviada" e permite reenviar sem perder o texto',
+    (tester) async {
+      var attempts = 0;
+      when(() => send(any())).thenAnswer((_) async {
+        attempts++;
+        return attempts == 1
+            ? const Failure(
+                ServerException(
+                  'Não foi possível enviar a mensagem. Tente novamente.',
+                ),
+              )
+            : Success(
+                chatMessage('srv', 'Texto que não pode sumir', mine: true),
+              );
+      });
+      await pumpPage(tester);
 
-    await tester.enterText(find.byKey(const Key('chat_input')), 'Texto que não pode sumir');
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('chat_send_button')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+      await tester.enterText(
+        find.byKey(const Key('chat_input')),
+        'Texto que não pode sumir',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('chat_send_button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Texto que não pode sumir'), findsOneWidget);
-    expect(find.byKey(const Key('chat_retry')), findsOneWidget);
-    expect(find.text('Não foi possível enviar a mensagem. Tente novamente.'), findsOneWidget);
+      expect(find.text('Texto que não pode sumir'), findsOneWidget);
+      expect(find.byKey(const Key('chat_retry')), findsOneWidget);
+      expect(
+        find.text('Não foi possível enviar a mensagem. Tente novamente.'),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.byKey(const Key('chat_retry')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byKey(const Key('chat_retry')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.byKey(const Key('chat_retry')), findsNothing);
-    expect(attempts, 2);
-  });
+      expect(find.byKey(const Key('chat_retry')), findsNothing);
+      expect(attempts, 2);
+    },
+  );
 
-  testWidgets('sem conexão mostra "reconectando" e desabilita o envio', (tester) async {
+  testWidgets('sem conexão mostra "reconectando" e desabilita o envio', (
+    tester,
+  ) async {
     await pumpPage(tester);
 
     realtime.reconnecting.add(null);
@@ -193,7 +252,9 @@ void main() {
 
     expect(find.byKey(const Key('chat_reconnecting_banner')), findsOneWidget);
     expect(
-      tester.widget<IconButton>(find.byKey(const Key('chat_send_button'))).onPressed,
+      tester
+          .widget<IconButton>(find.byKey(const Key('chat_send_button')))
+          .onPressed,
       isNull,
     );
   });
@@ -212,12 +273,16 @@ void main() {
 
     expect(find.byKey(const Key('chat_reconnecting_banner')), findsNothing);
     expect(
-      tester.widget<IconButton>(find.byKey(const Key('chat_send_button'))).onPressed,
+      tester
+          .widget<IconButton>(find.byKey(const Key('chat_send_button')))
+          .onPressed,
       isNotNull,
     );
   });
 
-  testWidgets('chat encerrado fecha a conversa e avisa em português', (tester) async {
+  testWidgets('chat encerrado fecha a conversa e avisa em português', (
+    tester,
+  ) async {
     await pumpPage(tester);
 
     realtime.closed.add({'travelId': kTravelId});
@@ -228,7 +293,9 @@ void main() {
     verify(() => navigator.pop()).called(1);
   });
 
-  testWidgets('viagem iniciada fecha a conversa mesmo sem ChatClosed', (tester) async {
+  testWidgets('viagem iniciada fecha a conversa mesmo sem ChatClosed', (
+    tester,
+  ) async {
     await pumpPage(tester);
 
     realtime.travelEnded.add({'travelId': kTravelId});
@@ -238,8 +305,12 @@ void main() {
     verify(() => navigator.pop()).called(1);
   });
 
-  testWidgets('falha ao carregar mostra a mensagem e "Tentar novamente"', (tester) async {
-    when(() => load(kTravelId)).thenAnswer((_) async => const Failure(NetworkException()));
+  testWidgets('falha ao carregar mostra a mensagem e "Tentar novamente"', (
+    tester,
+  ) async {
+    when(
+      () => load(kTravelId),
+    ).thenAnswer((_) async => const Failure(NetworkException()));
 
     await pumpPage(tester);
 
@@ -252,13 +323,19 @@ void main() {
         MaterialApp(
           theme: MotoTheme.claro(),
           home: Scaffold(
-            body: ChatActionButton(session: session, onPressed: onPressed, label: 'Chat com o passageiro'),
+            body: ChatActionButton(
+              session: session,
+              onPressed: onPressed,
+              label: 'Chat com o passageiro',
+            ),
           ),
         ),
       );
     }
 
-    testWidgets('sem não lidas mostra só o rótulo', (tester) async {
+    testWidgets('sem não lidas mantém o selo oculto', (
+      tester,
+    ) async {
       await pumpButton(tester, () {});
 
       expect(find.text('Chat com o passageiro'), findsOneWidget);
@@ -266,37 +343,20 @@ void main() {
       expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
     });
 
-    testWidgets('com não lidas mostra o selo e a contagem', (tester) async {
-      session.unread.value = 2;
-      await pumpButton(tester, () {});
-
-      expect(find.text('Chat com o passageiro (2)'), findsOneWidget);
-      expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
-    });
-
-    testWidgets('o selo acompanha a sessão', (tester) async {
-      await pumpButton(tester, () {});
-
-      session.unread.value = 5;
-      await tester.pump();
-
-      expect(find.text('Chat com o passageiro (5)'), findsOneWidget);
-    });
-
-    testWidgets('acima de 99 mostra 99+', (tester) async {
-      session.unread.value = 150;
-      await pumpButton(tester, () {});
-
-      expect(find.text('99+'), findsOneWidget);
-    });
-
-    testWidgets('toque chama a ação', (tester) async {
+    testWidgets('toque limpa as não lidas e chama a ação', (tester) async {
       var taps = 0;
+      session.unread.value = 4;
       await pumpButton(tester, () => taps++);
 
+      expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
+      expect(find.text('4'), findsOneWidget);
+
       await tester.tap(find.byKey(const Key('chat_action_button')));
+      await tester.pump();
 
       expect(taps, 1);
+      expect(session.unread.value, 0);
+      expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isFalse);
     });
   });
 }

@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ContentResolver
 import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
@@ -11,6 +12,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private var rideAlertPlayer: MediaPlayer? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -20,23 +22,63 @@ class MainActivity : FlutterActivity() {
         // OneSignal; recriar o mesmo id é inofensivo.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NOTIFICATION_CHANNEL)
             .setMethodCallHandler { call, result ->
-                if (call.method != "ensureChannel") {
-                    result.notImplemented()
-                    return@setMethodCallHandler
-                }
-
                 try {
-                    ensureChannel(
-                        id = call.argument<String>("id") ?: error("id ausente"),
-                        name = call.argument<String>("name") ?: error("name ausente"),
-                        description = call.argument<String>("description") ?: "",
-                        soundResource = call.argument<String>("sound") ?: "",
-                    )
-                    result.success(true)
+                    when (call.method) {
+                        "ensureChannel" -> {
+                            ensureChannel(
+                                id = call.argument<String>("id") ?: error("id ausente"),
+                                name = call.argument<String>("name") ?: error("name ausente"),
+                                description = call.argument<String>("description") ?: "",
+                                soundResource = call.argument<String>("sound") ?: "",
+                            )
+                            result.success(true)
+                        }
+                        "playRideAlertSound" -> {
+                            playRideAlertSound(
+                                call.argument<String>("sound") ?: "moto_notification"
+                            )
+                            result.success(true)
+                        }
+                        "stopRideAlertSound" -> {
+                            stopRideAlertSound()
+                            result.success(true)
+                        }
+                        else -> result.notImplemented()
+                    }
                 } catch (e: Exception) {
                     result.error("channel_failed", e.javaClass.simpleName, null)
                 }
             }
+    }
+
+    private fun playRideAlertSound(soundResource: String) {
+        val soundId = resources.getIdentifier(soundResource, "raw", packageName)
+        if (soundId == 0) return
+
+        rideAlertPlayer?.run {
+            if (isPlaying) stop()
+            release()
+        }
+        rideAlertPlayer = MediaPlayer.create(this, soundId)?.apply {
+            setOnCompletionListener { player ->
+                player.release()
+                if (rideAlertPlayer === player) rideAlertPlayer = null
+            }
+            start()
+        }
+    }
+
+    private fun stopRideAlertSound() {
+        rideAlertPlayer?.run {
+            if (isPlaying) stop()
+            release()
+        }
+        rideAlertPlayer = null
+    }
+
+    override fun onDestroy() {
+        stopRideAlertSound()
+        super.onDestroy()
     }
 
     private fun ensureChannel(id: String, name: String, description: String, soundResource: String) {

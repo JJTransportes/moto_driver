@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moto_driver/core/location/location_service.dart';
@@ -35,7 +36,8 @@ void main() {
     travelCancelledController =
         StreamController<Map<String, dynamic>>.broadcast();
     driverNearbyController = StreamController<Map<String, dynamic>>.broadcast();
-    driverArrivedController = StreamController<Map<String, dynamic>>.broadcast();
+    driverArrivedController =
+        StreamController<Map<String, dynamic>>.broadcast();
     reconnectedController = StreamController<void>.broadcast();
 
     GoogleMapsFlutterPlatform.instance = FakeGoogleMapsPlatform();
@@ -44,12 +46,15 @@ void main() {
     when(
       () => signalRService.onTravelCancelled,
     ).thenAnswer((_) => travelCancelledController.stream);
-    when(() => signalRService.onDriverNearby)
-        .thenAnswer((_) => driverNearbyController.stream);
-    when(() => signalRService.onDriverArrived)
-        .thenAnswer((_) => driverArrivedController.stream);
-    when(() => signalRService.onReconnected)
-        .thenAnswer((_) => reconnectedController.stream);
+    when(
+      () => signalRService.onDriverNearby,
+    ).thenAnswer((_) => driverNearbyController.stream);
+    when(
+      () => signalRService.onDriverArrived,
+    ).thenAnswer((_) => driverArrivedController.stream);
+    when(
+      () => signalRService.onReconnected,
+    ).thenAnswer((_) => reconnectedController.stream);
     when(() => signalRService.isConnected(any())).thenReturn(true);
     when(
       () => signalRService.connect(any(), any(), any()),
@@ -81,14 +86,15 @@ void main() {
     await reconnectedController.close();
   });
 
-  ActiveTravelTestModule buildModule({ChatSession? chatSession}) => ActiveTravelTestModule(
-    dio: dio,
-    authStorage: authStorage,
-    signalRService: signalRService,
-    travelLocalRepository: travelLocalRepository,
-    locationService: locationService,
-    chatSession: chatSession,
-  );
+  ActiveTravelTestModule buildModule({ChatSession? chatSession}) =>
+      ActiveTravelTestModule(
+        dio: dio,
+        authStorage: authStorage,
+        signalRService: signalRService,
+        travelLocalRepository: travelLocalRepository,
+        locationService: locationService,
+        chatSession: chatSession,
+      );
 
   Future<void> pumpPage(
     WidgetTester tester, {
@@ -143,6 +149,65 @@ void main() {
       expect(find.text('Deslize para finalizar'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'arrastar painel para baixo preserva endereços, esconde ações e amplia mapa',
+    (tester) async {
+      when(() => dio.get(any())).thenAnswer((invocation) async {
+        final url = invocation.positionalArguments.first as String;
+        if (url.contains('/api/passengers/')) {
+          return okResponse(passengerProfilePayload());
+        }
+        return okResponse(travelPayload(status: 'InProgress'));
+      });
+
+      await pumpPage(tester);
+      final mapBefore = tester.getSize(find.byType(GoogleMap)).height;
+      final departure = find.textContaining('Av. Paulista, 1000');
+      final destination = find.textContaining('Av. Faria Lima, 2000');
+
+      expect(find.text('Deslize para finalizar'), findsOneWidget);
+      expect(departure, findsOneWidget);
+      expect(destination, findsOneWidget);
+
+      await tester.fling(
+        find.byKey(const ValueKey('travel-info-panel')),
+        const Offset(0, 250),
+        1200,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Deslize para finalizar'), findsNothing);
+      expect(find.text('Cancelar viagem'), findsNothing);
+      expect(departure, findsOneWidget);
+      expect(destination, findsOneWidget);
+      expect(
+        tester.getSize(find.byType(GoogleMap)).height,
+        greaterThan(mapBefore),
+      );
+    },
+  );
+
+  testWidgets('botão alterna o acompanhamento da câmera de navegação', (
+    tester,
+  ) async {
+    when(() => dio.get(any())).thenAnswer((invocation) async {
+      final url = invocation.positionalArguments.first as String;
+      if (url.contains('/api/passengers/')) {
+        return okResponse(passengerProfilePayload());
+      }
+      return okResponse(travelPayload(status: 'InProgress'));
+    });
+
+    await pumpPage(tester);
+    expect(find.byIcon(Icons.my_location_rounded), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.my_location_rounded));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.navigation_rounded), findsOneWidget);
+  });
 
   testWidgets(
     'erro ao carregar → mostra mensagem + "Tentar novamente" recarrega',
@@ -259,7 +324,9 @@ void main() {
           return okResponse(passengerProfilePayload());
         return okResponse(travelPayload(status: status));
       });
-      when(() => dio.post(any())).thenAnswer((_) async {
+      when(
+        () => dio.post(any(), data: any(named: 'data')),
+      ).thenAnswer((_) async {
         status = 'Cancelled';
         return okResponse(const {});
       });
@@ -269,15 +336,21 @@ void main() {
 
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
-      expect(
-        find.text('Tem certeza que deseja cancelar esta viagem?'),
-        findsOneWidget,
-      );
+      expect(find.text('Motivo do cancelamento'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(TextButton, 'Sim, cancelar'));
+      await tester.enterText(find.byType(TextField), 'Problema no veículo');
+      await tester.pump();
+      await tester.tap(
+        find.widgetWithText(TextButton, 'Confirmar cancelamento'),
+      );
       await tester.pumpAndSettle();
 
-      verify(() => dio.post(any())).called(1);
+      verify(
+        () => dio.post(
+          any(),
+          data: {'reason': 'Problema no veículo'},
+        ),
+      ).called(1);
       // Aparece 2x: no título do AppBar (_statusLabel()) e no corpo do estado terminal.
       expect(find.text('Viagem cancelada'), findsWidgets);
       expect(find.text('Voltar para a tela inicial'), findsOneWidget);
@@ -285,7 +358,7 @@ void main() {
   );
 
   testWidgets(
-    'TravelCancelled via SignalR (mesmo travelId) → snackbar + volta pra Home',
+    'TravelCancelled via SignalR mostra quem cancelou no estado terminal',
     (tester) async {
       when(() => dio.get(any())).thenAnswer((invocation) async {
         final url = invocation.positionalArguments.first as String;
@@ -296,15 +369,21 @@ void main() {
 
       await pumpPage(tester, travelId: 'travel-1');
 
-      travelCancelledController.add({'travelId': 'travel-1'});
+      travelCancelledController.add({
+        'travelId': 'travel-1',
+        'cancelledByRole': 'Passenger',
+        'reason': 'Mudança de planos',
+      });
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('Viagem cancelada pelo passageiro.'), findsOneWidget);
-      verify(() => travelLocalRepository.clearTravels()).called(1);
-      verify(
-        () => navigator.navigate('/home', arguments: any(named: 'arguments')),
-      ).called(1);
+      expect(
+        find.text('A viagem foi cancelada pelo passageiro.'),
+        findsWidgets,
+      );
+      expect(find.text('Motivo: Mudança de planos'), findsOneWidget);
+      expect(find.text('Voltar para a tela inicial'), findsOneWidget);
+      verifyNever(() => travelLocalRepository.clearTravels());
     },
   );
 
@@ -382,7 +461,9 @@ void main() {
       expect(find.text(arrivedText), findsNothing);
     });
 
-    testWidgets('DriverNearby mostra que o passageiro foi avisado', (tester) async {
+    testWidgets('DriverNearby mostra que o passageiro foi avisado', (
+      tester,
+    ) async {
       stubTravel();
       await pumpPage(tester);
 
@@ -393,7 +474,9 @@ void main() {
       expect(find.text(nearbyText), findsOneWidget);
     });
 
-    testWidgets('DriverArrived substitui a indicação de próximo', (tester) async {
+    testWidgets('DriverArrived substitui a indicação de próximo', (
+      tester,
+    ) async {
       stubTravel();
       await pumpPage(tester);
 
@@ -408,7 +491,9 @@ void main() {
       expect(find.text(nearbyText), findsNothing);
     });
 
-    testWidgets('Nearby atrasado não regride a indicação de chegada', (tester) async {
+    testWidgets('Nearby atrasado não regride a indicação de chegada', (
+      tester,
+    ) async {
       stubTravel();
       await pumpPage(tester);
 
@@ -434,26 +519,32 @@ void main() {
       expect(find.text(arrivedText), findsNothing);
     });
 
-    testWidgets('reabrir a tela em Accepted já com Arrived reidrata pela consulta da viagem', (
-      tester,
-    ) async {
-      stubTravel(pickupProximity: 'Arrived');
+    testWidgets(
+      'reabrir a tela em Accepted já com Arrived reidrata pela consulta da viagem',
+      (
+        tester,
+      ) async {
+        stubTravel(pickupProximity: 'Arrived');
 
-      await pumpPage(tester);
+        await pumpPage(tester);
 
-      expect(find.text(arrivedText), findsOneWidget);
-    });
+        expect(find.text(arrivedText), findsOneWidget);
+      },
+    );
 
-    testWidgets('viagem InProgress não mostra indicação mesmo com marca residual', (
-      tester,
-    ) async {
-      stubTravel(status: 'InProgress', pickupProximity: 'Arrived');
+    testWidgets(
+      'viagem InProgress não mostra indicação mesmo com marca residual',
+      (
+        tester,
+      ) async {
+        stubTravel(status: 'InProgress', pickupProximity: 'Arrived');
 
-      await pumpPage(tester);
+        await pumpPage(tester);
 
-      expect(find.text(arrivedText), findsNothing);
-      expect(find.text(nearbyText), findsNothing);
-    });
+        expect(find.text(arrivedText), findsNothing);
+        expect(find.text(nearbyText), findsNothing);
+      },
+    );
 
     testWidgets('iniciar a viagem limpa a indicação', (tester) async {
       var status = 'Accepted';
@@ -481,7 +572,9 @@ void main() {
       expect(find.text(arrivedText), findsNothing);
     });
 
-    testWidgets('ao reconectar o hub, reidrata a indicação perdida', (tester) async {
+    testWidgets('ao reconectar o hub, reidrata a indicação perdida', (
+      tester,
+    ) async {
       var proximity = 'None';
       when(() => dio.get(any())).thenAnswer((invocation) async {
         final url = invocation.positionalArguments.first as String;
@@ -517,7 +610,9 @@ void main() {
       });
     }
 
-    testWidgets('Accepted distante mostra apenas a ação de chat', (tester) async {
+    testWidgets('Accepted distante mostra apenas a ação de chat', (
+      tester,
+    ) async {
       stubTravel('Accepted');
 
       await pumpPage(tester);
@@ -580,7 +675,9 @@ void main() {
       expect(session.travelId, 'travel-1');
     });
 
-    testWidgets('a sessão de chat não é iniciada fora de Accepted', (tester) async {
+    testWidgets('a sessão de chat não é iniciada fora de Accepted', (
+      tester,
+    ) async {
       stubTravel('InProgress');
       final session = buildQuietChatSession();
       addTearDown(session.stop);
@@ -590,7 +687,9 @@ void main() {
       expect(session.travelId, isNull);
     });
 
-    testWidgets('mensagens não lidas aparecem no selo do card', (tester) async {
+    testWidgets('o botão do card não repete a contagem do cabeçalho', (
+      tester,
+    ) async {
       stubTravel('Accepted');
       final session = buildQuietChatSession();
       addTearDown(session.stop);
@@ -599,7 +698,37 @@ void main() {
       session.unread.value = 3;
       await tester.pump();
 
-      expect(find.text('Chat (3)'), findsOneWidget);
+      expect(find.text('Chat'), findsOneWidget);
+      expect(find.text('Chat (3)'), findsNothing);
+    });
+
+    testWidgets('selo do chat aparece no cabeçalho e some após leitura', (
+      tester,
+    ) async {
+      stubTravel('Accepted');
+      final session = buildQuietChatSession();
+      addTearDown(session.stop);
+      await pumpPage(tester, chatSession: session);
+
+      session.unread.value = 3;
+      await tester.pump();
+
+      expect(find.byKey(const Key('header-chat-button')), findsOneWidget);
+      expect(find.byIcon(Icons.notifications_rounded), findsOneWidget);
+      final headerBadge = find.byKey(const Key('header-chat-unread-badge'));
+      expect(
+        find.descendant(of: headerBadge, matching: find.text('3')),
+        findsOneWidget,
+      );
+
+      session.setChatOpen(true);
+      await tester.pump();
+
+      expect(find.byKey(const Key('header-chat-button')), findsNothing);
+      expect(
+        find.descendant(of: headerBadge, matching: find.text('3')),
+        findsNothing,
+      );
     });
   });
 }

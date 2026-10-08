@@ -14,6 +14,7 @@ import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/maps/directions_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/inotification_service.dart';
+import 'package:moto_driver/core/notifications/notification_channel_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 
 enum OrderDecision { accepted, denied }
@@ -286,6 +287,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   Future<void> _accept(BuildContext context, String id) async {
     if (_actionInFlight) return;
     _actionInFlight = true;
+    unawaited(_stopAlertSound());
     setState(() {
       _status = _AcceptStatus.accepting;
       _errorMessage = null;
@@ -427,6 +429,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
   Future<void> _deny(BuildContext context, String orderId) async {
     if (_actionInFlight) return;
     _actionInFlight = true;
+    unawaited(_stopAlertSound());
     NotificationService.dismissOrder(orderId);
     unawaited(_dismissNativeNotification(orderId));
 
@@ -465,6 +468,7 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
 
   void _autoReject() {
     if (!mounted) return;
+    unawaited(_stopAlertSound());
     final orderId = widget.order['orderId'] as String;
     NotificationService.dismissOrder(orderId);
     unawaited(_dismissNativeNotification(orderId));
@@ -505,6 +509,15 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
       // O bloqueio local é a garantia durante a sessão. A remoção visual do
       // push é best-effort porque o plugin pode não estar disponível; após um
       // reinício, o backend continua sendo a autoridade e recusa a oferta.
+    }
+  }
+
+  Future<void> _stopAlertSound() async {
+    try {
+      await Modular.get<INotificationChannelService>().stopRideAlertSound();
+    } catch (_) {
+      // O áudio é auxiliar: a decisão da corrida nunca pode depender do
+      // canal nativo estar disponível.
     }
   }
 

@@ -156,9 +156,9 @@ class ProfileFormState extends State<ProfileForm> {
     return null;
   }
 
-  /// Telefone é opcional: sem erro se vazio, valida formato só se preenchido.
+  /// Telefone obrigatório em toda atualização de perfil.
   String? get _phoneErrorIfAny => _phoneController.text.trim().isEmpty
-      ? null
+      ? 'Telefone é obrigatório'
       : validators.validatePhone(_phoneController.text);
 
   /// Valida ao tentar salvar; retorna true se tudo estiver ok.
@@ -291,7 +291,7 @@ class ProfileFormState extends State<ProfileForm> {
                 maxLength,
               }) => null,
           decoration: InputDecoration(
-            labelText: 'Telefone (opcional)',
+            labelText: 'Telefone *',
             prefixIcon: const Icon(Icons.phone),
             border: const OutlineInputBorder(),
             hintText: '(12) 91234-5678',

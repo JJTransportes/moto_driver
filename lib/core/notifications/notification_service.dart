@@ -2,7 +2,9 @@ import 'dart:developer' show log;
 
 class NotificationService {
   static const _dismissedOrderTtl = Duration(hours: 6);
+  static const _pushSoundSuppressionTtl = Duration(seconds: 20);
   static final Map<String, int> _dismissedOrders = {};
+  static final Map<String, int> _pushSoundSuppressions = {};
 
   static bool _sheetVisible = false;
 
@@ -66,6 +68,27 @@ class NotificationService {
         _dismissedOrders.remove(entry.key);
       }
     }
+  }
+
+  /// Marca uma oferta aberta pelo toque na push. O sistema operacional já
+  /// reproduziu o som dessa notificação; se o SignalR reenviar o NewOrder ao
+  /// reconectar, a Home não deve tocar o mesmo áudio uma segunda vez.
+  static void suppressForegroundSound(String orderId) {
+    if (orderId.isEmpty) return;
+    _pushSoundSuppressions[orderId] = DateTime.now().millisecondsSinceEpoch;
+    _trimPushSoundSuppressions();
+  }
+
+  static bool shouldSuppressForegroundSound(String orderId) {
+    _trimPushSoundSuppressions();
+    return _pushSoundSuppressions.containsKey(orderId);
+  }
+
+  static void _trimPushSoundSuppressions() {
+    final cutoff = DateTime.now()
+        .subtract(_pushSoundSuppressionTtl)
+        .millisecondsSinceEpoch;
+    _pushSoundSuppressions.removeWhere((_, timestamp) => timestamp < cutoff);
   }
 
   // ── Página de pedido aberta ──────────────────────────────────────────

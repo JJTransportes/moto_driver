@@ -21,6 +21,8 @@ class SignalRService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _chatMessageController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _chatTypingController =
+      StreamController<Map<String, dynamic>>.broadcast();
   final _chatClosedController =
       StreamController<Map<String, dynamic>>.broadcast();
   final _reconnectingController = StreamController<void>.broadcast();
@@ -45,6 +47,15 @@ class SignalRService {
       _driverArrivedController.stream;
   Stream<Map<String, dynamic>> get onChatMessageReceived =>
       _chatMessageController.stream;
+  Stream<Map<String, dynamic>> get onChatTyping => _chatTypingController.stream;
+
+  Future<void> sendChatTyping(String travelId, bool isTyping) async {
+    await _connections['travel-management']?.invoke(
+      'SendChatTyping',
+      args: [travelId, isTyping],
+    );
+  }
+
   Stream<Map<String, dynamic>> get onChatClosed => _chatClosedController.stream;
 
   /// Conecta a um hub específico, identificado por [hubName].
@@ -125,6 +136,7 @@ class SignalRService {
     _driverNearbyController.close();
     _driverArrivedController.close();
     _chatMessageController.close();
+    _chatTypingController.close();
     _chatClosedController.close();
     _reconnectingController.close();
     _reconnectedController.close();
@@ -218,6 +230,11 @@ class SignalRService {
         connection.on('ChatMessageReceived', (args) {
           if (args != null && args.isNotEmpty) {
             _chatMessageController.add(args.first as Map<String, dynamic>);
+          }
+        });
+        connection.on('ChatTyping', (args) {
+          if (args != null && args.isNotEmpty) {
+            _chatTypingController.add(args.first as Map<String, dynamic>);
           }
         });
         connection.on('ChatClosed', (args) {

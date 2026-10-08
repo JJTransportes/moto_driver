@@ -29,6 +29,14 @@ abstract class INotificationChannelService {
   /// No iOS e em plataformas sem canais não faz nada. Nunca lança: uma falha só é registrada e
   /// o app segue, recebendo as notificações pelo canal padrão.
   Future<void> ensureRideAlertsChannel();
+
+  /// Reproduz o mesmo som da push quando uma oferta chega com o app aberto.
+  /// É best-effort e nunca deve impedir a abertura do card da corrida.
+  Future<void> playRideAlertSound();
+
+  /// Interrompe imediatamente o alerta local quando a oferta deixa de estar
+  /// pendente (aceite, recusa, expiração ou indisponibilidade).
+  Future<void> stopRideAlertSound();
 }
 
 class NotificationChannelService implements INotificationChannelService {
@@ -37,12 +45,17 @@ class NotificationChannelService implements INotificationChannelService {
   );
 
   final bool Function() _isAndroid;
+  final bool Function() _canPlaySound;
   final void Function(String message) _log;
 
   NotificationChannelService({
     bool Function()? isAndroid,
+    bool Function()? canPlaySound,
     void Function(String message)? log,
   }) : _isAndroid = isAndroid ?? (() => !kIsWeb && Platform.isAndroid),
+       _canPlaySound =
+           canPlaySound ??
+           (() => !kIsWeb && (Platform.isAndroid || Platform.isIOS)),
        _log =
            log ??
            ((message) => developer.log(message, name: 'push', level: 900));
@@ -61,6 +74,30 @@ class NotificationChannelService implements INotificationChannelService {
     } catch (e) {
       // Só o tipo do erro: o texto da exceção não precisa ir para o log.
       _log('[PUSH] Notification channel setup failed (${e.runtimeType}).');
+    }
+  }
+
+  @override
+  Future<void> playRideAlertSound() async {
+    if (!_canPlaySound()) return;
+
+    try {
+      await _channel.invokeMethod<bool>('playRideAlertSound', {
+        'sound': RideAlertsChannel.soundResource,
+      });
+    } catch (e) {
+      _log('[PUSH] Ride alert sound failed (${e.runtimeType}).');
+    }
+  }
+
+  @override
+  Future<void> stopRideAlertSound() async {
+    if (!_canPlaySound()) return;
+
+    try {
+      await _channel.invokeMethod<bool>('stopRideAlertSound');
+    } catch (e) {
+      _log('[PUSH] Stopping ride alert sound failed (${e.runtimeType}).');
     }
   }
 }
