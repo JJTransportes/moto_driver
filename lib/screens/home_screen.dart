@@ -46,6 +46,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _currentPassengerName;
   Timer? _locationTimer;
   Timer? _activeTravelPollTimer;
+  Timer? _offerRecoveryTimer;
+  bool _offerRecoveryInFlight = false;
   Position? _lastReportedPosition;
   DateTime? _lastLocationReportAt;
   bool _locationReportInFlight = false;
@@ -56,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _userName;
   bool? _hasVehicle;
   bool _showDriverReminders = true;
+  bool _isRefreshingHome = false;
 
   final Set<String> _deniedOrderIds = {};
 
@@ -105,6 +108,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 photoUrl: _userPhotoUrl,
                 userId: _userId ?? '',
                 onSignOut: _handleSignOut,
+                onRefresh: _refreshHome,
+                isRefreshing: _isRefreshingHome,
                 onSettingsTap: () async {
                   await Modular.to.pushNamed(
                     '/profile-configuration',
@@ -448,6 +453,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _locationTimer?.cancel();
     _availabilityTimer?.cancel();
     _activeTravelPollTimer?.cancel();
+    _offerRecoveryTimer?.cancel();
     _newOrderSub?.cancel();
     _orderCancelledSub?.cancel();
     _travelCancelledSub?.cancel();
@@ -471,6 +477,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Rede de segurança: re-consulta o estado canônico periodicamente,
     // cobrindo eventos SignalR perdidos (não há replay para o motorista).
     _startActiveTravelPolling();
+    _startOfferRecoveryPolling();
 
     // F04 (auditoria de escalabilidade): existia um terceiro canal aqui,
     // `POST /api/positions/drivers/{userId}` via HTTP a cada 10s, rodando em
@@ -488,6 +495,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Apenas leituras periódicas de GPS/HTTP e o repaint do contador param.
       _locationTimer?.cancel();
       _activeTravelPollTimer?.cancel();
+      _offerRecoveryTimer?.cancel();
       _availabilityTimer?.cancel();
       return;
     }
@@ -497,6 +505,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _checkActiveTravelHttp();
     _checkAvailability();
     _startActiveTravelPolling();
+    _startOfferRecoveryPolling();
     _reconnectSignalRIfNeeded();
   }
 
@@ -507,6 +516,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       const Duration(seconds: 15),
       (_) => _checkActiveTravelHttp(),
     );
+  }
+
+  void _startOfferRecoveryPolling() {
+    _offerRecoveryTimer?.cancel();
+    if (!_isAppActive) return;
+    unawaited(_checkCurrentOfferHttp());
+    _offerRecoveryTimer = Timer.periodic(
+      const Duration(seconds: 4),
+      (_) => _checkCurrentOfferHttp(),
+    );
+  }
+
+  Future<void> _checkCurrentOfferHttp() async {
+    if (_offerRecoveryInFlight ||
+        !_isAppActive ||
+        _currentTravelId != null ||
+        NotificationService.sheetVisible ||
+        NotificationService.orderAlertOpen) {
+      return;
+    }
+
+    _offerRecoveryInFlight = true;
+    try {
+      final dio = Modular.get<Dio>();
+      final response = await dio.get('/api/travels/orders/current-offer');
+      if (!mounted || response.statusCode != 200 || response.data == null) {
+        return;
+      }
+      final data = Map<String, dynamic>.from(
+        response.data as Map,
+      );
+      await _handleIncomingOrder(data);
+    } catch (_) {
+      // SignalR e push continuam como caminhos primários. Uma falha temporária
+      // nesta rede de segurança não altera disponibilidade nem encerra sessão.
+    } finally {
+      _offerRecoveryInFlight = false;
+    }
   }
 
   /// O SO pode ter suspendido a conexão de rede com o app em background sem
@@ -521,6 +568,52 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return;
     }
     await _connectSignalR();
+  }
+
+  Future<void> _refreshHome() async {
+    if (_isRefreshingHome) return;
+    setState(() => _isRefreshingHome = true);
+
+    try {
+      await _reconnectSignalRIfNeeded();
+      await Future.wait([
+        _checkActiveTravelHttp(),
+        _checkCurrentOfferHttp(),
+        _checkAvailability(),
+      ]);
+
+      if (!mounted) return;
+      final signalR = Modular.get<SignalRService>();
+      final connected =
+          signalR.isConnected('travel-orders') &&
+          signalR.isConnected('travel-management');
+      if (connected) {
+        _reconnectBadgeTimer?.cancel();
+        setState(() => _isReconnecting = false);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            connected
+                ? 'Informações atualizadas.'
+                : 'Ainda estamos tentando restabelecer a conexão.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      developer.log('Falha na atualização manual da tela inicial', error: e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível atualizar agora. Tente novamente.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshingHome = false);
+    }
   }
 
   Future<void> _loadUserId() async {
@@ -650,70 +743,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     _signalRListenersRegistered = true;
 
-    _newOrderSub = signalR.onNewOrder.listen((data) async {
-      if (NotificationService.orderAlertOpen) return;
-      // Reenvio do mesmo evento NewOrder (reconexão do hub, retry do
-      // backend) enquanto o sheet do pedido atual ainda está na tela —
-      // sem essa checagem, abria um segundo sheet por cima do primeiro.
-      if (NotificationService.sheetVisible) return;
-      if (_currentTravelId != null) return;
-
-      final orderId = data['orderId'] as String?;
-      if (orderId == null) return;
-
-      // Reserva o direito de abrir o sheet antes do primeiro `await`.
-      // Eventos SignalR repetidos podem chegar no mesmo frame; sem essa
-      // trava síncrona todos passavam pelas validações e empilhavam vários
-      // cards da mesma corrida.
-      NotificationService.setSheetVisible(true);
-
-      // `_currentTravelId` só é atualizado por fluxos que passam pela home —
-      // um aceite via notificação push (OrderAlertPage → /active-travel)
-      // nunca toca essa variável, então sob nenhuma hipótese basta confiar
-      // só nela: confere a fonte persistida antes de exibir qualquer oferta.
-      final travelRepo = Modular.get<TravelLocalRepository>();
-      try {
-        final active = await travelRepo.getActiveTravel();
-        if (active != null || !mounted) {
-          NotificationService.setSheetVisible(false);
-          return;
-        }
-
-        // If this order was already denied, ignore the re-send.
-        if (_deniedOrderIds.contains(orderId) ||
-            await NotificationService.isOrderDismissed(orderId)) {
-          NotificationService.setSheetVisible(false);
-          return;
-        }
-        if (!mounted) {
-          NotificationService.setSheetVisible(false);
-          return;
-        }
-
-        // Em primeiro plano o banner/som do OneSignal é bloqueado e o card é
-        // a fonte do alerta. Se a oferta veio de um toque na push, o SO já
-        // tocou o áudio e esta reprodução local é suprimida.
-        if (!NotificationService.shouldSuppressForegroundSound(orderId)) {
-          await Modular.get<INotificationChannelService>().playRideAlertSound();
-        }
-        if (!mounted) {
-          NotificationService.setSheetVisible(false);
-          return;
-        }
-
-        IncomingOrderSheet.show(
-          context,
-          data,
-          onDenied: () {
-            _deniedOrderIds.add(orderId);
-            NotificationService.dismissOrder(orderId);
-            NotificationService.setSheetVisible(false);
-          },
-        );
-      } catch (_) {
-        NotificationService.setSheetVisible(false);
-        debugPrint('Falha ao processar nova solicitação de viagem.');
-      }
+    _newOrderSub = signalR.onNewOrder.listen((data) {
+      unawaited(_handleIncomingOrder(data));
     });
 
     // Listen for travel cancellations
@@ -787,6 +818,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Sem replay de eventos para o motorista: ao reconectar, re-consulta
       // o estado canônico para refletir transições perdidas.
       _checkActiveTravelHttp();
+      _checkCurrentOfferHttp();
     });
 
     // Dispara quando o backoff automático se esgota e a conexão cai de vez
@@ -823,6 +855,99 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // ── Now connect to hubs (listeners are already registered) ──
     await _connectHubs(signalR, token);
+  }
+
+  Future<void> _handleIncomingOrder(Map<String, dynamic> data) async {
+    if (NotificationService.orderAlertOpen) return;
+    // Reenvio do mesmo evento NewOrder (reconexão do hub, retry do
+    // backend) enquanto o sheet do pedido atual ainda está na tela —
+    // sem essa checagem, abria um segundo sheet por cima do primeiro.
+    if (NotificationService.sheetVisible) return;
+    if (_currentTravelId != null) return;
+
+    final orderId = data['orderId'] as String?;
+    if (orderId == null) return;
+
+    // Reserva o direito de abrir o sheet antes do primeiro `await`.
+    // Eventos SignalR repetidos podem chegar no mesmo frame; sem essa
+    // trava síncrona todos passavam pelas validações e empilhavam vários
+    // cards da mesma corrida.
+    NotificationService.setSheetVisible(true);
+
+    // `_currentTravelId` só é atualizado por fluxos que passam pela home —
+    // um aceite via notificação push (OrderAlertPage → /active-travel)
+    // nunca toca essa variável, então sob nenhuma hipótese basta confiar
+    // só nela: confere a fonte persistida antes de exibir qualquer oferta.
+    final travelRepo = Modular.get<TravelLocalRepository>();
+    try {
+      final acknowledged = await _acknowledgeOffer(orderId);
+      if (acknowledged == null || !mounted) {
+        NotificationService.setSheetVisible(false);
+        return;
+      }
+      data = acknowledged;
+
+      final active = await travelRepo.getActiveTravel();
+      if (active != null || !mounted) {
+        NotificationService.setSheetVisible(false);
+        return;
+      }
+
+      // If this order was already denied, ignore the re-send.
+      if (_deniedOrderIds.contains(orderId) ||
+          await NotificationService.isOrderDismissed(orderId)) {
+        NotificationService.setSheetVisible(false);
+        return;
+      }
+      if (!mounted) {
+        NotificationService.setSheetVisible(false);
+        return;
+      }
+
+      // Em primeiro plano o banner/som do OneSignal é bloqueado e o card é
+      // a fonte do alerta. Se a oferta veio de um toque na push, o SO já
+      // tocou o áudio e esta reprodução local é suprimida.
+      if (!NotificationService.shouldSuppressForegroundSound(orderId)) {
+        await Modular.get<INotificationChannelService>().playRideAlertSound();
+      }
+      if (!mounted) {
+        NotificationService.setSheetVisible(false);
+        return;
+      }
+
+      IncomingOrderSheet.show(
+        context,
+        data,
+        onDenied: () {
+          _deniedOrderIds.add(orderId);
+          NotificationService.dismissOrder(orderId);
+          NotificationService.setSheetVisible(false);
+        },
+      );
+    } catch (_) {
+      NotificationService.setSheetVisible(false);
+      debugPrint('Falha ao processar nova solicitação de viagem.');
+    }
+  }
+
+  Future<Map<String, dynamic>?> _acknowledgeOffer(String orderId) async {
+    final dio = Modular.get<Dio>();
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final response = await dio.post(
+          '${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/received',
+        );
+        if (response.statusCode == 200 && response.data is Map) {
+          return Map<String, dynamic>.from(response.data as Map);
+        }
+        return null;
+      } catch (_) {
+        if (attempt == 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 750));
+        }
+      }
+    }
+    return null;
   }
 
   void _scheduleReconnectBadge() {

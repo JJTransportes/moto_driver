@@ -100,6 +100,15 @@ void main() {
     when(() => travelLocalRepository.clearTravels()).thenAnswer((_) async {});
 
     when(() => signOutService.signOut()).thenAnswer((_) async {});
+    when(() => dio.post(any())).thenAnswer((invocation) async {
+      final url = invocation.positionalArguments.first as String;
+      final segments = Uri.parse(url).pathSegments;
+      final receivedIndex = segments.indexOf('received');
+      final orderId = receivedIndex > 0
+          ? segments[receivedIndex - 1]
+          : 'order-1';
+      return okResponse(newOrderPayload(orderId: orderId));
+    });
     when(() => locationService.getCurrentPosition()).thenAnswer(
       (_) async => const LocationResult(status: LocationStatus.denied),
     );

@@ -54,6 +54,7 @@ void main() {
     when(() => signalRService.disconnect(any())).thenAnswer((_) async {});
     when(() => signalRService.denyOrder(any())).thenAnswer((_) async {});
     when(() => authStorage.getToken()).thenAnswer((_) async => 'token');
+    when(() => dio.post(any())).thenAnswer((_) async => okResponse({}));
   });
 
   PushTestModule buildModule() => PushTestModule(
@@ -133,48 +134,51 @@ void main() {
     destroyTestModule();
   });
 
-  testWidgets('403 → indisponível + Voltar para a tela inicial (limpa pendente)', (
-    tester,
-  ) async {
-    when(() => dio.get(any())).thenThrow(
-      DioException(
-        requestOptions: RequestOptions(path: ''),
-        response: Response<dynamic>(
+  testWidgets(
+    '403 → indisponível + Voltar para a tela inicial (limpa pendente)',
+    (
+      tester,
+    ) async {
+      when(() => dio.get(any())).thenThrow(
+        DioException(
           requestOptions: RequestOptions(path: ''),
-          statusCode: 403,
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: ''),
+            statusCode: 403,
+          ),
         ),
-      ),
-    );
-    when(() => navigator.path).thenReturn('/order-alert');
-    when(
-      () => navigator.pushReplacementNamed(
-        any(),
-        arguments: any(named: 'arguments'),
-      ),
-    ).thenAnswer((_) async => null);
+      );
+      when(() => navigator.path).thenReturn('/order-alert');
+      when(
+        () => navigator.pushReplacementNamed(
+          any(),
+          arguments: any(named: 'arguments'),
+        ),
+      ).thenAnswer((_) async => null);
 
-    NotificationService.setPendingOrder('order-1');
-    await pumpPage(tester);
+      NotificationService.setPendingOrder('order-1');
+      await pumpPage(tester);
 
-    expect(
-      find.text('Este pedido não está mais disponível para você.'),
-      findsOneWidget,
-    );
+      expect(
+        find.text('Este pedido não está mais disponível para você.'),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.text('Voltar para a tela inicial'));
-    await tester.pump();
+      await tester.tap(find.text('Voltar para a tela inicial'));
+      await tester.pump();
 
-    verify(
-      () => navigator.pushReplacementNamed(
-        '/home',
-        arguments: any(named: 'arguments'),
-      ),
-    ).called(1);
-    expect(NotificationService.peekPendingOrder(), isNull);
-    expect(await NotificationService.isOrderDismissed('order-1'), isTrue);
+      verify(
+        () => navigator.pushReplacementNamed(
+          '/home',
+          arguments: any(named: 'arguments'),
+        ),
+      ).called(1);
+      expect(NotificationService.peekPendingOrder(), isNull);
+      expect(await NotificationService.isOrderDismissed('order-1'), isTrue);
 
-    await disposeTree(tester);
-  });
+      await disposeTree(tester);
+    },
+  );
 
   testWidgets('404 → Pedido não encontrado', (tester) async {
     when(() => dio.get(any())).thenThrow(
@@ -512,9 +516,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     final captured = verify(
-      () => dio.post(captureAny(), data: captureAny(named: 'data')),
+      () => dio.post(
+        any(that: endsWith('/accept')),
+        data: captureAny(named: 'data'),
+      ),
     ).captured;
-    final body = captured[1] as Map<String, dynamic>?;
+    final body = captured.single as Map<String, dynamic>?;
     expect(body?['currentLatitude'], -23.55);
     expect(body?['currentLongitude'], -46.63);
 
