@@ -119,6 +119,15 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
 
     try {
       final dio = Modular.get<Dio>();
+      final acknowledgement = await dio.post(
+        '${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/received',
+      );
+      if (acknowledgement.statusCode != 200) {
+        throw DioException(
+          requestOptions: RequestOptions(path: '/received'),
+          response: acknowledgement,
+        );
+      }
       final response = await dio.get(
         '${AppConfig.getBaseUrl()}/api/travels/orders/$orderId',
       );
@@ -293,7 +302,7 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
             ],
             TextButton(
               onPressed: _exitToHome,
-              child: const Text('Voltar para a Home'),
+              child: const Text('Voltar para a tela inicial'),
             ),
           ],
         ),

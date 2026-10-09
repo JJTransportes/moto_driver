@@ -23,8 +23,8 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     if (!mounted) return;
 
     context.read<DeleteAccountBloc>().add(
-          DeleteAccountRequested(password: password),
-        );
+      DeleteAccountRequested(password: password),
+    );
   }
 
   Future<String?> _askPasswordToConfirm() {
@@ -62,8 +62,12 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: context.moto.danger, foregroundColor: context.moto.textOnAccent),
-              onPressed: () => Navigator.of(dialogContext).pop(passwordController.text),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: context.moto.danger,
+                foregroundColor: context.moto.textOnAccent,
+              ),
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(passwordController.text),
               child: const Text('Confirmar exclusão'),
             ),
           ],
@@ -131,7 +135,11 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded, color: context.moto.danger, size: 32),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: context.moto.danger,
+                        size: 32,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -149,7 +157,10 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   Text(
                     'Esta ação é irreversível e todos os seus dados, incluindo '
                     'histórico de viagens, serão perdidos.',
-                    style: TextStyle(fontSize: 16, color: context.moto.textPrimary),
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: context.moto.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 32),
                   SizedBox(
@@ -169,11 +180,17 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                           ? SizedBox(
                               width: 22,
                               height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: context.moto.textOnAccent),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: context.moto.textOnAccent,
+                              ),
                             )
                           : const Text(
                               'Continuar',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                     ),
                   ),
@@ -181,7 +198,9 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
-                      onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+                      onPressed: isLoading
+                          ? null
+                          : () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(

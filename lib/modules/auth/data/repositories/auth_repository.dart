@@ -34,11 +34,13 @@ class AuthRepository implements IAuthRepository {
       return Failure(e);
     }
 
-
     try {
       await _notificationService.login(user.id, user.token);
     } catch (e) {
-      log('[AUTH] push registration failed after successful login: $e', name: 'auth');
+      log(
+        '[AUTH] push registration failed after successful login: $e',
+        name: 'auth',
+      );
     }
 
     return Success(user);
@@ -68,9 +70,15 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<Result<String>> verifyResetCode({required String email, required String code}) async {
+  Future<Result<String>> verifyResetCode({
+    required String email,
+    required String code,
+  }) async {
     try {
-      final resetToken = await _datasource.verifyResetCode(email: email, code: code);
+      final resetToken = await _datasource.verifyResetCode(
+        email: email,
+        code: code,
+      );
       return Success(resetToken);
     } on Exception catch (e) {
       return Failure(e);

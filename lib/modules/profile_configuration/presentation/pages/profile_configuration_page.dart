@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
+import 'package:moto_driver/core/errors/user_error_message.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/design_system/design_system.dart';
@@ -15,25 +16,29 @@ import 'package:moto_driver/modules/profile_configuration/presentation/widgets/p
 
 class ProfileConfigurationPage extends StatefulWidget {
   final String userId;
+  final bool requirePhone;
 
   const ProfileConfigurationPage({
     super.key,
     required this.userId,
+    this.requirePhone = false,
   });
 
   @override
-  State<ProfileConfigurationPage> createState() => _ProfileConfigurationPageState();
+  State<ProfileConfigurationPage> createState() =>
+      _ProfileConfigurationPageState();
 }
 
 class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
   final ProfileImagePicker _imagePicker = ProfileImagePicker();
   final GlobalKey<ProfileFormState> _formKey = GlobalKey<ProfileFormState>();
   bool _hasActiveTravel = false;
-  bool _isEditing = false;
+  late bool _isEditing;
 
   @override
   void initState() {
     super.initState();
+    _isEditing = widget.requirePhone;
     context.read<ProfileConfigurationBloc>().add(
       ProfileLoadEvent(userId: widget.userId),
     );
@@ -62,16 +67,22 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
             } else {
               setState(() => _isEditing = false);
               _showSnackbar('Dados atualizados com sucesso!');
+              if (widget.requirePhone &&
+                  (state.profile.phone?.trim().isNotEmpty ?? false)) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) Modular.to.pop();
+                });
+              }
             }
           }
           if (state is ProfileUpdateFailure) {
-            _showSnackbar(state.error.toString(), isError: true);
+            _showSnackbar(userErrorMessage(state.error), isError: true);
           }
           if (state is ProfileImageUploadSuccess) {
             _showSnackbar('Foto atualizada com sucesso!');
           }
           if (state is ProfileImageUploadFailure) {
-            _showSnackbar(state.error.toString(), isError: true);
+            _showSnackbar(userErrorMessage(state.error), isError: true);
           }
         },
         builder: (context, state) {
@@ -85,12 +96,15 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
               state is ProfileUpdateSuccess ||
               state is ProfileImageUploadSuccess) {
             final profile = _resolveProfile(state);
-            if (profile == null) return const Center(child: CircularProgressIndicator());
+            if (profile == null)
+              return const Center(child: CircularProgressIndicator());
 
             final isSaving = state is ProfileUpdateLoading;
-            final uploadState = state is ProfileImageUploadLoading ? state : null;
+            final uploadState = state is ProfileImageUploadLoading
+                ? state
+                : null;
             final isUploading = uploadState != null;
-            final canEdit = !_hasActiveTravel;
+            final canEdit = widget.requirePhone || !_hasActiveTravel;
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -123,7 +137,9 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                   ],
                   const SizedBox(height: 8),
                   TextButton.icon(
-                    onPressed: isUploading || _hasActiveTravel ? null : _onPickImage,
+                    onPressed: isUploading || _hasActiveTravel
+                        ? null
+                        : _onPickImage,
                     icon: const Icon(Icons.camera_alt),
                     label: const Text('Alterar foto'),
                   ),
@@ -138,11 +154,14 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                     isEditing: _isEditing,
                     onChanged: () => setState(() {}),
                   ),
-                  if (_hasActiveTravel) ...[
+                  if (_hasActiveTravel && !widget.requirePhone) ...[
                     const SizedBox(height: 8),
                     Text(
                       'Não é possível editar o perfil enquanto houver uma viagem em andamento.',
-                      style: TextStyle(fontSize: 12, color: context.moto.danger),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.moto.danger,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -169,7 +188,11 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                             label: 'Salvar',
                             large: false,
                             loading: isSaving,
-                            onPressed: isSaving || !(_formKey.currentState?.isValid ?? false) ? null : _onSave,
+                            onPressed:
+                                isSaving ||
+                                    !(_formKey.currentState?.isValid ?? false)
+                                ? null
+                                : _onSave,
                           ),
                         ),
                       ],
@@ -181,14 +204,20 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                     decoration: BoxDecoration(
                       color: context.moto.dangerSoft,
                       borderRadius: MotoRadius.brLg,
-                      border: Border.all(color: context.moto.danger.withValues(alpha: .18)),
+                      border: Border.all(
+                        color: context.moto.danger.withValues(alpha: .18),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.warning_amber_rounded, color: context.moto.danger, size: 20),
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: context.moto.danger,
+                              size: 20,
+                            ),
                             const SizedBox(width: MotoSpace.s2),
                             Text(
                               'Zona de perigo',
@@ -204,18 +233,26 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
                         const SizedBox(height: MotoSpace.s2),
                         Text(
                           'Excluir a conta apaga seus dados e o histórico. Não dá pra desfazer.',
-                          style: TextStyle(fontSize: 13, color: context.moto.textSecondary),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: context.moto.textSecondary,
+                          ),
                         ),
                         const SizedBox(height: MotoSpace.s3),
                         Tooltip(
-                          message: _hasActiveTravel ? 'Não é possível excluir a conta enquanto houver viagens em andamento.' : '',
+                          message: _hasActiveTravel
+                              ? 'Não é possível excluir a conta enquanto houver viagens em andamento.'
+                              : '',
                           child: MotoButton(
                             label: 'Excluir minha conta',
                             icon: Icons.delete_forever,
                             variant: MotoButtonVariant.danger,
                             large: false,
                             expand: false,
-                            onPressed: _hasActiveTravel ? null : () => Modular.to.pushNamed('/delete-account/'),
+                            onPressed: _hasActiveTravel
+                                ? null
+                                : () =>
+                                      Modular.to.pushNamed('/delete-account/'),
                           ),
                         ),
                       ],
@@ -231,12 +268,16 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, size: 48, color: context.moto.danger),
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: context.moto.danger,
+                  ),
                   const SizedBox(height: 16),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Text(
-                      state.error.toString(),
+                      userErrorMessage(state.error),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -290,7 +331,9 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
     if (formState == null) return;
     if (!formState.validate()) return;
 
-    final password = await _askPasswordToConfirm(emailChanged: formState.emailChanged);
+    final password = await _askPasswordToConfirm(
+      emailChanged: formState.emailChanged,
+    );
     if (password == null || password.isEmpty) return;
     if (!mounted) return;
 
@@ -319,8 +362,8 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
               Text(
                 emailChanged
                     ? 'Digite sua senha atual para confirmar a alteração. Como você está '
-                        'mudando o e-mail, isso vai encerrar sua sessão e você precisará '
-                        'fazer login novamente.'
+                          'mudando o e-mail, isso vai encerrar sua sessão e você precisará '
+                          'fazer login novamente.'
                     : 'Digite sua senha atual para confirmar a alteração dos seus dados.',
               ),
               const SizedBox(height: 16),
@@ -341,7 +384,8 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(passwordController.text),
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(passwordController.text),
               child: const Text('Confirmar'),
             ),
           ],

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moto_driver/core/location/location_service.dart';
+import 'package:moto_driver/core/local_db/models/local_data_models.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 import 'package:moto_driver/screens/home_screen.dart';
 
@@ -99,6 +100,15 @@ void main() {
     when(() => travelLocalRepository.clearTravels()).thenAnswer((_) async {});
 
     when(() => signOutService.signOut()).thenAnswer((_) async {});
+    when(() => dio.post(any())).thenAnswer((invocation) async {
+      final url = invocation.positionalArguments.first as String;
+      final segments = Uri.parse(url).pathSegments;
+      final receivedIndex = segments.indexOf('received');
+      final orderId = receivedIndex > 0
+          ? segments[receivedIndex - 1]
+          : 'order-1';
+      return okResponse(newOrderPayload(orderId: orderId));
+    });
     when(() => locationService.getCurrentPosition()).thenAnswer(
       (_) async => const LocationResult(status: LocationStatus.denied),
     );
@@ -183,6 +193,27 @@ void main() {
 
     expect(find.text('Aguardando novas viagens...'), findsOneWidget);
     expect(find.text('Viagem ativa'), findsNothing);
+  });
+
+  testWidgets('orientações começam abertas e podem ser recolhidas', (
+    tester,
+  ) async {
+    await pumpHome(tester, surfaceSize: const Size(430, 932));
+
+    final toggle = find.byKey(const ValueKey('driver-reminders-toggle'));
+    expect(find.text('Antes de receber corridas'), findsOneWidget);
+    expect(find.text('Mantenha as notificações ativadas'), findsOneWidget);
+
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Antes de receber corridas'), findsOneWidget);
+    expect(find.text('Mantenha as notificações ativadas'), findsNothing);
+
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(find.text('Mantenha as notificações ativadas'), findsOneWidget);
   });
 
   for (final viewport in <({String name, Size size, double textScale})>[
@@ -369,12 +400,47 @@ void main() {
     newOrderController.add(newOrderPayload());
     await tester.pump();
     // Não usa pumpAndSettle: o sheet tem um Timer.periodic de countdown
-    // (20s até auto-rejeitar) que ficaria reagendando frames — pumpAndSettle
+    // (40s até auto-rejeitar) que ficaria reagendando frames — pumpAndSettle
     // avançaria o relógio até ele disparar de verdade.
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Nova viagem'), findsOneWidget);
+    expect(find.text('40'), findsOneWidget);
+    expect(
+      find.text(
+        'Mantenha o volume do celular no máximo para não perder os avisos de corrida.',
+      ),
+      findsOneWidget,
+    );
   });
+
+  testWidgets(
+    'eventos NewOrder simultâneos da mesma corrida exibem somente um sheet',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1080, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final activeTravelLookup = Completer<TravelLocalData?>();
+      when(
+        () => travelLocalRepository.getActiveTravel(),
+      ).thenAnswer((_) => activeTravelLookup.future);
+
+      await pumpHome(tester);
+
+      final payload = newOrderPayload(orderId: 'same-order');
+      for (var i = 0; i < 7; i++) {
+        newOrderController.add(payload);
+      }
+      await tester.pump();
+
+      activeTravelLookup.complete(null);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Nova viagem'), findsOneWidget);
+      verify(() => travelLocalRepository.getActiveTravel()).called(1);
+    },
+  );
 
   testWidgets(
     'NewOrder com viagem ativa já carregada → ignora (não mostra o sheet)',
@@ -393,14 +459,25 @@ void main() {
   );
 
   testWidgets(
-    'onReconnecting → mostra banner; onReconnected → esconde banner',
+    'reconexão breve não mostra badge; desconexão persistente mostra',
     (tester) async {
       await pumpHome(tester);
       expect(find.text('Reconectando...'), findsNothing);
 
       reconnectingController.add(null);
       await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Reconectando...'), findsNothing);
+
+      reconnectedController.add(null);
       await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('Reconectando...'), findsNothing);
+
+      when(() => signalRService.isConnected(any())).thenReturn(false);
+      reconnectingController.add(null);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
       expect(find.text('Reconectando...'), findsOneWidget);
 
       reconnectedController.add(null);

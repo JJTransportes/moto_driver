@@ -8,8 +8,10 @@ class PasswordResetBloc extends Bloc<PasswordResetEvent, PasswordResetState> {
   final IConfirmPasswordResetUsecase _confirmPasswordResetUsecase;
   final String resetToken;
 
-  PasswordResetBloc(this._confirmPasswordResetUsecase, {required this.resetToken})
-      : super(const PasswordResetInitial()) {
+  PasswordResetBloc(
+    this._confirmPasswordResetUsecase, {
+    required this.resetToken,
+  }) : super(const PasswordResetInitial()) {
     on<ResetConfirmSubmitted>(_onResetConfirmSubmitted);
   }
 
@@ -31,7 +33,10 @@ class PasswordResetBloc extends Bloc<PasswordResetEvent, PasswordResetState> {
           ConflictException() => (error.message, true),
           ValidationException() => (error.message, true),
           RateLimitedException() => (error.message, false),
-          _ => ('Erro ao redefinir a senha. Verifique sua conexão e tente novamente.', false),
+          _ => (
+            'Erro ao redefinir a senha. Verifique sua conexão e tente novamente.',
+            false,
+          ),
         };
         emit(PasswordResetError(message, canRequestNewCode: canRequestNewCode));
       },

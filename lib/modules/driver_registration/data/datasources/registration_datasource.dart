@@ -51,7 +51,8 @@ class RegistrationDatasource implements IRegistrationDatasource {
       case 400:
         final serverMessage = e.response?.data?['error'] as String?;
         return ValidationException(
-          serverMessage ?? 'Dados inválidos. Verifique as informações e tente novamente.',
+          serverMessage ??
+              'Dados inválidos. Verifique as informações e tente novamente.',
         );
       case 409:
         final serverError = e.response?.data?['error'] as String? ?? '';
@@ -70,7 +71,9 @@ class RegistrationDatasource implements IRegistrationDatasource {
             'Erro de conexão. Verifique sua internet e tente novamente.',
           );
         }
-        return NetworkException(e.message ?? 'Erro inesperado. Tente novamente.');
+        return NetworkException(
+          e.message ?? 'Erro inesperado. Tente novamente.',
+        );
     }
   }
 
@@ -79,17 +82,20 @@ class RegistrationDatasource implements IRegistrationDatasource {
     if (lowered.contains('e-mail') || lowered.contains('email')) return 'email';
     if (lowered.contains('cpf')) return 'cpf';
     if (lowered.contains('cnh')) return 'cnh';
+    if (lowered.contains('telefone')) return 'phone';
     return null;
   }
 
   String _duplicateMessage(String? field, String serverError) {
-    if (serverError.isNotEmpty && !serverError.toLowerCase().contains('duplicate')) {
+    if (serverError.isNotEmpty &&
+        !serverError.toLowerCase().contains('duplicate')) {
       return serverError;
     }
     return switch (field) {
       'email' => 'Este e-mail já está cadastrado.',
       'cpf' => 'Este CPF já está cadastrado.',
       'cnh' => 'Esta CNH já está cadastrada.',
+      'phone' => 'Este telefone já está cadastrado.',
       _ => 'Já existe um cadastro com estes dados.',
     };
   }

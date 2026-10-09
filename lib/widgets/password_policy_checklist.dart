@@ -25,9 +25,13 @@ class PasswordPolicyChecklist extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  requirement.satisfied ? Icons.check_circle : Icons.circle_outlined,
+                  requirement.satisfied
+                      ? Icons.check_circle
+                      : Icons.circle_outlined,
                   size: 16,
-                  color: requirement.satisfied ? context.moto.success : context.moto.textTertiary,
+                  color: requirement.satisfied
+                      ? context.moto.success
+                      : context.moto.textTertiary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -35,7 +39,9 @@ class PasswordPolicyChecklist extends StatelessWidget {
                     requirement.label,
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: requirement.satisfied ? context.moto.success : context.moto.textTertiary,
+                      color: requirement.satisfied
+                          ? context.moto.success
+                          : context.moto.textTertiary,
                     ),
                   ),
                 ),

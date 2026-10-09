@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
+import 'package:flutter_modular/flutter_modular.dart'
+    hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/utils/server_error_guard.dart';
 import 'package:moto_driver/design_system/design_system.dart';
@@ -69,7 +70,9 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage> {
 
   void _submit() {
     if (!_validate()) return;
-    context.read<VerifyResetCodeBloc>().add(VerifyCodeSubmitted(_codeController.text.trim()));
+    context.read<VerifyResetCodeBloc>().add(
+      VerifyCodeSubmitted(_codeController.text.trim()),
+    );
   }
 
   @override
@@ -105,12 +108,19 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage> {
             children: [
               GradientText(
                 'Recupere sua senha',
-                style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700),
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 72),
               Text(
                 'Informe o código de verificação enviado para ${widget.email}',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: context.moto.textPrimary),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: context.moto.textPrimary,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -127,10 +137,14 @@ class _VerifyResetCodePageState extends State<VerifyResetCodePage> {
                 const SizedBox(height: 12),
                 Center(
                   child: TextButton(
-                    onPressed: () => Navigator.of(context).pushReplacementNamed('/recovery'),
+                    onPressed: () =>
+                        Navigator.of(context).pushReplacementNamed('/recovery'),
                     child: Text(
                       'Solicitar novo código',
-                      style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: context.moto.accent,
+                      ),
                     ),
                   ),
                 ),

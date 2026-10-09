@@ -17,7 +17,8 @@ class PasswordRecoverySent extends PasswordRecoveryState {
   const PasswordRecoverySent(this.email);
 
   @override
-  bool operator ==(Object other) => other is PasswordRecoverySent && other.email == email;
+  bool operator ==(Object other) =>
+      other is PasswordRecoverySent && other.email == email;
 
   @override
   int get hashCode => email.hashCode;
@@ -31,7 +32,8 @@ class PasswordRecoveryError extends PasswordRecoveryState {
   const PasswordRecoveryError(this.message);
 
   @override
-  bool operator ==(Object other) => other is PasswordRecoveryError && other.message == message;
+  bool operator ==(Object other) =>
+      other is PasswordRecoveryError && other.message == message;
 
   @override
   int get hashCode => message.hashCode;

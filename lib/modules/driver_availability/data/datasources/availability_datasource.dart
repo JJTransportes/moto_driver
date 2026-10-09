@@ -38,8 +38,7 @@ class AvailabilityDatasource {
 
   /// Ativa o modo de atendimento por 4h (janela controlada pelo backend).
   /// Usado pelo modal de atendimento ao tocar em "Confirmar".
-  Future<DriverAvailabilityEntity> activate() =>
-      updateAvailability('activate');
+  Future<DriverAvailabilityEntity> activate() => updateAvailability('activate');
 
   /// Desativa o modo de atendimento (usado no logout/delete de conta).
   Future<DriverAvailabilityEntity> deactivate() =>

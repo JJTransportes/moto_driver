@@ -46,4 +46,17 @@ void main() {
       expect(NotificationService.orderAlertOpen, isFalse);
     });
   });
+
+  test('toque na push suprime o som local do mesmo pedido', () {
+    NotificationService.suppressForegroundSound('order-push');
+
+    expect(
+      NotificationService.shouldSuppressForegroundSound('order-push'),
+      isTrue,
+    );
+    expect(
+      NotificationService.shouldSuppressForegroundSound('outra-order'),
+      isFalse,
+    );
+  });
 }

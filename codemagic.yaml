@@ -54,7 +54,11 @@ workflows:
         echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
 
     - name: Build App Bundle
-      script: flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER --dart-define=FORCE_PLAY_UPDATE=true
+      script: >-
+        flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER
+        --dart-define=FORCE_PLAY_UPDATE=true
+        --dart-define=SENTRY_DSN="$SENTRY_DSN"
+        --dart-define=APP_ENV="${APP_ENV:-production}"
 
     artifacts:
     - build/**/outputs/**/*.aab
@@ -117,7 +121,11 @@ workflows:
         NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
         echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
     - name: Build IPA
-      script: flutter build ipa --release --build-number=$NEW_BUILD_NUMBER --export-options-plist=/Users/builder/export_options.plist
+      script: >-
+        flutter build ipa --release --build-number=$NEW_BUILD_NUMBER
+        --export-options-plist=/Users/builder/export_options.plist
+        --dart-define=SENTRY_DSN="$SENTRY_DSN"
+        --dart-define=APP_ENV="${APP_ENV:-production}"
     artifacts:
     - build/ios/ipa/*.ipa
     - /tmp/xcodebuild_logs/*.log
@@ -180,7 +188,11 @@ workflows:
         NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
         echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
     - name: Build IPA
-      script: flutter build ipa --release --build-number=$NEW_BUILD_NUMBER --export-options-plist=/Users/builder/export_options.plist
+      script: >-
+        flutter build ipa --release --build-number=$NEW_BUILD_NUMBER
+        --export-options-plist=/Users/builder/export_options.plist
+        --dart-define=SENTRY_DSN="$SENTRY_DSN"
+        --dart-define=APP_ENV="${APP_ENV:-production}"
     artifacts:
     - build/ios/ipa/*.ipa
     - /tmp/xcodebuild_logs/*.log

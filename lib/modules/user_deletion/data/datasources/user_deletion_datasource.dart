@@ -43,7 +43,9 @@ class UserDeletionDatasource implements IUserDeletionDatasource {
             'Erro de conexão. Verifique sua internet e tente novamente.',
           );
         }
-        return NetworkException(e.message ?? 'Erro inesperado. Tente novamente.');
+        return NetworkException(
+          e.message ?? 'Erro inesperado. Tente novamente.',
+        );
     }
   }
 }

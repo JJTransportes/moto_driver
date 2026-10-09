@@ -29,28 +29,36 @@ class DuplicateException implements Exception {
 
 class ConflictException implements Exception {
   final String message;
-  const ConflictException([this.message = 'Operação em conflito com o estado atual']);
+  const ConflictException([
+    this.message = 'Operação em conflito com o estado atual',
+  ]);
   @override
   String toString() => message;
 }
 
 class RateLimitedException implements Exception {
   final String message;
-  const RateLimitedException([this.message = 'Muitas tentativas. Tente novamente mais tarde.']);
+  const RateLimitedException([
+    this.message = 'Muitas tentativas. Tente novamente mais tarde.',
+  ]);
   @override
   String toString() => message;
 }
 
 class NetworkException implements Exception {
   final String message;
-  const NetworkException([this.message = 'Erro de conexão. Verifique sua internet.']);
+  const NetworkException([
+    this.message = 'Erro de conexão. Verifique sua internet.',
+  ]);
   @override
   String toString() => message;
 }
 
 class ServerException implements Exception {
   final String message;
-  const ServerException([this.message = 'Erro interno do servidor. Tente novamente.']);
+  const ServerException([
+    this.message = 'Não foi possível concluir agora. Tente novamente.',
+  ]);
   @override
   String toString() => message;
 }
@@ -59,7 +67,8 @@ class ServerException implements Exception {
 class DeviceConflictException implements Exception {
   final String message;
   const DeviceConflictException([
-    this.message = 'Já existe uma sessão ativa em outro tipo de dispositivo. Faça logout lá primeiro.',
+    this.message =
+        'Já existe uma sessão ativa em outro tipo de dispositivo. Faça logout lá primeiro.',
   ]);
   @override
   String toString() => message;
@@ -69,7 +78,8 @@ class DeviceConflictException implements Exception {
 class DeviceMismatchException implements Exception {
   final String message;
   const DeviceMismatchException([
-    this.message = 'Sessão vinculada a outro tipo de dispositivo. Faça logout no dispositivo original.',
+    this.message =
+        'Sessão vinculada a outro tipo de dispositivo. Faça logout no dispositivo original.',
   ]);
   @override
   String toString() => message;
@@ -90,8 +100,17 @@ class RoleMismatchException implements Exception {
 class UnapprovedAccountException implements Exception {
   final String message;
   const UnapprovedAccountException([
-    this.message = 'Sua conta ainda não foi aprovada. Aguarde a aprovação de um administrador.',
+    this.message =
+        'Sua conta ainda não foi aprovada. Aguarde a aprovação de um administrador.',
   ]);
+  @override
+  String toString() => message;
+}
+
+/// 403: o usuário não participa da viagem (chat do trecho de busca).
+class ForbiddenException implements Exception {
+  final String message;
+  const ForbiddenException([this.message = 'Ação não permitida.']);
   @override
   String toString() => message;
 }

@@ -20,7 +20,10 @@ class ProfileRepository implements IProfileRepository {
   }
 
   @override
-  Future<Result<ProfileEntity>> updateProfile(ProfileEntity profile, {String? password}) async {
+  Future<Result<ProfileEntity>> updateProfile(
+    ProfileEntity profile, {
+    String? password,
+  }) async {
     try {
       final model = await _datasource.updateProfile(
         profile.id,

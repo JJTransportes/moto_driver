@@ -4,6 +4,6 @@ class DeleteAccountRequestModel {
   const DeleteAccountRequestModel({required this.password});
 
   Map<String, dynamic> toJson() => {
-        'password': password,
-      };
+    'password': password,
+  };
 }

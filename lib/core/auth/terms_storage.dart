@@ -23,7 +23,8 @@ class TermsStorage {
       // uninstall/reinstall or signing-key change).
       // Clear corrupted entries and return null so the app
       // gracefully falls back to the login screen.
-      if (e.code == 'Exception encountered' && e.message?.contains('read') == true) {
+      if (e.code == 'Exception encountered' &&
+          e.message?.contains('read') == true) {
         debugPrint('TermsStorage: corrupted secure storage — clearing');
         await _storage.deleteAll();
         return null;
