@@ -96,8 +96,9 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
               state is ProfileUpdateSuccess ||
               state is ProfileImageUploadSuccess) {
             final profile = _resolveProfile(state);
-            if (profile == null)
+            if (profile == null) {
               return const Center(child: CircularProgressIndicator());
+            }
 
             final isSaving = state is ProfileUpdateLoading;
             final uploadState = state is ProfileImageUploadLoading
@@ -395,11 +396,14 @@ class _ProfileConfigurationPageState extends State<ProfileConfigurationPage> {
   }
 
   Future<void> _forceLogoutAfterEmailChange() async {
+    // Capture the services before awaiting SignalR shutdown. Disconnecting can
+    // rebuild/unmount this page; logout must still finish even if the widget's
+    // BuildContext is no longer mounted (observed on the second e-mail change).
+    final signalR = context.read<SignalRService>();
+    final signOutService = context.read<SignOutService>();
     _showSnackbar('E-mail atualizado! Faça login novamente.');
-    await context.read<SignalRService>().disconnectAll();
-    if (mounted) {
-      await context.read<SignOutService>().signOut();
-    }
+    await signalR.disconnectAll();
+    await signOutService.signOut(notifyBackend: false);
   }
 
   void _showSnackbar(String message, {bool isError = false}) {

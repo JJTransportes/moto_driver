@@ -302,6 +302,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildAvailabilityCard() {
     final isActive = _availability?.isActive ?? false;
+    final hasActiveTravel = _currentTravelId != null;
 
     return MotoSapphire(
       // Builder: precisamos do BuildContext DE DENTRO do MotoSapphire (que
@@ -324,7 +325,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 );
                 final availabilitySwitch = Switch(
                   value: isActive,
-                  onChanged: _isTogglingAvailability || _hasVehicle == false
+                  onChanged:
+                      _isTogglingAvailability ||
+                          _hasVehicle == false ||
+                          hasActiveTravel
                       ? null
                       : _onAvailabilityToggled,
                 );
@@ -357,6 +361,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               isActive ? 'Você está\nonline' : 'Você está\noffline',
               style: Theme.of(context).textTheme.displaySmall,
             ),
+            if (hasActiveTravel) ...[
+              const SizedBox(height: MotoSpace.s3),
+              Text(
+                'A disponibilidade não pode ser alterada durante uma viagem.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.moto.textSecondary,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -413,7 +426,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(width: MotoSpace.s3),
                 Expanded(
                   child: Text(
-                    'Viagem ativa',
+                    isInProgress ? 'Viagem em andamento' : 'Viagem aceita',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -1102,6 +1115,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _onAvailabilityToggled(bool value) async {
+    if (_currentTravelId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Finalize ou cancele a viagem antes de alterar sua disponibilidade.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     if (value && _hasVehicle == false) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

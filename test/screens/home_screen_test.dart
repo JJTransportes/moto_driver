@@ -192,7 +192,8 @@ void main() {
     await pumpHome(tester);
 
     expect(find.text('Aguardando novas viagens...'), findsOneWidget);
-    expect(find.text('Viagem ativa'), findsNothing);
+    expect(find.text('Viagem aceita'), findsNothing);
+    expect(find.text('Viagem em andamento'), findsNothing);
   });
 
   testWidgets('orientações começam abertas e podem ser recolhidas', (
@@ -251,7 +252,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Viagem ativa'), findsOneWidget);
+      expect(find.text('Viagem aceita'), findsOneWidget);
       expect(find.text('Maria Passageira'), findsOneWidget);
       expect(find.text('Aceita · aguardando'), findsOneWidget);
     },
@@ -306,7 +307,7 @@ void main() {
           activeTravelPayload(travelId: 'travel-1'),
         ),
       );
-      expect(find.text('Viagem ativa'), findsOneWidget);
+      expect(find.text('Viagem aceita'), findsOneWidget);
 
       // O handler de TravelCancelled também re-consulta o estado canônico
       // (_checkActiveTravelHttp) — sem atualizar o stub, a próxima chamada
@@ -317,7 +318,8 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('Viagem ativa'), findsNothing);
+      expect(find.text('Viagem aceita'), findsNothing);
+      expect(find.text('Viagem em andamento'), findsNothing);
       expect(find.text('Aguardando novas viagens...'), findsOneWidget);
       expect(find.text('Viagem cancelada'), findsOneWidget);
       verify(() => travelLocalRepository.clearTravels()).called(1);
@@ -336,7 +338,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Viagem ativa'), findsOneWidget);
+    expect(find.text('Viagem aceita'), findsOneWidget);
   });
 
   testWidgets('TravelStarted → status muda para "Em andamento"', (
@@ -372,7 +374,7 @@ void main() {
           activeTravelPayload(travelId: 'travel-1', status: 'InProgress'),
         ),
       );
-      expect(find.text('Viagem ativa'), findsOneWidget);
+      expect(find.text('Viagem em andamento'), findsOneWidget);
 
       stubBackgroundCalls(activeTravelResponse: noContentResponse());
       travelCompletedController.add({'travelId': 'travel-1'});
@@ -380,7 +382,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.text('Viagem ativa'), findsNothing);
+      expect(find.text('Viagem em andamento'), findsNothing);
       expect(find.text('Viagem concluída'), findsOneWidget);
       verify(() => travelLocalRepository.clearTravels()).called(1);
     },

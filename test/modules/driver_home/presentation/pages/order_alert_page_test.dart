@@ -55,6 +55,9 @@ void main() {
     when(() => signalRService.denyOrder(any())).thenAnswer((_) async {});
     when(() => authStorage.getToken()).thenAnswer((_) async => 'token');
     when(() => dio.post(any())).thenAnswer((_) async => okResponse({}));
+    when(
+      () => navigator.navigate(any(), arguments: any(named: 'arguments')),
+    ).thenAnswer((_) async => null);
   });
 
   PushTestModule buildModule() => PushTestModule(
@@ -168,7 +171,7 @@ void main() {
       await tester.pump();
 
       verify(
-        () => navigator.pushReplacementNamed(
+        () => navigator.navigate(
           '/home',
           arguments: any(named: 'arguments'),
         ),
@@ -296,7 +299,7 @@ void main() {
     },
   );
 
-  testWidgets('recusar → _exitToHome: popUntil + /home + pendente limpo', (
+  testWidgets('recusar → _exitToHome: navigate /home + pendente limpo', (
     tester,
   ) async {
     stubOrderFetched();
@@ -316,9 +319,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    verify(() => navigator.popUntil(any())).called(1);
     verify(
-      () => navigator.pushReplacementNamed(
+      () => navigator.navigate(
         '/home',
         arguments: any(named: 'arguments'),
       ),
@@ -356,7 +358,7 @@ void main() {
 
     // Sair para a home e reabrir o fluxo com o novo pendente.
     verify(
-      () => navigator.pushReplacementNamed(
+      () => navigator.navigate(
         '/home',
         arguments: any(named: 'arguments'),
       ),

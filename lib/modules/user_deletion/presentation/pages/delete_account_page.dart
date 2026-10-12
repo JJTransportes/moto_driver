@@ -95,10 +95,12 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
   }
 
   String _resolveErrorMessage(Exception error) {
-    if (error is UnauthorizedException) return error.toString();
-    if (error is ValidationException) return error.toString();
-    if (error is NetworkException) return error.toString();
-    if (error is ServerException) return error.toString();
+    if (error is UnauthorizedException) return error.message;
+    if (error is ValidationException) return error.message;
+    if (error is NetworkException) return error.message;
+    if (error is ServerException) {
+      return 'Não foi possível concluir agora. Tente novamente.';
+    }
     return 'Erro inesperado. Tente novamente.';
   }
 

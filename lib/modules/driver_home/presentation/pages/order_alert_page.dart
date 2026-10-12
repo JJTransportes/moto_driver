@@ -209,6 +209,16 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
       return;
     }
 
+    if (decision == OrderDecision.expired) {
+      NotificationService.clearPendingOrder();
+      if (!mounted) return;
+      setState(() {
+        _state = _PageState.unavailable;
+        _message = 'O tempo para aceitar esta corrida terminou.';
+      });
+      return;
+    }
+
     _exitToHome();
   }
 
@@ -221,16 +231,20 @@ class _OrderAlertPageState extends State<OrderAlertPage> {
     final nextOrderId = (holder != null && holder != _orderId) ? holder : null;
     NotificationService.clearPendingOrder();
 
-    Modular.to.popUntil((route) => route.isFirst);
-    if (Modular.to.path != '/home') {
-      Modular.to.pushReplacementNamed('/home');
-    }
+    // Uma disputa entre o cancelamento do passageiro e o aceite pode chamar
+    // esta saída enquanto a rota do alerta ainda está mudando de estado.
+    // `popUntil` seguido de `pushReplacementNamed` deixava por um frame uma
+    // pilha sem página renderizável (tela preta). `navigate` substitui a pilha
+    // declarativa de forma atômica.
+    Modular.to.navigate('/home');
 
     if (nextOrderId != null) {
-      Modular.to.pushNamed(
-        '/order-refresh',
-        arguments: {'orderId': nextOrderId},
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Modular.to.pushNamed(
+          '/order-refresh',
+          arguments: {'orderId': nextOrderId},
+        );
+      });
     }
   }
 

@@ -17,7 +17,7 @@ import 'package:moto_driver/core/notifications/inotification_service.dart';
 import 'package:moto_driver/core/notifications/notification_channel_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
 
-enum OrderDecision { accepted, denied }
+enum OrderDecision { accepted, denied, expired }
 
 class IncomingOrderSheet extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -477,10 +477,16 @@ class _IncomingOrderSheetState extends State<IncomingOrderSheet> {
     if (onDecision != null) {
       // Modo embutido: sem pop — o dono decide a saída.
       NotificationService.setSheetVisible(false);
-      onDecision(OrderDecision.denied, null);
+      onDecision(OrderDecision.expired, null);
     } else {
       // Modo modal: notifica o pai (duplicate tracking) e fecha o sheet.
       widget.onDenied?.call();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('O tempo para aceitar esta corrida terminou.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       // Close the sheet
       Navigator.of(context).pop();
     }

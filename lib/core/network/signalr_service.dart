@@ -28,8 +28,12 @@ class SignalRService {
   final _reconnectingController = StreamController<void>.broadcast();
   final _reconnectedController = StreamController<void>.broadcast();
   final _closedController = StreamController<void>.broadcast();
+  final _sessionRevokedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<void> get onClosed => _closedController.stream;
+  Stream<Map<String, dynamic>> get onSessionRevoked =>
+      _sessionRevokedController.stream;
   Stream<Map<String, dynamic>> get onNewOrder => _newOrderController.stream;
   Stream<Map<String, dynamic>> get onOrderCancelled =>
       _orderCancelledController.stream;
@@ -141,6 +145,7 @@ class SignalRService {
     _reconnectingController.close();
     _reconnectedController.close();
     _closedController.close();
+    _sessionRevokedController.close();
   }
 
   /// Finaliza a viagem (InProgress → Completed) via SignalR.
@@ -184,6 +189,11 @@ class SignalRService {
   }
 
   void _registerHubHandlers(HubConnection connection, String hubName) {
+    connection.on('SessionRevoked', (args) {
+      if (args != null && args.isNotEmpty) {
+        _sessionRevokedController.add(args.first as Map<String, dynamic>);
+      }
+    });
     switch (hubName) {
       case 'travel-orders':
         connection.on('NewOrder', (args) {

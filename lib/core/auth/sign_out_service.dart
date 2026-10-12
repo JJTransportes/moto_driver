@@ -39,25 +39,27 @@ class SignOutService {
   /// corrompem a chave AES no web) e individualmente tolerantes a falha: este é
   /// o caminho de recuperação de sessão inválida, então a navegação para
   /// `/login` tem que acontecer mesmo que alguma limpeza falhe.
-  Future<void> signOut() async {
+  Future<void> signOut({bool notifyBackend = true}) async {
     await _runSafely(
       'serviço de localização em segundo plano',
       _backgroundLocation.stop,
     );
-    try {
-      await _availability.deactivate();
-    } catch (e) {
-      log(
-        '[AVAILABILITY] deactivate failed on signOut: $e',
-        name: 'availability',
-      );
+    if (notifyBackend) {
+      try {
+        await _availability.deactivate();
+      } catch (e) {
+        log(
+          '[AVAILABILITY] deactivate failed on signOut: $e',
+          name: 'availability',
+        );
+      }
     }
 
     // Device binding: libera a sessão no backend (device=NULL nos tokens
     // ativos) para que outro tipo de dispositivo possa logar. O AuthInterceptor
     // anexa o Bearer token automaticamente — por isso roda ANTES do clear.
     try {
-      if (await _authStorage.getToken() != null) {
+      if (notifyBackend && await _authStorage.getToken() != null) {
         await _dio.post('/api/auth/sign-out');
       }
     } catch (e) {
