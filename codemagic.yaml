@@ -163,6 +163,7 @@ workflows:
       cancel_previous_builds: true
     environment:
       flutter: 3.44.8
+      xcode: 26.1
       groups:
       - moto_staging
     cache:
@@ -232,6 +233,7 @@ workflows:
       cancel_previous_builds: true
     environment:
       flutter: 3.44.8
+      xcode: 26.1
       groups:
       - release
     cache:
