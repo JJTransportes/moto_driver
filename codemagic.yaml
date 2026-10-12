@@ -165,15 +165,17 @@ workflows:
       flutter: 3.44.8
       groups:
       - moto_staging
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: br.com.rockservicos.motoDriverApp
     cache:
       cache_paths:
       - $HOME/.pub-cache
     scripts:
-    - name: Set up code signing settings on Xcode project
-      script: xcode-project use-profiles
+    - name: Set up automatic iOS code signing
+      script: |
+        keychain initialize
+        app-store-connect fetch-signing-files "br.com.rockservicos.motoDriverApp" --type IOS_APP_STORE --create
+        app-store-connect fetch-signing-files "br.com.rockservicos.motoDriverApp.OneSignalNotificationServiceExtension" --type IOS_APP_STORE --create
+        keychain add-certificates
+        xcode-project use-profiles
     - name: Get Flutter packages
       script: flutter pub get
     - name: Run tests
@@ -232,15 +234,17 @@ workflows:
       flutter: 3.44.8
       groups:
       - release
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: br.com.rockservicos.motoDriverApp
     cache:
       cache_paths:
       - $HOME/.pub-cache
     scripts:
-    - name: Set up code signing settings on Xcode project
-      script: xcode-project use-profiles
+    - name: Set up automatic iOS code signing
+      script: |
+        keychain initialize
+        app-store-connect fetch-signing-files "br.com.rockservicos.motoDriverApp" --type IOS_APP_STORE --create
+        app-store-connect fetch-signing-files "br.com.rockservicos.motoDriverApp.OneSignalNotificationServiceExtension" --type IOS_APP_STORE --create
+        keychain add-certificates
+        xcode-project use-profiles
     - name: Get Flutter packages
       script: flutter pub get
     - name: Run tests
