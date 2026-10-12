@@ -9,7 +9,10 @@ class UpdateProfileUseCase implements IUpdateProfileUseCase {
   UpdateProfileUseCase(this._repository);
 
   @override
-  Future<Result<ProfileEntity>> call(ProfileEntity profile, {String? password}) {
+  Future<Result<ProfileEntity>> call(
+    ProfileEntity profile, {
+    String? password,
+  }) {
     return _repository.updateProfile(profile, password: password);
   }
 }

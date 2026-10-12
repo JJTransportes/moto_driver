@@ -8,11 +8,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
+import 'package:moto_driver/core/location/background_location_service.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
-import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/core/notifications/notification_channel_service.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/driver_availability/data/datasources/availability_datasource.dart';
 import 'package:moto_driver/modules/driver_availability/domain/entities/driver_availability_entity.dart';
 import 'package:moto_driver/modules/driver_availability/presentation/widgets/availability_sheet.dart';
@@ -37,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _travelCompletedSub;
   bool _isReconnecting = false;
   bool _reconnectLoopActive = false;
+  Timer? _reconnectBadgeTimer;
   bool _signalRListenersRegistered = false;
   bool _checkingActiveTravel = false;
   String? _currentTravelStatus;
@@ -44,40 +46,60 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _currentPassengerName;
   Timer? _locationTimer;
   Timer? _activeTravelPollTimer;
+  Timer? _offerRecoveryTimer;
+  bool _offerRecoveryInFlight = false;
+  Position? _lastReportedPosition;
+  DateTime? _lastLocationReportAt;
+  bool _locationReportInFlight = false;
+  bool _backgroundPermissionPromptOpen = false;
+  bool _isAppActive = true;
   String? _userId;
   String? _userPhotoUrl;
   String? _userName;
+  bool? _hasVehicle;
+  bool _showDriverReminders = true;
+  bool _isRefreshingHome = false;
 
   final Set<String> _deniedOrderIds = {};
 
   // ── Disponibilidade (modo de atendimento) ──
   DriverAvailabilityEntity? _availability;
   Timer? _availabilityTimer;
-  Timer? _driverPositionTimer;
+  bool _isTogglingAvailability = false;
+
+  static const _locationReportInterval = Duration(seconds: 5);
+  static const _locationHeartbeatInterval = Duration(seconds: 5);
+  static const _minimumDisplacementMeters = 5.0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_isReconnecting)
                 Container(
-                  color: Colors.orange,
+                  color: context.moto.warning,
                   padding: const EdgeInsets.all(8),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.moto.textOnAccent,
+                        ),
                       ),
-                      SizedBox(width: 8),
-                      Text('Reconectando...', style: TextStyle(color: Colors.white)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Reconectando...',
+                        style: TextStyle(color: context.moto.textOnAccent),
+                      ),
                     ],
                   ),
                 ),
@@ -86,35 +108,69 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 photoUrl: _userPhotoUrl,
                 userId: _userId ?? '',
                 onSignOut: _handleSignOut,
+                onRefresh: _refreshHome,
+                isRefreshing: _isRefreshingHome,
                 onSettingsTap: () async {
-                  await Modular.to.pushNamed('/profile-configuration', arguments: {'userId': _userId});
+                  await Modular.to.pushNamed(
+                    '/profile-configuration',
+                    arguments: {'userId': _userId},
+                  );
                   _loadUserId();
                 },
               ),
-              const SizedBox(height: 24),
-              // Active travel card — exibido quando existe viagem ativa (Accepted/InProgress)
-              if (_currentTravelId != null) _buildActiveTravelCard(),
-              if (_currentTravelId == null)
-                const Expanded(
+              const SizedBox(height: MotoSpace.s5),
+              _buildAvailabilityCard(),
+              const SizedBox(height: MotoSpace.s4),
+              if (_currentTravelId != null)
+                _buildActiveTravelCard()
+              else ...[
+                MotoGlass(
+                  painted: true,
+                  padding: const EdgeInsets.all(MotoSpace.s5),
                   child: Center(
-                    child: Text('Aguardando novas viagens...', style: TextStyle(color: Color(0xFF4E4E4E), fontSize: 16)),
+                    child: Text(
+                      'Aguardando novas viagens...',
+                      style: TextStyle(
+                        color: context.moto.textSecondary,
+                        fontSize: 15,
+                      ),
+                    ),
                   ),
                 ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => Modular.to.pushNamed('/travel-history'),
-                  icon: const Icon(Icons.history),
-                  label: const Text('Histórico de Viagens'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF4685C0),
-                    side: const BorderSide(color: Color(0xFF4685C0)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                const SizedBox(height: MotoSpace.s4),
+                _buildDriverRemindersCard(),
+              ],
+              const SizedBox(height: MotoSpace.s4),
+              MotoGlass(
+                painted: true,
+                child: InkWell(
+                  borderRadius: MotoRadius.brLg,
+                  onTap: () => Modular.to.pushNamed('/travel-history'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(MotoSpace.s4),
+                    child: Row(
+                      children: [
+                        const MotoTile(icon: Icons.history),
+                        const SizedBox(width: MotoSpace.s3),
+                        Expanded(
+                          child: Text(
+                            'Histórico de viagens',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          color: context.moto.textTertiary,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+              if (_hasVehicle == false) ...[
+                const SizedBox(height: MotoSpace.s4),
+                _buildVehicleRequiredCard(),
+              ],
             ],
           ),
         ),
@@ -122,85 +178,283 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildActiveTravelCard() {
-    final isInProgress = _currentTravelStatus == 'InProgress';
+  Widget _buildDriverRemindersCard() {
+    return MotoGlass(
+      painted: true,
+      padding: const EdgeInsets.all(MotoSpace.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            key: const ValueKey('driver-reminders-toggle'),
+            borderRadius: MotoRadius.brMd,
+            onTap: () => setState(
+              () => _showDriverReminders = !_showDriverReminders,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: MotoSpace.s1),
+              child: Row(
+                children: [
+                  const MotoTile(icon: Icons.info_outline, size: 36),
+                  const SizedBox(width: MotoSpace.s3),
+                  Expanded(
+                    child: Text(
+                      'Antes de receber corridas',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _showDriverReminders ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: context.moto.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: _showDriverReminders
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: MotoSpace.s4),
+                      _buildReminderItem(
+                        icon: Icons.notifications_active_outlined,
+                        title: 'Mantenha as notificações ativadas',
+                        description:
+                            'Elas são essenciais para avisar imediatamente sobre novas solicitações de corrida.',
+                      ),
+                      const SizedBox(height: MotoSpace.s3),
+                      _buildReminderItem(
+                        icon: Icons.location_on_outlined,
+                        title: 'Permita a localização o tempo todo',
+                        description:
+                            'O acesso contínuo mantém sua posição atualizada, inclusive quando o aplicativo estiver em segundo plano.',
+                        actionLabel: 'Verificar configuração',
+                        onAction: Geolocator.openAppSettings,
+                      ),
+                      const SizedBox(height: MotoSpace.s3),
+                      _buildReminderItem(
+                        icon: Icons.volume_up_outlined,
+                        title: 'Mantenha o volume audível',
+                        description:
+                            'Use um volume adequado para ouvir o alerta e não perder novas oportunidades de corrida.',
+                      ),
+                    ],
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return GestureDetector(
-      onTap: _openActiveTravel,
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: Colors.grey.shade300),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+  Widget _buildReminderItem({
+    required IconData icon,
+    required String title,
+    required String description,
+    String? actionLabel,
+    Future<bool> Function()? onAction,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 22, color: context.moto.accent),
+        const SizedBox(width: MotoSpace.s3),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
-                children: [
-                  Icon(Icons.directions_car, color: Color(0xFF4685C0), size: 24),
-                  SizedBox(width: 8),
-                  Text(
-                    'Viagem Ativa',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF4E4E4E)),
-                  ),
-                ],
+              Text(title, style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: MotoSpace.s1),
+              Text(
+                description,
+                style: TextStyle(
+                  color: context.moto.textSecondary,
+                  fontSize: 13,
+                  height: 1.35,
+                ),
               ),
-              const SizedBox(height: 12),
-              if (_currentPassengerName != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(height: MotoSpace.s1),
+                TextButton.icon(
+                  onPressed: () => unawaited(onAction()),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: Text(actionLabel),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAvailabilityCard() {
+    final isActive = _availability?.isActive ?? false;
+    final hasActiveTravel = _currentTravelId != null;
+
+    return MotoSapphire(
+      // Builder: precisamos do BuildContext DE DENTRO do MotoSapphire (que
+      // troca o Theme ambiente para a paleta safira/escura) — usar o
+      // `context` do método externo pegava o Theme.of() de fora (claro),
+      // deixando o texto escuro em cima do card azul-marinho.
+      child: Builder(
+        builder: (context) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final useStackedControls =
+                    constraints.maxWidth < 300 ||
+                    MediaQuery.textScalerOf(context).scale(12) > 14;
+                final badge = MotoStatusBadge(
+                  label: isActive ? 'Recebendo corridas' : 'Modo indisponível',
+                  tone: isActive ? MotoTone.success : MotoTone.neutral,
+                  live: isActive,
+                );
+                final availabilitySwitch = Switch(
+                  value: isActive,
+                  onChanged:
+                      _isTogglingAvailability ||
+                          _hasVehicle == false ||
+                          hasActiveTravel
+                      ? null
+                      : _onAvailabilityToggled,
+                );
+
+                if (useStackedControls) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.person, color: Color(0xFF4685C0), size: 20),
-                      const SizedBox(width: 8),
-                      Text(_currentPassengerName!, style: const TextStyle(color: Color(0xFF4E4E4E), fontSize: 14)),
+                      badge,
+                      const SizedBox(height: MotoSpace.s2),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: availabilitySwitch,
+                      ),
                     ],
-                  ),
-                ),
-              Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Color(0xFF4685C0), size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    isInProgress ? 'Em andamento' : 'Aceita — aguardando início',
-                    style: const TextStyle(color: Color(0xFF4E4E4E), fontSize: 14),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isInProgress ? Colors.green.shade100 : Colors.orange.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  isInProgress ? 'Em andamento' : 'Aceita',
-                  style: TextStyle(
-                    color: isInProgress ? Colors.green.shade800 : Colors.orange.shade800,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: _openActiveTravel,
-                  child: const Text('Abrir Viagem', style: TextStyle(color: Colors.white, fontSize: 14)),
+                  );
+                }
+
+                return Row(
+                  children: [
+                    badge,
+                    const Spacer(),
+                    availabilitySwitch,
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: MotoSpace.s4),
+            Text(
+              isActive ? 'Você está\nonline' : 'Você está\noffline',
+              style: Theme.of(context).textTheme.displaySmall,
+            ),
+            if (hasActiveTravel) ...[
+              const SizedBox(height: MotoSpace.s3),
+              Text(
+                'A disponibilidade não pode ser alterada durante uma viagem.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: context.moto.textSecondary,
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleRequiredCard() {
+    return Container(
+      padding: const EdgeInsets.all(MotoSpace.s4),
+      decoration: BoxDecoration(
+        color: context.moto.warning.withValues(alpha: 0.14),
+        borderRadius: MotoRadius.brLg,
+        border: Border.all(color: context.moto.warning.withValues(alpha: 0.55)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: context.moto.warning),
+          const SizedBox(width: MotoSpace.s3),
+          Expanded(
+            child: Text(
+              'Você precisa ter um veículo vinculado para ficar online e receber corridas.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.moto.textPrimary,
+              ),
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveTravelCard() {
+    final isInProgress = _currentTravelStatus == 'InProgress';
+    final tripStatus = isInProgress
+        ? TripStatus.emAndamento
+        : TripStatus.aceita;
+
+    return GestureDetector(
+      onTap: _openActiveTravel,
+      child: MotoGlass(
+        painted: true,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const MotoTile(
+                  icon: Icons.directions_car,
+                  accent: true,
+                  size: 40,
+                ),
+                const SizedBox(width: MotoSpace.s3),
+                Expanded(
+                  child: Text(
+                    isInProgress ? 'Viagem em andamento' : 'Viagem aceita',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                MotoStatusBadge.trip(tripStatus),
+              ],
+            ),
+            const SizedBox(height: MotoSpace.s4),
+            if (_currentPassengerName != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: MotoSpace.s2),
+                child: Row(
+                  children: [
+                    Icon(Icons.person, color: context.moto.accent, size: 20),
+                    const SizedBox(width: MotoSpace.s2),
+                    Text(
+                      _currentPassengerName!,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: MotoSpace.s3),
+            MotoButton(
+              label: 'Abrir viagem',
+              large: false,
+              onPressed: _openActiveTravel,
+            ),
+          ],
         ),
       ),
     );
@@ -211,8 +465,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _locationTimer?.cancel();
     _availabilityTimer?.cancel();
-    _driverPositionTimer?.cancel();
     _activeTravelPollTimer?.cancel();
+    _offerRecoveryTimer?.cancel();
     _newOrderSub?.cancel();
     _orderCancelledSub?.cancel();
     _travelCancelledSub?.cancel();
@@ -220,6 +474,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _travelCompletedSub?.cancel();
     _reconnectingSub?.cancel();
     _reconnectedSub?.cancel();
+    _reconnectBadgeTimer?.cancel();
     _closedSub?.cancel();
     super.dispose();
   }
@@ -232,49 +487,85 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _checkActiveTravelHttp();
     _connectSignalR();
 
-    _checkAvailability();
-
     // Rede de segurança: re-consulta o estado canônico periodicamente,
     // cobrindo eventos SignalR perdidos (não há replay para o motorista).
-    _activeTravelPollTimer = Timer.periodic(
-      const Duration(seconds: 15),
-      (_) => _checkActiveTravelHttp(),
-    );
+    _startActiveTravelPolling();
+    _startOfferRecoveryPolling();
 
-    _driverPositionTimer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => _updateDriverPosition(),
-    );
-  }
-
-  Future<void> _updateDriverPosition() async {
-    try {
-      final dio = Modular.get<Dio>();
-      final localtionService = Modular.get<LocationService>();
-      final position = await localtionService.getCurrentPosition();
-
-      final response = await dio.post(
-        '/api/positions/drivers/$_userId',
-        data: {
-          "latitude": position.position?.latitude,
-          "longitude": position.position?.longitude,
-        },
-      );
-
-      developer.log('${response.statusCode}');
-    } on DioException catch (e) {
-      developer.log(e.message ?? "");
-      return;
-    }
+    // F04 (auditoria de escalabilidade): existia um terceiro canal aqui,
+    // `POST /api/positions/drivers/{userId}` via HTTP a cada 10s, rodando em
+    // paralelo ao `reportLocation` via SignalR abaixo — redundante (mesma
+    // informação, dois transportes, ao mesmo tempo, para o mesmo motorista).
+    // Removido; o SignalR já é o transporte usado para tudo mais no app.
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isAppActive = state == AppLifecycleState.resumed;
+
+    if (!_isAppActive) {
+      // SignalR permanece conectado para não alterar recebimento de ofertas.
+      // Apenas leituras periódicas de GPS/HTTP e o repaint do contador param.
+      _locationTimer?.cancel();
+      _activeTravelPollTimer?.cancel();
+      _offerRecoveryTimer?.cancel();
+      _availabilityTimer?.cancel();
+      return;
+    }
+
     // Ao voltar de background, re-consulta a viagem ativa para refletir
     // mudanças de status ocorridas enquanto o app não estava visível.
-    if (state == AppLifecycleState.resumed) {
-      _checkActiveTravelHttp();
-      _reconnectSignalRIfNeeded();
+    _checkActiveTravelHttp();
+    _checkAvailability();
+    _startActiveTravelPolling();
+    _startOfferRecoveryPolling();
+    _reconnectSignalRIfNeeded();
+  }
+
+  void _startActiveTravelPolling() {
+    _activeTravelPollTimer?.cancel();
+    if (!_isAppActive) return;
+    _activeTravelPollTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _checkActiveTravelHttp(),
+    );
+  }
+
+  void _startOfferRecoveryPolling() {
+    _offerRecoveryTimer?.cancel();
+    if (!_isAppActive) return;
+    unawaited(_checkCurrentOfferHttp());
+    _offerRecoveryTimer = Timer.periodic(
+      const Duration(seconds: 4),
+      (_) => _checkCurrentOfferHttp(),
+    );
+  }
+
+  Future<void> _checkCurrentOfferHttp() async {
+    if (_offerRecoveryInFlight ||
+        !_isAppActive ||
+        _currentTravelId != null ||
+        NotificationService.sheetVisible ||
+        NotificationService.orderAlertOpen) {
+      return;
+    }
+
+    _offerRecoveryInFlight = true;
+    try {
+      final dio = Modular.get<Dio>();
+      final response = await dio.get('/api/travels/orders/current-offer');
+      if (!mounted || response.statusCode != 200 || response.data == null) {
+        return;
+      }
+      final data = Map<String, dynamic>.from(
+        response.data as Map,
+      );
+      await _handleIncomingOrder(data);
+    } catch (_) {
+      // SignalR e push continuam como caminhos primários. Uma falha temporária
+      // nesta rede de segurança não altera disponibilidade nem encerra sessão.
+    } finally {
+      _offerRecoveryInFlight = false;
     }
   }
 
@@ -285,36 +576,93 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// ao primeiro plano.
   Future<void> _reconnectSignalRIfNeeded() async {
     final signalR = Modular.get<SignalRService>();
-    if (signalR.isConnected('travel-orders') && signalR.isConnected('travel-management')) {
+    if (signalR.isConnected('travel-orders') &&
+        signalR.isConnected('travel-management')) {
       return;
     }
     await _connectSignalR();
   }
 
+  Future<void> _refreshHome() async {
+    if (_isRefreshingHome) return;
+    setState(() => _isRefreshingHome = true);
+
+    try {
+      await _reconnectSignalRIfNeeded();
+      await Future.wait([
+        _checkActiveTravelHttp(),
+        _checkCurrentOfferHttp(),
+        _checkAvailability(),
+      ]);
+
+      if (!mounted) return;
+      final signalR = Modular.get<SignalRService>();
+      final connected =
+          signalR.isConnected('travel-orders') &&
+          signalR.isConnected('travel-management');
+      if (connected) {
+        _reconnectBadgeTimer?.cancel();
+        setState(() => _isReconnecting = false);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            connected
+                ? 'Informações atualizadas.'
+                : 'Ainda estamos tentando restabelecer a conexão.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      developer.log('Falha na atualização manual da tela inicial', error: e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível atualizar agora. Tente novamente.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshingHome = false);
+    }
+  }
+
   Future<void> _loadUserId() async {
     final authStorage = Modular.get<AuthStorage>();
     final userId = await authStorage.getUserId();
+    if (!mounted) return;
     setState(() => _userId = userId);
     if (userId != null) {
       await _loadUserName(userId);
     }
+    if (mounted) _checkAvailability();
   }
 
   Future<void> _loadUserName(String userId) async {
     try {
       final dio = Modular.get<Dio>();
-      final response = await dio.get('${AppConfig.getBaseUrl()}/api/drivers/$userId');
+      final response = await dio.get(
+        '${AppConfig.getBaseUrl()}/api/drivers/me',
+      );
       if (!mounted) return;
       if (response.statusCode == 200 && response.data != null) {
         final name = response.data['name'] as String?;
+        final hasVehicle = response.data['vehicle'] != null;
         var photoUrl = response.data['photoUrl'] as String?;
-        if (photoUrl != null && photoUrl.isNotEmpty && !photoUrl.startsWith('http://') && !photoUrl.startsWith('https://')) {
+        if (photoUrl != null &&
+            photoUrl.isNotEmpty &&
+            !photoUrl.startsWith('http://') &&
+            !photoUrl.startsWith('https://')) {
           photoUrl = '${AppConfig.getBaseUrl()}$photoUrl';
         }
         setState(() {
           if (name != null && name.isNotEmpty) _userName = name;
           _userPhotoUrl = photoUrl;
+          _hasVehicle = hasVehicle;
         });
+        if (!hasVehicle) _checkAvailability();
       }
     } catch (_) {
       // Silently fallback — name stays null, ProfileHeader handles gracefully
@@ -326,7 +674,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _checkingActiveTravel = true;
     try {
       final dio = Modular.get<Dio>();
-      final response = await dio.get('${AppConfig.getBaseUrl()}/api/travels/active');
+      final response = await dio.get(
+        '${AppConfig.getBaseUrl()}/api/travels/active',
+      );
       if (!mounted) return;
 
       // Contrato do endpoint GET /api/travels/active:
@@ -342,6 +692,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             _currentTravelStatus = data['status'] as String?;
             _currentPassengerName = data['passengerName'] as String?;
           });
+          _syncBackgroundTravelStatus(_currentTravelStatus);
           return;
         }
       }
@@ -351,6 +702,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _currentTravelStatus = null;
         _currentPassengerName = null;
       });
+      _syncBackgroundTravelStatus(null);
     } catch (_) {
       // Falha de rede/erro de servidor — fallback silencioso para cache local
       await _loadActiveTravelFromLocal();
@@ -368,13 +720,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _currentTravelStatus = active.status;
         _currentPassengerName = active.passengerName;
       });
+      _syncBackgroundTravelStatus(active.status);
+    }
+  }
+
+  void _syncBackgroundTravelStatus(String? status) {
+    try {
+      unawaited(
+        Modular.get<BackgroundLocationService>().setTravelStatus(status),
+      );
+    } catch (_) {
+      // Serviço exclusivo do Android; ausente em testes e plataformas iOS.
     }
   }
 
   /// Abre a página da viagem ativa e, ao voltar, re-consulta o estado canônico
   /// para que mudanças de status feitas na página reflitam na home na hora.
   Future<void> _openActiveTravel() async {
-    await Modular.to.pushNamed('/active-travel', arguments: {'travelId': _currentTravelId});
+    await Modular.to.pushNamed(
+      '/active-travel',
+      arguments: {'travelId': _currentTravelId},
+    );
     if (mounted) _checkActiveTravelHttp();
   }
 
@@ -390,40 +756,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     _signalRListenersRegistered = true;
 
-    _newOrderSub = signalR.onNewOrder.listen((data) async {
-      if (NotificationService.orderAlertOpen) return;
-      if (_currentTravelId != null) return;
-
-      // `_currentTravelId` só é atualizado por fluxos que passam pela home —
-      // um aceite via notificação push (OrderAlertPage → /active-travel)
-      // nunca toca essa variável, então sob nenhuma hipótese basta confiar
-      // só nela: confere a fonte persistida antes de exibir qualquer oferta.
-      final travelRepo = Modular.get<TravelLocalRepository>();
-      final active = await travelRepo.getActiveTravel();
-      if (active != null || !mounted) return;
-
-      final orderId = data['orderId'] as String?;
-      if (orderId == null) return;
-
-      // If this order was already denied, ignore the re-send
-      if (_deniedOrderIds.contains(orderId)) return;
-
-      // A new (non-denied) order signals a fresh dispatch round — clear old denials
-      if (_deniedOrderIds.isNotEmpty) {
-        _deniedOrderIds.clear();
-      }
-
-      IncomingOrderSheet.show(
-        context,
-        data,
-        onDenied: () {
-          _deniedOrderIds.add(orderId);
-          NotificationService.setSheetVisible(false);
-        },
-      );
-
-      // RF05: Marcar sheet como visível para suprimir foreground dup
-      NotificationService.setSheetVisible(true);
+    _newOrderSub = signalR.onNewOrder.listen((data) {
+      unawaited(_handleIncomingOrder(data));
     });
 
     // Listen for travel cancellations
@@ -488,14 +822,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
 
     _reconnectingSub = signalR.onReconnecting.listen((_) {
-      setState(() => _isReconnecting = true);
+      _scheduleReconnectBadge();
     });
 
     _reconnectedSub = signalR.onReconnected.listen((_) {
+      _reconnectBadgeTimer?.cancel();
       setState(() => _isReconnecting = false);
       // Sem replay de eventos para o motorista: ao reconectar, re-consulta
       // o estado canônico para refletir transições perdidas.
       _checkActiveTravelHttp();
+      _checkCurrentOfferHttp();
     });
 
     // Dispara quando o backoff automático se esgota e a conexão cai de vez
@@ -504,7 +840,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // que nada tirava _isReconnecting de true nesse caso.
     _closedSub = signalR.onClosed.listen((_) {
       if (!mounted) return;
-      setState(() => _isReconnecting = true);
+      _scheduleReconnectBadge();
       _reconnectSignalRWithRetry();
     });
 
@@ -513,6 +849,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Página de pedido aberta: quem trata o cancelamento é a própria página
       // (RF10) — o popUntil abaixo arrancaria a /order-alert da pilha.
       if (NotificationService.orderAlertOpen) return;
+      unawaited(
+        Modular.get<INotificationChannelService>().stopRideAlertSound(),
+      );
+      NotificationService.setSheetVisible(false);
       // Dismiss any open bottom sheet and notify the driver
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -528,6 +868,112 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // ── Now connect to hubs (listeners are already registered) ──
     await _connectHubs(signalR, token);
+  }
+
+  Future<void> _handleIncomingOrder(Map<String, dynamic> data) async {
+    if (NotificationService.orderAlertOpen) return;
+    // Reenvio do mesmo evento NewOrder (reconexão do hub, retry do
+    // backend) enquanto o sheet do pedido atual ainda está na tela —
+    // sem essa checagem, abria um segundo sheet por cima do primeiro.
+    if (NotificationService.sheetVisible) return;
+    if (_currentTravelId != null) return;
+
+    final orderId = data['orderId'] as String?;
+    if (orderId == null) return;
+
+    // Reserva o direito de abrir o sheet antes do primeiro `await`.
+    // Eventos SignalR repetidos podem chegar no mesmo frame; sem essa
+    // trava síncrona todos passavam pelas validações e empilhavam vários
+    // cards da mesma corrida.
+    NotificationService.setSheetVisible(true);
+
+    // `_currentTravelId` só é atualizado por fluxos que passam pela home —
+    // um aceite via notificação push (OrderAlertPage → /active-travel)
+    // nunca toca essa variável, então sob nenhuma hipótese basta confiar
+    // só nela: confere a fonte persistida antes de exibir qualquer oferta.
+    final travelRepo = Modular.get<TravelLocalRepository>();
+    try {
+      final acknowledged = await _acknowledgeOffer(orderId);
+      if (acknowledged == null || !mounted) {
+        NotificationService.setSheetVisible(false);
+        return;
+      }
+      data = acknowledged;
+
+      final active = await travelRepo.getActiveTravel();
+      if (active != null || !mounted) {
+        NotificationService.setSheetVisible(false);
+        return;
+      }
+
+      // If this order was already denied, ignore the re-send.
+      if (_deniedOrderIds.contains(orderId) ||
+          await NotificationService.isOrderDismissed(orderId)) {
+        NotificationService.setSheetVisible(false);
+        return;
+      }
+      if (!mounted) {
+        NotificationService.setSheetVisible(false);
+        return;
+      }
+
+      // Em primeiro plano o banner/som do OneSignal é bloqueado e o card é
+      // a fonte do alerta. Se a oferta veio de um toque na push, o SO já
+      // tocou o áudio e esta reprodução local é suprimida.
+      if (!NotificationService.shouldSuppressForegroundSound(orderId)) {
+        await Modular.get<INotificationChannelService>().playRideAlertSound();
+      }
+      if (!mounted) {
+        NotificationService.setSheetVisible(false);
+        return;
+      }
+
+      IncomingOrderSheet.show(
+        context,
+        data,
+        onDenied: () {
+          _deniedOrderIds.add(orderId);
+          NotificationService.dismissOrder(orderId);
+          NotificationService.setSheetVisible(false);
+        },
+      );
+    } catch (_) {
+      NotificationService.setSheetVisible(false);
+      debugPrint('Falha ao processar nova solicitação de viagem.');
+    }
+  }
+
+  Future<Map<String, dynamic>?> _acknowledgeOffer(String orderId) async {
+    final dio = Modular.get<Dio>();
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final response = await dio.post(
+          '${AppConfig.getBaseUrl()}/api/travels/orders/$orderId/received',
+        );
+        if (response.statusCode == 200 && response.data is Map) {
+          return Map<String, dynamic>.from(response.data as Map);
+        }
+        return null;
+      } catch (_) {
+        if (attempt == 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 750));
+        }
+      }
+    }
+    return null;
+  }
+
+  void _scheduleReconnectBadge() {
+    _reconnectBadgeTimer?.cancel();
+    _reconnectBadgeTimer = Timer(const Duration(seconds: 3), () {
+      final signalR = Modular.get<SignalRService>();
+      final stillDisconnected =
+          !signalR.isConnected('travel-orders') ||
+          !signalR.isConnected('travel-management');
+      if (mounted && stillDisconnected) {
+        setState(() => _isReconnecting = true);
+      }
+    });
   }
 
   /// Reconecta após um onClosed, com retry em loop até dar certo.
@@ -547,10 +993,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       while (mounted) {
         try {
           await _connectSignalR();
+          _reconnectBadgeTimer?.cancel();
           if (mounted) setState(() => _isReconnecting = false);
           return;
         } catch (e) {
-          developer.log('Falha ao reconectar SignalR, tentando novamente', error: e);
+          developer.log(
+            'Falha ao reconectar SignalR, tentando novamente',
+            error: e,
+          );
           await Future.delayed(retryDelay);
         }
       }
@@ -622,13 +1072,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       setState(() => _availability = availability);
 
-      if (availability.isActive) {
+      if (_hasVehicle == false) {
+        _stopAvailabilityTimer();
+        await Modular.get<BackgroundLocationService>().stop();
+      } else if (availability.isActive) {
         _startAvailabilityTimer();
+        await _ensureBackgroundLocation();
       } else if (!AvailabilitySheet.isOpen) {
-        final result = await AvailabilitySheet.show(context, datasource: datasource);
+        final result = await AvailabilitySheet.show(
+          context,
+          datasource: datasource,
+        );
         if (!mounted || result == null) return; // cancelou — permanece inactive
         setState(() => _availability = result);
         _startAvailabilityTimer();
+        await _ensureBackgroundLocation();
       }
     } catch (e) {
       // RF06: falha silenciosa — re-tenta na próxima entrada do app
@@ -646,6 +1104,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       setState(() {}); // recalcula a contagem regressiva
       if (availability.isExpired) {
         _stopAvailabilityTimer(); // indicador passa a exibir ramo inativo
+        unawaited(Modular.get<BackgroundLocationService>().stop());
       }
     });
   }
@@ -655,26 +1114,210 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _availabilityTimer = null;
   }
 
+  Future<void> _onAvailabilityToggled(bool value) async {
+    if (_currentTravelId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Finalize ou cancele a viagem antes de alterar sua disponibilidade.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (value && _hasVehicle == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vincule um veículo ao seu cadastro para ficar online.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final datasource = Modular.get<AvailabilityDatasource>();
+    setState(() => _isTogglingAvailability = true);
+
+    try {
+      if (value) {
+        // Ativar passa pelo sheet de confirmação (RF02/03/04) — mesma janela
+        // de 4h já usada em outros pontos de entrada, não pula essa etapa.
+        final result = await AvailabilitySheet.show(
+          context,
+          datasource: datasource,
+        );
+        if (!mounted || result == null) return; // cancelou no sheet
+        setState(() => _availability = result);
+        _startAvailabilityTimer();
+        await _ensureBackgroundLocation();
+        await _reportIdleLocation(
+          Modular.get<SignalRService>(),
+          force: true,
+        );
+      } else {
+        final result = await datasource.deactivate();
+        if (!mounted) return;
+        setState(() => _availability = result);
+        _stopAvailabilityTimer();
+        await Modular.get<BackgroundLocationService>().stop();
+        _lastReportedPosition = null;
+        _lastLocationReportAt = null;
+      }
+    } catch (e) {
+      developer.log('[AVAILABILITY] toggle failed: $e', name: 'availability');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível atualizar sua disponibilidade.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTogglingAvailability = false);
+    }
+  }
+
+  Future<void> _ensureBackgroundLocation() async {
+    if (_availability?.isActive != true || _hasVehicle == false) return;
+    final service = Modular.get<BackgroundLocationService>();
+    final permission = await service.requestPermissions();
+    if (!mounted) return;
+
+    if (permission == BackgroundLocationPermissionStatus.granted) {
+      await service.start();
+      return;
+    }
+    if (_backgroundPermissionPromptOpen) return;
+
+    String title = 'Permissão de localização necessária';
+    String message =
+        'Ative a localização para compartilhar sua posição durante o atendimento.';
+    bool openAppSettings = false;
+    bool openLocationSettings = false;
+
+    switch (permission) {
+      case BackgroundLocationPermissionStatus.backgroundLocationRequired:
+        title = 'Permita a localização o tempo todo';
+        message =
+            'Para continuar sendo acompanhado com a tela bloqueada ou com o Motô em segundo plano, abra as configurações, toque em Permissões, depois em Localização e selecione “Permitir o tempo todo”.';
+        openAppSettings = true;
+      case BackgroundLocationPermissionStatus.locationDeniedForever:
+        message =
+            'A permissão foi bloqueada. Abra as configurações do aplicativo e permita o acesso à localização.';
+        openAppSettings = true;
+      case BackgroundLocationPermissionStatus.notificationsDenied:
+        title = 'Permita as notificações';
+        message =
+            'O Android exige uma notificação fixa enquanto a localização é compartilhada em segundo plano. Ative as notificações nas configurações.';
+        openAppSettings = true;
+      case BackgroundLocationPermissionStatus.serviceDisabled:
+        title = 'Ative o GPS';
+        message = 'O serviço de localização do aparelho está desligado.';
+        openLocationSettings = true;
+      case BackgroundLocationPermissionStatus.locationDenied:
+      case BackgroundLocationPermissionStatus.unsupported:
+      case BackgroundLocationPermissionStatus.granted:
+        break;
+    }
+
+    _backgroundPermissionPromptOpen = true;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Agora não'),
+          ),
+          if (openAppSettings || openLocationSettings)
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                if (openLocationSettings) {
+                  await Geolocator.openLocationSettings();
+                } else {
+                  await Geolocator.openAppSettings();
+                }
+              },
+              child: const Text('Abrir configurações'),
+            ),
+        ],
+      ),
+    );
+    _backgroundPermissionPromptOpen = false;
+  }
+
   void _startLocationReporting(SignalRService signalR) {
     _locationTimer?.cancel();
+    if (!_isAppActive) return;
+
+    _reportIdleLocation(signalR, force: true);
     _locationTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) async {
-        try {
-          final hasPermission = await Geolocator.checkPermission();
-          if (hasPermission == LocationPermission.denied || hasPermission == LocationPermission.deniedForever) {
-            return;
-          }
-          final position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-            ),
-          );
-          await signalR.reportLocation(position.latitude, position.longitude);
-        } catch (_) {
-          // Silently skip on error
-        }
-      },
+      _locationReportInterval,
+      (_) => _reportIdleLocation(signalR),
     );
+  }
+
+  Future<void> _reportIdleLocation(
+    SignalRService signalR, {
+    bool force = false,
+  }) async {
+    if (!_isAppActive ||
+        _availability?.isActive != true ||
+        _currentTravelStatus == 'InProgress' ||
+        _locationReportInFlight) {
+      return;
+    }
+    _locationReportInFlight = true;
+    try {
+      // F04: enquanto a viagem está InProgress, o ActiveTravelPage já
+      // reporta a posição via SignalR a cada 5s (canal mais frequente e
+      // mais relevante nesse momento) — pausar este canal da Home evita
+      // dois canais de localização simultâneos, ao mesmo tempo, para o
+      // mesmo motorista. Retoma sozinho no próximo tick assim que a
+      // viagem deixar de ser InProgress (_currentTravelStatus muda em
+      // várias listeners de SignalR/HTTP já existentes acima).
+      final hasPermission = await Geolocator.checkPermission();
+      if (hasPermission == LocationPermission.denied ||
+          hasPermission == LocationPermission.deniedForever) {
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      if (!_isAppActive || _currentTravelStatus == 'InProgress') return;
+
+      final previous = _lastReportedPosition;
+      final lastReportAt = _lastLocationReportAt;
+      final heartbeatDue =
+          lastReportAt == null ||
+          DateTime.now().difference(lastReportAt) >= _locationHeartbeatInterval;
+      final movedEnough =
+          previous == null ||
+          Geolocator.distanceBetween(
+                previous.latitude,
+                previous.longitude,
+                position.latitude,
+                position.longitude,
+              ) >=
+              _minimumDisplacementMeters;
+
+      if (!force && !heartbeatDue && !movedEnough) return;
+
+      await signalR.reportLocation(position.latitude, position.longitude);
+      _lastReportedPosition = position;
+      _lastLocationReportAt = DateTime.now();
+    } catch (_) {
+      // Silently skip on error
+    } finally {
+      _locationReportInFlight = false;
+    }
   }
 }

@@ -3,7 +3,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/device_type.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/auth/domain/repositories/i_auth_repository.dart';
 
 /// Página de passagem do fluxo de push: renova o token exibindo apenas um
@@ -45,8 +45,10 @@ class _OrderRefreshPageState extends State<OrderRefreshPage> {
         await authStorage.saveToken(success.accessToken, success.userId);
         await authStorage.saveRefreshToken(success.refreshToken);
         if (!mounted) return;
-        Modular.to.pushReplacementNamed('/order-alert',
-            arguments: {'orderId': widget.orderId});
+        Modular.to.pushReplacementNamed(
+          '/order-alert',
+          arguments: {'orderId': widget.orderId},
+        );
       },
       (_) async {
         await signOutService.signOut();
@@ -56,10 +58,9 @@ class _OrderRefreshPageState extends State<OrderRefreshPage> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: AppColors.white,
+    return Scaffold(
       body: Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+        child: CircularProgressIndicator(color: context.moto.accent),
       ),
     );
   }

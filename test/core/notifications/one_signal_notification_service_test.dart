@@ -1,6 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:moto_driver/core/local_db/models/local_data_models.dart';
 import 'package:moto_driver/core/local_db/repositories/auth_local_repository.dart';
 import 'package:moto_driver/core/local_db/repositories/notifications_local_repository.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
@@ -8,7 +8,8 @@ import 'package:moto_driver/core/notifications/one_signal_notification_service.d
 
 import '../../helpers/push_test_utils.dart';
 
-class MockNotificationsLocalRepository extends Mock implements NotificationsLocalRepository {}
+class MockNotificationsLocalRepository extends Mock
+    implements NotificationsLocalRepository {}
 
 class MockAuthLocalRepository extends Mock implements AuthLocalRepository {}
 
@@ -36,7 +37,12 @@ void main() {
     NotificationService.setOrderAlertOpen(false);
 
     when(() => navigator.path).thenReturn('/home');
-    when(() => navigator.pushNamed(any(), arguments: any(named: 'arguments'))).thenAnswer((_) async => null);
+    when(
+      () => authStorage.getRefreshToken(),
+    ).thenAnswer((_) async => 'refresh-token');
+    when(
+      () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
+    ).thenAnswer((_) async => null);
   });
 
   PushTestModule buildModule() => PushTestModule(
@@ -59,7 +65,9 @@ void main() {
     'order_id': orderId,
   };
 
-  testWidgets('tipo != NewOrder → ignorado (sem pendente, sem navegação)', (tester) async {
+  testWidgets('tipo != NewOrder → ignorado (sem pendente, sem navegação)', (
+    tester,
+  ) async {
     initTestModule(buildModule(), navigator);
     final service = buildService();
 
@@ -85,20 +93,49 @@ void main() {
     destroyTestModule();
   });
 
-  testWidgets('ok → pendente + pushNamed(/order-refresh) com orderId', (tester) async {
-    when(() => authStorage.getRefreshToken()).thenAnswer((_) async => 'refresh-token');
-    when(() => travelLocalRepository.getActiveTravel()).thenAnswer((_) async => null);
+  testWidgets('ok → pendente + pushNamed(/order-refresh) com orderId', (
+    tester,
+  ) async {
+    when(
+      () => authStorage.getRefreshToken(),
+    ).thenAnswer((_) async => 'refresh-token');
+    when(
+      () => travelLocalRepository.getActiveTravel(),
+    ).thenAnswer((_) async => null);
     initTestModule(buildModule(), navigator);
     final service = buildService();
 
     await service.handleNotificationClick(pushData('order-1'));
 
     expect(NotificationService.peekPendingOrder(), 'order-1');
-    verify(() => navigator.pushNamed('/order-refresh', arguments: {'orderId': 'order-1'})).called(1);
+    verify(
+      () => navigator.pushNamed(
+        '/order-refresh',
+        arguments: {'orderId': 'order-1'},
+      ),
+    ).called(1);
     destroyTestModule();
   });
 
-  testWidgets('página de pedido aberta → só atualiza o pendente (RF11)', (tester) async {
+  testWidgets('push atrasado de pedido recusado → ignora sem navegar', (
+    tester,
+  ) async {
+    initTestModule(buildModule(), navigator);
+    final service = buildService();
+    NotificationService.dismissOrder('order-dismissed');
+
+    await service.handleNotificationClick(pushData('order-dismissed'));
+
+    expect(NotificationService.peekPendingOrder(), isNull);
+    verifyNever(
+      () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
+    );
+    destroyTestModule();
+  });
+
+  testWidgets('página de pedido aberta → só atualiza o pendente (RF11)', (
+    tester,
+  ) async {
     NotificationService.setOrderAlertOpen(true);
     initTestModule(buildModule(), navigator);
     final service = buildService();
@@ -112,66 +149,86 @@ void main() {
     destroyTestModule();
   });
 
-  testWidgets('fluxo de sessão (path /terms) → não navega; pendente mantido', (tester) async {
-    when(() => navigator.path).thenReturn('/terms');
-    initTestModule(buildModule(), navigator);
-    final service = buildService();
+  testWidgets(
+    'fluxo de sessão (path /terms) → não navega; pendente mantido',
+    (tester) async {
+      when(() => navigator.path).thenReturn('/terms');
+      initTestModule(buildModule(), navigator);
+      final service = buildService();
 
-    await service.handleNotificationClick(pushData('order-1'));
+      await service.handleNotificationClick(pushData('order-1'));
 
-    expect(NotificationService.peekPendingOrder(), 'order-1');
-    verifyNever(
-      () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
-    );
-    destroyTestModule();
-  });
+      expect(NotificationService.peekPendingOrder(), 'order-1');
+      verifyNever(
+        () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
+      );
+      destroyTestModule();
+    },
+  );
 
-  testWidgets('sem sessão (refresh token nulo) → não navega; pendente mantido', (tester) async {
-    when(() => authStorage.getRefreshToken()).thenAnswer((_) async => null);
-    initTestModule(buildModule(), navigator);
-    final service = buildService();
+  testWidgets(
+    'sem sessão (refresh token nulo) → não navega; pendente mantido',
+    (tester) async {
+      when(() => authStorage.getRefreshToken()).thenAnswer((_) async => null);
+      initTestModule(buildModule(), navigator);
+      final service = buildService();
 
-    await service.handleNotificationClick(pushData('order-1'));
+      await service.handleNotificationClick(pushData('order-1'));
 
-    expect(NotificationService.peekPendingOrder(), 'order-1');
-    verifyNever(
-      () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
-    );
-    destroyTestModule();
-  });
+      expect(NotificationService.peekPendingOrder(), 'order-1');
+      verifyNever(
+        () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
+      );
+      destroyTestModule();
+    },
+  );
 
-  testWidgets('viagem ativa → ignora por completo (limpa pendente)', (tester) async {
-    when(() => authStorage.getRefreshToken()).thenAnswer((_) async => 'refresh-token');
-    when(() => travelLocalRepository.getActiveTravel()).thenAnswer(
-      (_) async => TravelLocalData(
-        travelId: 'travel-1',
-        status: 'Accepted',
-        createdAt: DateTime.now(),
-      ),
-    );
-    initTestModule(buildModule(), navigator);
-    final service = buildService();
+  testWidgets(
+    'viagem ativa → ignora por completo (limpa pendente)',
+    (tester) async {
+      when(
+        () => authStorage.getRefreshToken(),
+      ).thenAnswer((_) async => 'refresh-token');
+      when(() => dio.get('/api/travels/active')).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/travels/active'),
+          statusCode: 200,
+          data: {'travelId': 'travel-1', 'status': 'Accepted'},
+        ),
+      );
+      when(
+        () => navigator.navigate(any(), arguments: any(named: 'arguments')),
+      ).thenReturn(null);
+      initTestModule(buildModule(), navigator);
+      final service = buildService();
 
-    await service.handleNotificationClick(pushData('order-1'));
+      await service.handleNotificationClick(pushData('order-1'));
 
-    expect(NotificationService.peekPendingOrder(), isNull);
-    verifyNever(
-      () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
-    );
-    destroyTestModule();
-  });
+      expect(NotificationService.peekPendingOrder(), isNull);
+      verify(
+        () => navigator.navigate(
+          '/active-travel',
+          arguments: {'travelId': 'travel-1'},
+        ),
+      ).called(1);
+      destroyTestModule();
+    },
+  );
 
-  testWidgets('navegação lança (cold start) → engolida; pendente sobrevive', (tester) async {
-    when(() => navigator.path).thenThrow(StateError('Modular not ready'));
-    initTestModule(buildModule(), navigator);
-    final service = buildService();
+  testWidgets(
+    'navegação lança (cold start) → engolida; pendente sobrevive',
+    (tester) async {
+      when(() => navigator.path).thenThrow(StateError('Modular not ready'));
+      initTestModule(buildModule(), navigator);
+      final service = buildService();
 
-    await service.handleNotificationClick(pushData('order-1'));
+      await service.handleNotificationClick(pushData('order-1'));
 
-    expect(NotificationService.peekPendingOrder(), 'order-1');
-    verifyNever(
-      () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
-    );
-    destroyTestModule();
-  });
+      expect(NotificationService.peekPendingOrder(), 'order-1');
+      verifyNever(
+        () => navigator.pushNamed(any(), arguments: any(named: 'arguments')),
+      );
+      destroyTestModule();
+    },
+  );
 }
