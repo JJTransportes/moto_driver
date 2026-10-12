@@ -51,7 +51,12 @@ class MotoGlass extends StatelessWidget {
       GlassLevel.card => (c.glass2, MotoGlassSpec.blur2, 28.0),
       GlassLevel.sheet => (c.glass3, MotoGlassSpec.blur3, 60.0),
     };
-    final base = painted ? Color.alphaBlend(fill, c.bgRaised.withValues(alpha: c.isDark ? .1 : .82)) : fill;
+    final base = painted
+        ? Color.alphaBlend(
+            fill,
+            c.bgRaised.withValues(alpha: c.isDark ? .1 : .82),
+          )
+        : fill;
 
     final surface = CustomPaint(
       foregroundPainter: _RimPainter(radius, c.rim),
@@ -64,7 +69,10 @@ class MotoGlass extends StatelessWidget {
             begin: Alignment.topLeft,
             end: const Alignment(.2, .3),
             colors: [
-              Color.alphaBlend(c.highlight.withValues(alpha: c.isDark ? .12 : .6), base),
+              Color.alphaBlend(
+                c.highlight.withValues(alpha: c.isDark ? .12 : .6),
+                base,
+              ),
               base,
             ],
           ),
@@ -77,8 +85,17 @@ class MotoGlass extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: radius,
         boxShadow: [
-          BoxShadow(color: c.shadow.withValues(alpha: .10), blurRadius: 2, offset: const Offset(0, 1)),
-          BoxShadow(color: c.shadow, blurRadius: blur, offset: Offset(0, blur / 2.6), spreadRadius: -blur / 2.5),
+          BoxShadow(
+            color: c.shadow.withValues(alpha: .10),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+          BoxShadow(
+            color: c.shadow,
+            blurRadius: blur,
+            offset: Offset(0, blur / 2.6),
+            spreadRadius: -blur / 2.5,
+          ),
         ],
       ),
       child: ClipRRect(
@@ -113,14 +130,20 @@ class _RimPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RimPainter old) => old.radius != radius || old.gradient != gradient;
+  bool shouldRepaint(_RimPainter old) =>
+      old.radius != radius || old.gradient != gradient;
 }
 
 /// SAFIRA — superfície escura "joia" para momentos importantes
 /// (motorista online, cartão do motorista, instrução de rota, KPI principal).
 /// Troca o tema do conteúdo: textos, badges e métricas de dentro se adaptam sozinhos.
 class MotoSapphire extends StatelessWidget {
-  const MotoSapphire({super.key, required this.child, this.padding = const EdgeInsets.all(20), this.radius});
+  const MotoSapphire({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(20),
+    this.radius,
+  });
   final Widget child;
   final EdgeInsetsGeometry padding;
   final BorderRadius? radius;
@@ -132,8 +155,17 @@ class MotoSapphire extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: r,
         boxShadow: const [
-          BoxShadow(color: Color(0x330B1B55), blurRadius: 4, offset: Offset(0, 2)),
-          BoxShadow(color: Color(0x8C132C86), blurRadius: 40, offset: Offset(0, 20), spreadRadius: -16),
+          BoxShadow(
+            color: Color(0x330B1B55),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+          BoxShadow(
+            color: Color(0x8C132C86),
+            blurRadius: 40,
+            offset: Offset(0, 20),
+            spreadRadius: -16,
+          ),
         ],
       ),
       child: ClipRRect(
@@ -145,7 +177,11 @@ class MotoSapphire extends StatelessWidget {
               gradient: RadialGradient(
                 center: Alignment(-.7, -1.1),
                 radius: 1.3,
-                colors: [Color(0xFF3F6EF0), MotoRaw.safira800, MotoRaw.safira900],
+                colors: [
+                  Color(0xFF3F6EF0),
+                  MotoRaw.safira800,
+                  MotoRaw.safira900,
+                ],
                 stops: [0, .5, 1],
               ),
             ),
@@ -175,9 +211,21 @@ class MotoCanvas extends StatelessWidget {
       decoration: BoxDecoration(gradient: c.canvas),
       child: Stack(
         children: [
-          const Positioned(top: -140, right: -120, child: _Blob(color: Color(0x385B8CFF), size: 380)),
-          const Positioned(top: 40, left: -160, child: _Blob(color: Color(0x4D9DBBFF), size: 320)),
-          const Positioned(bottom: -160, left: -120, child: _Blob(color: Color(0x1FB8E04A), size: 360)),
+          const Positioned(
+            top: -140,
+            right: -120,
+            child: _Blob(color: Color(0x385B8CFF), size: 380),
+          ),
+          const Positioned(
+            top: 40,
+            left: -160,
+            child: _Blob(color: Color(0x4D9DBBFF), size: 320),
+          ),
+          const Positioned(
+            bottom: -160,
+            left: -120,
+            child: _Blob(color: Color(0x1FB8E04A), size: 360),
+          ),
           Positioned.fill(child: child),
         ],
       ),

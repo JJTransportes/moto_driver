@@ -36,17 +36,27 @@ void main() {
     blocTest<LoginBloc, LoginState>(
       'emits [LoginLoading, LoginSuccess] when login succeeds and persists token',
       build: () {
-        when(() => mockUsecase.call(any(), any(), any(), expectedRole: any(named: 'expectedRole')))
-            .thenAnswer((_) async => Success(user));
-        when(() => mockAuthStorage.saveToken(any(), any()))
-            .thenAnswer((_) async {});
-        when(() => mockAuthStorage.saveRefreshToken(any()))
-            .thenAnswer((_) async {});
-        when(() => mockAuthLocal.saveAuth(
-              userId: any(named: 'userId'),
-              accessToken: any(named: 'accessToken'),
-              roles: any(named: 'roles'),
-            )).thenAnswer((_) async {});
+        when(
+          () => mockUsecase.call(
+            any(),
+            any(),
+            any(),
+            expectedRole: any(named: 'expectedRole'),
+          ),
+        ).thenAnswer((_) async => Success(user));
+        when(
+          () => mockAuthStorage.saveToken(any(), any()),
+        ).thenAnswer((_) async {});
+        when(
+          () => mockAuthStorage.saveRefreshToken(any()),
+        ).thenAnswer((_) async {});
+        when(
+          () => mockAuthLocal.saveAuth(
+            userId: any(named: 'userId'),
+            accessToken: any(named: 'accessToken'),
+            roles: any(named: 'roles'),
+          ),
+        ).thenAnswer((_) async {});
         return LoginBloc(mockUsecase, mockAuthStorage, mockAuthLocal);
       },
       act: (bloc) => bloc.add(
@@ -57,31 +67,42 @@ void main() {
         LoginSuccess(user),
       ],
       verify: (_) {
-        verify(() => mockAuthStorage.saveToken('tok_123', 'user_1'))
-            .called(1);
+        verify(() => mockAuthStorage.saveToken('tok_123', 'user_1')).called(1);
         verifyNever(() => mockAuthStorage.saveRefreshToken(any()));
-        verify(() => mockAuthLocal.saveAuth(
-              userId: 'user_1',
-              accessToken: 'tok_123',
-              roles: ['Driver'],
-            )).called(1);
+        verify(
+          () => mockAuthLocal.saveAuth(
+            userId: 'user_1',
+            accessToken: 'tok_123',
+            roles: ['Driver'],
+          ),
+        ).called(1);
       },
     );
 
     blocTest<LoginBloc, LoginState>(
       'emits [LoginLoading, LoginSuccess] and persists refreshToken when present',
       build: () {
-        when(() => mockUsecase.call(any(), any(), any(), expectedRole: any(named: 'expectedRole')))
-            .thenAnswer((_) async => Success(userWithRefresh));
-        when(() => mockAuthStorage.saveToken(any(), any()))
-            .thenAnswer((_) async {});
-        when(() => mockAuthStorage.saveRefreshToken(any()))
-            .thenAnswer((_) async {});
-        when(() => mockAuthLocal.saveAuth(
-              userId: any(named: 'userId'),
-              accessToken: any(named: 'accessToken'),
-              roles: any(named: 'roles'),
-            )).thenAnswer((_) async {});
+        when(
+          () => mockUsecase.call(
+            any(),
+            any(),
+            any(),
+            expectedRole: any(named: 'expectedRole'),
+          ),
+        ).thenAnswer((_) async => Success(userWithRefresh));
+        when(
+          () => mockAuthStorage.saveToken(any(), any()),
+        ).thenAnswer((_) async {});
+        when(
+          () => mockAuthStorage.saveRefreshToken(any()),
+        ).thenAnswer((_) async {});
+        when(
+          () => mockAuthLocal.saveAuth(
+            userId: any(named: 'userId'),
+            accessToken: any(named: 'accessToken'),
+            roles: any(named: 'roles'),
+          ),
+        ).thenAnswer((_) async {});
         return LoginBloc(mockUsecase, mockAuthStorage, mockAuthLocal);
       },
       act: (bloc) => bloc.add(
@@ -92,22 +113,29 @@ void main() {
         LoginSuccess(userWithRefresh),
       ],
       verify: (_) {
-        verify(() => mockAuthStorage.saveToken('tok_123', 'user_1'))
-            .called(1);
-        verify(() => mockAuthStorage.saveRefreshToken('refresh_456'))
-            .called(1);
-        verify(() => mockAuthLocal.saveAuth(
-              userId: 'user_1',
-              accessToken: 'tok_123',
-              roles: ['Driver'],
-            )).called(1);
+        verify(() => mockAuthStorage.saveToken('tok_123', 'user_1')).called(1);
+        verify(() => mockAuthStorage.saveRefreshToken('refresh_456')).called(1);
+        verify(
+          () => mockAuthLocal.saveAuth(
+            userId: 'user_1',
+            accessToken: 'tok_123',
+            roles: ['Driver'],
+          ),
+        ).called(1);
       },
     );
 
     blocTest<LoginBloc, LoginState>(
       'emits [LoginLoading, LoginFailure] when login fails and does not persist',
       build: () {
-        when(() => mockUsecase.call(any(), any(), any(), expectedRole: any(named: 'expectedRole'))).thenAnswer(
+        when(
+          () => mockUsecase.call(
+            any(),
+            any(),
+            any(),
+            expectedRole: any(named: 'expectedRole'),
+          ),
+        ).thenAnswer(
           (_) async => Failure(Exception('E-mail ou senha inválidos')),
         );
         return LoginBloc(mockUsecase, mockAuthStorage, mockAuthLocal);
@@ -117,39 +145,55 @@ void main() {
       ),
       expect: () => [
         const LoginLoading(),
-        const LoginFailure('Exception: E-mail ou senha inválidos'),
+        const LoginFailure('E-mail ou senha inválidos'),
       ],
       verify: (_) {
         verifyNever(() => mockAuthStorage.saveToken(any(), any()));
-        verifyNever(() => mockAuthLocal.saveAuth(
-              userId: any(named: 'userId'),
-              accessToken: any(named: 'accessToken'),
-              roles: any(named: 'roles'),
-            ));
+        verifyNever(
+          () => mockAuthLocal.saveAuth(
+            userId: any(named: 'userId'),
+            accessToken: any(named: 'accessToken'),
+            roles: any(named: 'roles'),
+          ),
+        );
       },
     );
 
     blocTest<LoginBloc, LoginState>(
       'calls usecase with correct credentials',
       build: () {
-        when(() => mockUsecase.call(any(), any(), any(), expectedRole: any(named: 'expectedRole')))
-            .thenAnswer((_) async => Success(user));
-        when(() => mockAuthStorage.saveToken(any(), any()))
-            .thenAnswer((_) async {});
-        when(() => mockAuthLocal.saveAuth(
-              userId: any(named: 'userId'),
-              accessToken: any(named: 'accessToken'),
-              roles: any(named: 'roles'),
-            )).thenAnswer((_) async {});
+        when(
+          () => mockUsecase.call(
+            any(),
+            any(),
+            any(),
+            expectedRole: any(named: 'expectedRole'),
+          ),
+        ).thenAnswer((_) async => Success(user));
+        when(
+          () => mockAuthStorage.saveToken(any(), any()),
+        ).thenAnswer((_) async {});
+        when(
+          () => mockAuthLocal.saveAuth(
+            userId: any(named: 'userId'),
+            accessToken: any(named: 'accessToken'),
+            roles: any(named: 'roles'),
+          ),
+        ).thenAnswer((_) async {});
         return LoginBloc(mockUsecase, mockAuthStorage, mockAuthLocal);
       },
       act: (bloc) => bloc.add(
-        const LoginSubmitted(
-            email: 'driver@moto.com', password: 'secret123'),
+        const LoginSubmitted(email: 'driver@moto.com', password: 'secret123'),
       ),
       verify: (_) {
-        verify(() => mockUsecase.call('driver@moto.com', 'secret123', any(), expectedRole: 'Driver'))
-            .called(1);
+        verify(
+          () => mockUsecase.call(
+            'driver@moto.com',
+            'secret123',
+            any(),
+            expectedRole: 'Driver',
+          ),
+        ).called(1);
       },
     );
   });

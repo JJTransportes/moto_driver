@@ -53,7 +53,10 @@ class PhoneInputFormatter extends TextInputFormatter {
     final capped = digits.length > 11 ? digits.substring(0, 11) : digits;
 
     if (capped.isEmpty) {
-      return const TextEditingValue(text: '', selection: TextSelection.collapsed(offset: 0));
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
     }
 
     final ddd = capped.length > 2 ? capped.substring(0, 2) : capped;

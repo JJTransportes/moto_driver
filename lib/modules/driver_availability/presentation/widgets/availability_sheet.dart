@@ -52,6 +52,13 @@ class _AvailabilitySheetBodyState extends State<AvailabilitySheetBody> {
 
   Future<void> _confirm() async {
     if (_submitting) return;
+    // A ativacao pode fazer o backend despachar uma oferta antes mesmo de a
+    // resposta deste POST voltar. Nesse intervalo, o modal da oferta fica no
+    // topo do Navigator. Um `pop()` comum fecharia a oferta (e deixaria este
+    // sheet, que esta por baixo, eternamente em loading). Guarde a rota deste
+    // proprio sheet para removê-la explicitamente quando o POST concluir.
+    final sheetRoute = ModalRoute.of(context);
+    final navigator = Navigator.of(context);
     setState(() {
       _submitting = true;
       _error = null;
@@ -60,7 +67,9 @@ class _AvailabilitySheetBodyState extends State<AvailabilitySheetBody> {
     try {
       final entity = await widget.datasource.activate();
       if (!mounted) return;
-      Navigator.of(context).pop(entity);
+      if (sheetRoute != null && sheetRoute.isActive) {
+        navigator.removeRoute(sheetRoute, entity);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

@@ -8,7 +8,8 @@ import 'package:moto_driver/modules/profile_configuration/domain/usecases/i_uplo
 import 'package:moto_driver/modules/profile_configuration/presentation/blocs/profile_configuration_event.dart';
 import 'package:moto_driver/modules/profile_configuration/presentation/blocs/profile_configuration_state.dart';
 
-class ProfileConfigurationBloc extends Bloc<ProfileConfigurationEvent, ProfileConfigurationState> {
+class ProfileConfigurationBloc
+    extends Bloc<ProfileConfigurationEvent, ProfileConfigurationState> {
   final IGetProfileUseCase _getProfile;
   final IUpdateProfileUseCase _updateProfile;
   final IUploadProfileImageUseCase _uploadImage;
@@ -19,16 +20,19 @@ class ProfileConfigurationBloc extends Bloc<ProfileConfigurationEvent, ProfileCo
     required IGetProfileUseCase getProfile,
     required IUpdateProfileUseCase updateProfile,
     required IUploadProfileImageUseCase uploadImage,
-  })  : _getProfile = getProfile,
-        _updateProfile = updateProfile,
-        _uploadImage = uploadImage,
-        super(ProfileInitial()) {
+  }) : _getProfile = getProfile,
+       _updateProfile = updateProfile,
+       _uploadImage = uploadImage,
+       super(ProfileInitial()) {
     on<ProfileLoadEvent>(_onLoad);
     on<ProfileUpdateEvent>(_onUpdate);
     on<ProfileImageUploadEvent>(_onUploadImage);
   }
 
-  Future<void> _onLoad(ProfileLoadEvent event, Emitter<ProfileConfigurationState> emit) async {
+  Future<void> _onLoad(
+    ProfileLoadEvent event,
+    Emitter<ProfileConfigurationState> emit,
+  ) async {
     emit(ProfileLoading());
     final result = await _getProfile(event.userId);
     result.fold(
@@ -37,24 +41,32 @@ class ProfileConfigurationBloc extends Bloc<ProfileConfigurationEvent, ProfileCo
         emit(ProfileLoaded(profile: profile));
       },
       (error) {
-        emit(ProfileUpdateFailure(
-          profile: _lastLoadedProfile ?? ProfileEntity(
-            id: event.userId,
-            name: '',
-            email: '',
-            phone: '',
+        emit(
+          ProfileUpdateFailure(
+            profile:
+                _lastLoadedProfile ??
+                ProfileEntity(
+                  id: event.userId,
+                  name: '',
+                  email: '',
+                  phone: '',
+                ),
+            error: error,
           ),
-          error: error,
-        ));
+        );
       },
     );
   }
 
-  Future<void> _onUpdate(ProfileUpdateEvent event, Emitter<ProfileConfigurationState> emit) async {
+  Future<void> _onUpdate(
+    ProfileUpdateEvent event,
+    Emitter<ProfileConfigurationState> emit,
+  ) async {
     final profile = _lastLoadedProfile;
     if (profile == null) return;
 
-    final emailChanged = event.email.trim().toLowerCase() != profile.email.trim().toLowerCase();
+    final emailChanged =
+        event.email.trim().toLowerCase() != profile.email.trim().toLowerCase();
 
     emit(ProfileUpdateLoading(profile: profile));
 
@@ -74,13 +86,18 @@ class ProfileConfigurationBloc extends Bloc<ProfileConfigurationEvent, ProfileCo
     result.fold(
       (profile) {
         _lastLoadedProfile = profile;
-        emit(ProfileUpdateSuccess(profile: profile, emailChanged: emailChanged));
+        emit(
+          ProfileUpdateSuccess(profile: profile, emailChanged: emailChanged),
+        );
       },
       (error) => emit(ProfileUpdateFailure(profile: profile, error: error)),
     );
   }
 
-  Future<void> _onUploadImage(ProfileImageUploadEvent event, Emitter<ProfileConfigurationState> emit) async {
+  Future<void> _onUploadImage(
+    ProfileImageUploadEvent event,
+    Emitter<ProfileConfigurationState> emit,
+  ) async {
     final profile = _lastLoadedProfile;
     if (profile == null) return;
 
@@ -93,11 +110,17 @@ class ProfileConfigurationBloc extends Bloc<ProfileConfigurationEvent, ProfileCo
       (photoUrl) {
         final updatedProfile = profile.copyWith(photoUrl: photoUrl);
         _lastLoadedProfile = updatedProfile;
-        emit(ProfileImageUploadSuccess(profile: updatedProfile, photoUrl: photoUrl));
+        emit(
+          ProfileImageUploadSuccess(
+            profile: updatedProfile,
+            photoUrl: photoUrl,
+          ),
+        );
         // Reload to get fresh data from backend
         add(ProfileLoadEvent(userId: profile.id));
       },
-      (error) => emit(ProfileImageUploadFailure(profile: profile, error: error)),
+      (error) =>
+          emit(ProfileImageUploadFailure(profile: profile, error: error)),
     );
   }
 }

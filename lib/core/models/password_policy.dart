@@ -22,10 +22,10 @@ class PasswordPolicy {
   /// regra estática documentada no requirements (RF4): mínimo 8, máximo 72,
   /// com maiúscula, minúscula, número e caractere especial.
   const PasswordPolicy.fallback()
-      : minLength = 8,
-        maxLength = 72,
-        requireUppercase = true,
-        requireLowercase = true,
-        requireDigit = true,
-        requireSpecialChar = true;
+    : minLength = 8,
+      maxLength = 72,
+      requireUppercase = true,
+      requireLowercase = true,
+      requireDigit = true,
+      requireSpecialChar = true;
 }

@@ -26,5 +26,6 @@ class UserEntity {
           listEquals(roles, other.roles);
 
   @override
-  int get hashCode => Object.hash(id, token, refreshToken, Object.hashAll(roles));
+  int get hashCode =>
+      Object.hash(id, token, refreshToken, Object.hashAll(roles));
 }

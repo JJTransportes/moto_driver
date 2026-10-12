@@ -56,6 +56,8 @@ class ProfileConfigurationModule extends Module {
         ],
         child: ProfileConfigurationPage(
           userId: Modular.args.data['userId'] as String,
+          requirePhone:
+              (Modular.args.data as Map?)?['requirePhone'] as bool? ?? false,
         ),
       ),
     );
