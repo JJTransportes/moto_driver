@@ -179,6 +179,12 @@ workflows:
         xcode-project use-profiles
     - name: Get Flutter packages
       script: flutter pub get
+    - name: Configure runtime definitions
+      script: |
+        cat > .env << EOF
+        API_BASE_URL=$API_BASE_URL
+        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
+        EOF
     - name: Run tests
       script: flutter test
     - name: Set application secrets
@@ -188,12 +194,6 @@ workflows:
         EOF
     - name: Install pods
       script: find . -name "Podfile" -execdir pod install \;
-    - name: Configure runtime definitions
-      script: |
-        cat > .env << EOF
-        API_BASE_URL=$API_BASE_URL
-        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
-        EOF
     - name: Determine next TestFlight build number
       script: |
         LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
@@ -249,6 +249,12 @@ workflows:
         xcode-project use-profiles
     - name: Get Flutter packages
       script: flutter pub get
+    - name: Configure runtime definitions
+      script: |
+        cat > .env << EOF
+        API_BASE_URL=$API_BASE_URL
+        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
+        EOF
     - name: Run tests
       script: flutter test
     - name: Set application secrets
@@ -258,12 +264,6 @@ workflows:
         EOF
     - name: Install pods
       script: find . -name "Podfile" -execdir pod install \;
-    - name: Configure runtime definitions
-      script: |
-        cat > .env << EOF
-        API_BASE_URL=$API_BASE_URL
-        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
-        EOF
     - name: Determine next TestFlight build number
       script: |
         LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
