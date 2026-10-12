@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/blocs/bloc/bootstrap_bloc.dart';
+import 'package:moto_driver/modules/chat/chat_module.dart';
 import 'package:moto_driver/core/common_module.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/confirm_password_reset_usecase.dart';
 import 'package:moto_driver/modules/auth/domain/usecases/i_confirm_password_reset_usecase.dart';
@@ -35,6 +36,7 @@ class AppModule extends Module {
   @override
   List<Module> get imports => [
     CommonModule(),
+    ChatModule(),
   ];
 
   @override
@@ -129,6 +131,7 @@ class AppModule extends Module {
       ),
     );
     r.child('/travel-history', child: (_) => const DriverTravelHistoryPage());
+    r.module('/chat', module: ChatModule());
     r.module('/driver-register', module: DriverRegistrationModule());
     r.module('/profile-configuration', module: ProfileConfigurationModule());
     r.module('/delete-account', module: UserDeletionModule());

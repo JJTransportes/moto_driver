@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
+import 'package:flutter_modular/flutter_modular.dart'
+    hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/utils/server_error_guard.dart';
 import 'package:moto_driver/design_system/design_system.dart';
@@ -56,7 +57,8 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
 
   bool get _isFormComplete =>
       validators.validateEmailFormat(_emailController.text.trim()) == null &&
-      validators.validateMaxLength(_emailController.text, 100, 'E-mail') == null &&
+      validators.validateMaxLength(_emailController.text, 100, 'E-mail') ==
+          null &&
       _confirmEmailController.text.trim().toLowerCase() ==
           _emailController.text.trim().toLowerCase() &&
       !_serverErrorGuard.isBlocking;
@@ -75,7 +77,7 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
       _emailError = email.isEmpty
           ? 'E-mail obrigatório'
           : validators.validateEmailFormat(email) ??
-              validators.validateMaxLength(email, 100, 'E-mail');
+                validators.validateMaxLength(email, 100, 'E-mail');
       if (confirmEmail.isEmpty) {
         _confirmEmailError = 'Campo obrigatório';
       } else if (confirmEmail.toLowerCase() != email.toLowerCase()) {
@@ -121,18 +123,32 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
               const SizedBox(height: 24),
               Text(
                 'Se o e-mail estiver cadastrado, você receberá um código de verificação em instantes.',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: context.moto.textPrimary),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: context.moto.textPrimary,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
               AppButton(
                 label: 'Já tenho o código',
-                onPressed: () => Modular.to.pushNamed('/verify-reset-code', arguments: {'email': email}),
+                onPressed: () => Modular.to.pushNamed(
+                  '/verify-reset-code',
+                  arguments: {'email': email},
+                ),
               ),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
-                child: Text('Voltar ao login', style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent)),
+                onPressed: () =>
+                    Navigator.of(context).pushReplacementNamed('/login'),
+                child: Text(
+                  'Voltar ao login',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: context.moto.accent,
+                  ),
+                ),
               ),
             ],
           ),
@@ -154,12 +170,19 @@ class _PasswordRecoveryPageState extends State<PasswordRecoveryPage> {
             children: [
               GradientText(
                 'Recupere sua senha',
-                style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700),
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 72),
               Text(
                 'Informe o e-mail da sua conta. Enviaremos um código de verificação para que você redefina sua senha.',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: context.moto.textPrimary),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: context.moto.textPrimary,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),

@@ -30,7 +30,9 @@ class PasswordResetError extends PasswordResetState {
 
   @override
   bool operator ==(Object other) =>
-      other is PasswordResetError && other.message == message && other.canRequestNewCode == canRequestNewCode;
+      other is PasswordResetError &&
+      other.message == message &&
+      other.canRequestNewCode == canRequestNewCode;
 
   @override
   int get hashCode => Object.hash(message, canRequestNewCode);

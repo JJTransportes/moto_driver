@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_modular/flutter_modular.dart' hide ModularWatchExtension;
+import 'package:flutter_modular/flutter_modular.dart'
+    hide ModularWatchExtension;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/models/password_policy.dart';
 import 'package:moto_driver/core/utils/server_error_guard.dart';
@@ -116,7 +117,10 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
 
   void _requestNewCode() {
     if (widget.email != null) {
-      Modular.to.pushReplacementNamed('/verify-reset-code', arguments: {'email': widget.email});
+      Modular.to.pushReplacementNamed(
+        '/verify-reset-code',
+        arguments: {'email': widget.email},
+      );
     } else {
       Navigator.of(context).pushReplacementNamed('/recovery');
     }
@@ -154,13 +158,19 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
               const SizedBox(height: 24),
               Text(
                 'Senha redefinida com sucesso! Faça login novamente.',
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: context.moto.accent),
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: context.moto.accent,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
               AppButton(
                 label: 'Fazer login',
-                onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false),
+                onPressed: () => Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/login', (_) => false),
               ),
             ],
           ),
@@ -182,12 +192,19 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
             children: [
               GradientText(
                 'Recupere sua senha',
-                style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700),
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 72),
               Text(
                 'Defina sua nova senha',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: context.moto.textPrimary),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: context.moto.textPrimary,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -202,7 +219,10 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
               if (_passwordFocused) ...[
                 const SizedBox(height: 8),
                 PasswordPolicyChecklist(
-                  requirements: validators.evaluatePasswordPolicy(_passwordController.text, _policy),
+                  requirements: validators.evaluatePasswordPolicy(
+                    _passwordController.text,
+                    _policy,
+                  ),
                 ),
               ],
               const SizedBox(height: 16),
@@ -222,7 +242,10 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
                     onPressed: _requestNewCode,
                     child: Text(
                       'Solicitar novo código',
-                      style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: context.moto.accent,
+                      ),
                     ),
                   ),
                 ),

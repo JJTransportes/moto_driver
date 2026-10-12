@@ -12,7 +12,10 @@ abstract class IAuthRepository {
   });
 
   /// Exchanges a [refreshToken] for a new pair of access + refresh tokens (rotation).
-  Future<Result<RefreshTokenResponseModel>> refreshToken(String refreshToken, String device);
+  Future<Result<RefreshTokenResponseModel>> refreshToken(
+    String refreshToken,
+    String device,
+  );
 
   /// Solicita o código de redefinição de senha. Falha com [NotFoundException]
   /// quando o e-mail não está cadastrado (404) — ver [IAuthDatasource].
@@ -20,7 +23,10 @@ abstract class IAuthRepository {
 
   /// Verifica o código recebido por e-mail (tela 1). Sucesso devolve o
   /// `resetToken` de uso único a ser usado em [confirmPasswordReset].
-  Future<Result<String>> verifyResetCode({required String email, required String code});
+  Future<Result<String>> verifyResetCode({
+    required String email,
+    required String code,
+  });
 
   /// Confirma a redefinição de senha com o `resetToken` obtido em
   /// [verifyResetCode].

@@ -9,7 +9,8 @@ final class LoginInitial extends LoginState {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is LoginInitial && runtimeType == other.runtimeType;
+      identical(this, other) ||
+      other is LoginInitial && runtimeType == other.runtimeType;
 
   @override
   int get hashCode => runtimeType.hashCode;
@@ -20,7 +21,8 @@ final class LoginLoading extends LoginState {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is LoginLoading && runtimeType == other.runtimeType;
+      identical(this, other) ||
+      other is LoginLoading && runtimeType == other.runtimeType;
 
   @override
   int get hashCode => runtimeType.hashCode;
@@ -34,7 +36,9 @@ final class LoginSuccess extends LoginState {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is LoginSuccess && runtimeType == other.runtimeType && user == other.user;
+      other is LoginSuccess &&
+          runtimeType == other.runtimeType &&
+          user == other.user;
 
   @override
   int get hashCode => user.hashCode;
@@ -48,7 +52,9 @@ final class LoginFailure extends LoginState {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is LoginFailure && runtimeType == other.runtimeType && message == other.message;
+      other is LoginFailure &&
+          runtimeType == other.runtimeType &&
+          message == other.message;
 
   @override
   int get hashCode => message.hashCode;

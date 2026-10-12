@@ -5,6 +5,8 @@ import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/config/device_type.dart';
+import 'package:moto_driver/core/errors/exceptions.dart';
+import 'package:moto_driver/core/errors/user_error_message.dart';
 import 'package:moto_driver/core/local_db/local_database_service.dart';
 import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/notifications/inotification_service.dart';
@@ -54,21 +56,28 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     if (refreshToken != null) {
       bool userAuthenticated = false;
 
-      final result = await _authRepository.refreshToken(refreshToken, deviceType);
-
-      result.fold(
-        (success) async {
-          userAuthenticated = true;
-
-          await Future.wait([
-            _authStorage.saveToken(success.accessToken, success.userId),
-            _authStorage.saveRefreshToken(success.refreshToken),
-          ]);
-        },
-        (_) async {
-          await _signOutService.signOut();
-        },
+      final result = await _authRepository.refreshToken(
+        refreshToken,
+        deviceType,
       );
+
+      final success = result.getOrNull();
+      if (success != null) {
+        userAuthenticated = true;
+        await Future.wait([
+          _authStorage.saveToken(success.accessToken, success.userId),
+          _authStorage.saveRefreshToken(success.refreshToken),
+        ]);
+      } else {
+        final error = result.exceptionOrNull();
+        if (_isInvalidSession(error)) {
+          await _signOutService.signOut();
+        } else {
+          // Sem rede/servidor indisponível ao reabrir o app não invalida a
+          // sessão nem pode apagar uma viagem ativa salva localmente.
+          userAuthenticated = true;
+        }
+      }
 
       emit(
         userAuthenticated
@@ -80,12 +89,17 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     }
   }
 
+  bool _isInvalidSession(Object? error) =>
+      error is UnauthorizedException ||
+      error is ValidationException ||
+      error is DeviceMismatchException;
+
   Future<void> _initLocalPersistence(Emitter<BootstrapStates> emit) async {
     try {
       emit(LocalPersistenceConfigurationState());
       await LocalDatabaseService.init();
     } on Exception catch (e) {
-      emit(LocalPersistenceFailureState(message: e.toString()));
+      emit(LocalPersistenceFailureState(message: userErrorMessage(e)));
     }
   }
 
@@ -94,7 +108,9 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     await LocationService.requestPermissionIfNeeded();
   }
 
-  Future<void> _initializeNotificationService(Emitter<BootstrapStates> emit) async {
+  Future<void> _initializeNotificationService(
+    Emitter<BootstrapStates> emit,
+  ) async {
     emit(NotificationServiceConfigurationState());
     try {
       final appId = AppConfig.getOneSignalAppId();
@@ -102,11 +118,20 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
       // fallback, não incondicional) já acontece dentro de initialize().
       await _notificationService.initialize(appId);
     } on Exception catch (e) {
-      emit(NotificationServiceFailureState(message: e.toString()));
+      emit(
+        NotificationServiceFailureState(
+          message: userErrorMessage(
+            e,
+            fallback: 'Não foi possível preparar as notificações.',
+          ),
+        ),
+      );
     }
   }
 
-  Future<void> _requestNotificationsPermission(Emitter<BootstrapStates> emit) async {
+  Future<void> _requestNotificationsPermission(
+    Emitter<BootstrapStates> emit,
+  ) async {
     emit(NotificationsPermissionRequestState());
     await _notificationService.requestNotificationPermission();
   }
