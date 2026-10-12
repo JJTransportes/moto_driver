@@ -1,46 +1,37 @@
 workflows:
-  ios_staging:
-    name: Moto IOs Staging
+  android_release:
+    name: Moto Android Release
     instance_type: mac_mini_m2
     max_build_duration: 30
-    integrations:
-      app_store_connect: Moto Driver
 
     triggering:
-      events:
-      - push
+      events: []
+      # push trigger temporarily disabled while this pipeline is being reconstructed
+      # in a working branch — re-add "- push" under events when ready to resume
+      # automatic builds/publishing on android_release.
       branch_patterns:
-      - pattern: "ios_staging"
-      - include: true
-      - source: true
+      - pattern: "android_release"
+        include: true
+        source: true
       cancel_previous_builds: true
 
     environment:
-      flutter: 3.44.8
+      flutter: 3.44.0
       groups:
-      - moto_staging
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: $BUNDLE_ID
+      - release
+      android_signing:
+      - moto_keystore
+
+    cache:
+      cache_paths:
+      - $HOME/.pub-cache
 
     scripts:
-    - name: Set up code signing settings on Xcode project
-      script: |
-        xcode-project use-profiles
+    - name: Set up local.properties
+      script: echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
 
     - name: Get Flutter packages
-      script: |
-        flutter pub get
-
-    - name: Set application secrets
-      script: |
-        cat <<EOF > ios/Flutter/Secrets.xcconfig
-        IOS_MAPS_API_KEY=$IOS_MAPS_API_KEY
-        EOF
-
-    - name: Install pods
-      script: |
-        find . -name "Podfile" -execdir pod install \;
+      script: flutter pub get
 
     - name: Config definitions
       script: |
@@ -49,30 +40,244 @@ workflows:
         ONE_SIGNAL_ID=$ONE_SIGNAL_ID
         EOF
 
-    - name: Flutter build ipa
-      script: |+
-        flutter build ipa --release \
-          --build-name=1.0.0 \
-          --build-number=24 \
-          --export-options-plist=/Users/builder/export_options.plist
-          
+    - name: Run tests
+      script: flutter test
+
+    - name: Determine next build number
+      script: |
+        LATEST_BUILD_NUMBER=$(google-play get-latest-build-number \
+          --package-name "br.com.rockservicos.moto_driver" \
+          --credentials "@env:GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS")
+        NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+        echo "Latest build number across all tracks: $LATEST_BUILD_NUMBER"
+        echo "Next build number: $NEW_BUILD_NUMBER"
+        echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
+
+    - name: Build App Bundle
+      script: >-
+        flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER
+        --dart-define=FORCE_PLAY_UPDATE=true
+        --dart-define=SENTRY_DSN="$SENTRY_DSN"
+        --dart-define=APP_ENV="${APP_ENV:-production}"
+
+    artifacts:
+    - build/**/outputs/**/*.aab
+    - build/**/outputs/**/mapping.txt
+    - flutter_drive.log
+
+    publishing:
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: production
+        submit_as_draft: false
+
+  android_staging:
+    name: Moto Driver Android Staging
+    max_build_duration: 30
+    instance_type: linux_x2
+
+    triggering:
+      # Somente manual: iniciar pelo painel do Codemagic na branch android_staging.
+      events: []
+      branch_patterns:
+      - pattern: "android_staging"
+        include: true
+        source: true
+      cancel_previous_builds: true
+
+    environment:
+      flutter: 3.44.0
+      groups:
+      - moto_staging
+      android_signing:
+      - moto_keystore
+
+    cache:
+      cache_paths:
+      - $HOME/.pub-cache
+
+    scripts:
+    - name: Guard - somente API de homologacao
+      script: |
+        if [ "$API_BASE_URL" != "https://dev.moto-jacarei.com.br" ]; then
+          echo "API_BASE_URL do grupo nao e a de homologacao; abortando para nao compilar contra producao."
+          exit 1
+        fi
+
+    - name: Set up local.properties
+      script: echo "flutter.sdk=$HOME/programs/flutter" > "$CM_BUILD_DIR/android/local.properties"
+
+    - name: Get Flutter packages
+      script: flutter pub get
+
+    - name: Config definitions
+      script: |
+        cat > .env << EOF
+        API_BASE_URL=$API_BASE_URL
+        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
+        EOF
+
+    - name: Run tests
+      script: flutter test
+
+    - name: Determine next build number
+      script: |
+        LATEST_BUILD_NUMBER=$(google-play get-latest-build-number \
+          --package-name "br.com.rockservicos.moto_driver" \
+          --credentials "@env:GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS")
+        NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+        echo "Latest build number across all tracks: $LATEST_BUILD_NUMBER"
+        echo "Next build number: $NEW_BUILD_NUMBER"
+        echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
+
+    - name: Build App Bundle
+      script: >-
+        flutter build appbundle --release --build-number=$NEW_BUILD_NUMBER
+        --dart-define=SENTRY_DSN="$SENTRY_DSN"
+        --dart-define=APP_ENV=staging
+
+    artifacts:
+    - build/**/outputs/**/*.aab
+    - build/**/outputs/**/mapping.txt
+    - flutter_drive.log
+
+    publishing:
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: false
+
+  ios_staging:
+    name: Moto Driver iOS Staging
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    integrations:
+      app_store_connect: Codemagic Moto
+    triggering:
+      # Manual until Apple completes the organization migration and signing setup.
+      events: []
+      branch_patterns:
+      - pattern: "ios_staging"
+        include: true
+        source: true
+      cancel_previous_builds: true
+    environment:
+      flutter: 3.44.8
+      groups:
+      - moto_staging
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: br.com.rockservicos.motoDriverApp
+    cache:
+      cache_paths:
+      - $HOME/.pub-cache
+    scripts:
+    - name: Set up code signing settings on Xcode project
+      script: xcode-project use-profiles
+    - name: Get Flutter packages
+      script: flutter pub get
+    - name: Run tests
+      script: flutter test
+    - name: Set application secrets
+      script: |
+        cat <<EOF > ios/Flutter/Secrets.xcconfig
+        IOS_MAPS_API_KEY=$IOS_MAPS_API_KEY
+        EOF
+    - name: Install pods
+      script: find . -name "Podfile" -execdir pod install \;
+    - name: Configure runtime definitions
+      script: |
+        cat > .env << EOF
+        API_BASE_URL=$API_BASE_URL
+        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
+        EOF
+    - name: Determine next TestFlight build number
+      script: |
+        LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
+        NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+        echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
+    - name: Build IPA
+      script: >-
+        flutter build ipa --release --build-number=$NEW_BUILD_NUMBER
+        --export-options-plist=/Users/builder/export_options.plist
+        --dart-define=SENTRY_DSN="$SENTRY_DSN"
+        --dart-define=APP_ENV=staging
     artifacts:
     - build/ios/ipa/*.ipa
     - /tmp/xcodebuild_logs/*.log
     - flutter_drive.log
-
     publishing:
-      email:
-        recipients:
-        - comercialpepiviagens@gmail.com
-        notify:
-          success: false
-          failure: true
-
       app_store_connect:
         auth: integration
         beta_groups:
         - Moto Driver Staging
+        submit_to_testflight: true
+        submit_to_app_store: false
+        issuer_id: $ISSUER_ID
+
+  ios_release:
+    name: Moto Driver iOS Release
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    integrations:
+      app_store_connect: Codemagic Moto
+    triggering:
+      events: []
+      branch_patterns:
+      - pattern: "ios_release"
+        include: true
+        source: true
+      cancel_previous_builds: true
+    environment:
+      flutter: 3.44.8
+      groups:
+      - release
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: br.com.rockservicos.motoDriverApp
+    cache:
+      cache_paths:
+      - $HOME/.pub-cache
+    scripts:
+    - name: Set up code signing settings on Xcode project
+      script: xcode-project use-profiles
+    - name: Get Flutter packages
+      script: flutter pub get
+    - name: Run tests
+      script: flutter test
+    - name: Set application secrets
+      script: |
+        cat <<EOF > ios/Flutter/Secrets.xcconfig
+        IOS_MAPS_API_KEY=$IOS_MAPS_API_KEY
+        EOF
+    - name: Install pods
+      script: find . -name "Podfile" -execdir pod install \;
+    - name: Configure runtime definitions
+      script: |
+        cat > .env << EOF
+        API_BASE_URL=$API_BASE_URL
+        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
+        EOF
+    - name: Determine next TestFlight build number
+      script: |
+        LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
+        NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+        echo "NEW_BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $CM_ENV
+    - name: Build IPA
+      script: >-
+        flutter build ipa --release --build-number=$NEW_BUILD_NUMBER
+        --export-options-plist=/Users/builder/export_options.plist
+        --dart-define=SENTRY_DSN="$SENTRY_DSN"
+        --dart-define=APP_ENV=production
+    artifacts:
+    - build/ios/ipa/*.ipa
+    - /tmp/xcodebuild_logs/*.log
+    - flutter_drive.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        beta_groups:
+        - Moto Driver Release
         submit_to_testflight: true
         submit_to_app_store: false
         issuer_id: $ISSUER_ID

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moto_driver/core/errors/exceptions.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/driver_availability/data/datasources/availability_datasource.dart';
 import 'package:moto_driver/modules/driver_availability/domain/entities/driver_availability_entity.dart';
 
@@ -52,6 +52,13 @@ class _AvailabilitySheetBodyState extends State<AvailabilitySheetBody> {
 
   Future<void> _confirm() async {
     if (_submitting) return;
+    // A ativacao pode fazer o backend despachar uma oferta antes mesmo de a
+    // resposta deste POST voltar. Nesse intervalo, o modal da oferta fica no
+    // topo do Navigator. Um `pop()` comum fecharia a oferta (e deixaria este
+    // sheet, que esta por baixo, eternamente em loading). Guarde a rota deste
+    // proprio sheet para removê-la explicitamente quando o POST concluir.
+    final sheetRoute = ModalRoute.of(context);
+    final navigator = Navigator.of(context);
     setState(() {
       _submitting = true;
       _error = null;
@@ -60,7 +67,9 @@ class _AvailabilitySheetBodyState extends State<AvailabilitySheetBody> {
     try {
       final entity = await widget.datasource.activate();
       if (!mounted) return;
-      Navigator.of(context).pop(entity);
+      if (sheetRoute != null && sheetRoute.isActive) {
+        navigator.removeRoute(sheetRoute, entity);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -89,27 +98,27 @@ class _AvailabilitySheetBodyState extends State<AvailabilitySheetBody> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'Atendimento',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF4E4E4E),
+                color: context.moto.textPrimary,
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Ao clicar no botão abaixo você entrará em modo de atendimento',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Color(0xFF4E4E4E)),
+              style: TextStyle(fontSize: 14, color: context.moto.textPrimary),
             ),
             if (_error != null) ...[
               const SizedBox(height: 16),
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13, color: Colors.red),
+                style: TextStyle(fontSize: 13, color: context.moto.danger),
               ),
             ],
             const SizedBox(height: 24),
@@ -121,8 +130,8 @@ class _AvailabilitySheetBodyState extends State<AvailabilitySheetBody> {
                         ? null
                         : () => Navigator.of(context).pop(null),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF4E4E4E),
-                      side: const BorderSide(color: Color(0xFFB0B0B0)),
+                      foregroundColor: context.moto.textPrimary,
+                      side: BorderSide(color: context.moto.borderDefault),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -136,19 +145,19 @@ class _AvailabilitySheetBodyState extends State<AvailabilitySheetBody> {
                   child: FilledButton(
                     onPressed: _submitting ? null : _confirm,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: context.moto.accent,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                     child: _submitting
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: context.moto.textOnAccent,
                             ),
                           )
                         : const Text('Confirmar'),

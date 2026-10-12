@@ -8,11 +8,13 @@ import 'package:moto_driver/modules/auth/domain/usecases/i_get_password_policy_u
 import 'package:moto_driver/modules/driver_registration/domain/usecases/i_register_usecase.dart';
 import 'package:moto_driver/modules/driver_registration/presentation/blocs/register_bloc.dart';
 import 'package:moto_driver/modules/driver_registration/presentation/pages/registration_page.dart';
+import 'package:moto_driver/widgets/app_button.dart';
 import 'package:result_dart/result_dart.dart';
 
 class MockRegisterUsecase extends Mock implements IRegisterUsecase {}
 
-class MockGetPasswordPolicyUsecase extends Mock implements IGetPasswordPolicyUsecase {}
+class MockGetPasswordPolicyUsecase extends Mock
+    implements IGetPasswordPolicyUsecase {}
 
 /// Módulo mínimo só para disponibilizar o [IGetPasswordPolicyUsecase] via
 /// `Modular.get` na página (design D4 — usecase compartilhado de CommonModule).
@@ -66,7 +68,7 @@ void main() {
       expect(find.text('CPF *'), findsOneWidget);
       expect(find.text('RG *'), findsOneWidget);
       expect(find.text('Matrícula *'), findsOneWidget);
-      expect(find.text('Telefone'), findsOneWidget);
+      expect(find.text('Telefone *'), findsOneWidget);
       expect(find.text('Data de nascimento *'), findsOneWidget);
       expect(find.text('E-mail *'), findsOneWidget);
       expect(find.text('Confirmar E-mail *'), findsOneWidget);
@@ -75,23 +77,28 @@ void main() {
       expect(find.text('CNH *'), findsOneWidget);
     });
 
-    testWidgets('shows "As senhas não coincidem" when confirm password differs', (tester) async {
-      await tester.pumpWidget(buildTestableWidget());
+    testWidgets(
+      'shows "As senhas não coincidem" when confirm password differs',
+      (tester) async {
+        await tester.pumpWidget(buildTestableWidget());
 
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Informe sua senha'),
-        'Senha@123',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Digite novamente a senha'),
-        'Outra@123',
-      );
-      await tester.pump();
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Informe sua senha'),
+          'Senha@123',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextField, 'Digite novamente a senha'),
+          'Outra@123',
+        );
+        await tester.pump();
 
-      expect(find.text('As senhas não coincidem'), findsOneWidget);
-    });
+        expect(find.text('As senhas não coincidem'), findsOneWidget);
+      },
+    );
 
-    testWidgets('clears the mismatch error once both password fields match', (tester) async {
+    testWidgets('clears the mismatch error once both password fields match', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildTestableWidget());
 
       await tester.enterText(
@@ -113,7 +120,9 @@ void main() {
       expect(find.text('As senhas não coincidem'), findsNothing);
     });
 
-    testWidgets('requires confirm password to be filled on submit', (tester) async {
+    testWidgets('requires confirm password to be filled on submit', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildTestableWidget());
 
       final cadastrarButton = find.text('Cadastrar');
@@ -131,7 +140,7 @@ void main() {
       // validação diretamente chamando tap num finder habilitado seria
       // redundante aqui; o importante é confirmar que o campo de confirmação
       // vazio não deixa o formulário completo.
-      final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+      final button = tester.widget<AppButton>(find.byType(AppButton));
       expect(button.onPressed, isNull);
     });
 
@@ -148,34 +157,33 @@ void main() {
     });
 
     testWidgets(
-        'shows validation errors when required fields are empty and submit is tapped',
-        (tester) async {
-      await tester.pumpWidget(buildTestableWidget());
+      // Regra de negócio: o botão "Cadastrar" fica desabilitado enquanto o
+      // formulário não estiver completo (ver _isFormComplete em
+      // registration_page.dart) — por isso não dá pra "tocar no botão
+      // vazio" para revelar "Campo obrigatório"; o teste correto é
+      // verificar que o botão continua desabilitado com campos vazios.
+      'Cadastrar button stays disabled with required fields empty',
+      (tester) async {
+        await tester.pumpWidget(buildTestableWidget());
 
-      // Scroll down to make the Cadastrar button visible
-      final cadastrarButton = find.text('Cadastrar');
-      await tester.ensureVisible(cadastrarButton);
-      await tester.pumpAndSettle();
+        final button = tester.widget<AppButton>(find.byType(AppButton));
+        expect(button.onPressed, isNull);
+      },
+    );
 
-      await tester.tap(cadastrarButton);
-      await tester.pumpAndSettle();
-
-      // Should show multiple "Campo obrigatório" errors
-      expect(find.text('Campo obrigatório'), findsWidgets);
-    });
-
-    testWidgets('shows loading indicator when state is RegisterLoading',
-        (tester) async {
+    testWidgets('shows loading indicator when state is RegisterLoading', (
+      tester,
+    ) async {
       registerBloc.emit(const RegisterLoading());
       await tester.pumpWidget(buildTestableWidget());
       await tester.pump();
 
-      // The CircularProgressIndicator should be rendered
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(tester.widget<AppButton>(find.byType(AppButton)).loading, isTrue);
     });
 
-    testWidgets('shows error message when state is RegisterFailure',
-        (tester) async {
+    testWidgets('shows error message when state is RegisterFailure', (
+      tester,
+    ) async {
       registerBloc.emit(const RegisterFailure('Erro de conexão.'));
       await tester.pumpWidget(buildTestableWidget());
       await tester.pumpAndSettle();

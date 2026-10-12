@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart' hide ReadContext;
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
-import 'package:moto_driver/core/theme/app_theme.dart';
+import 'package:moto_driver/design_system/design_system.dart';
 import 'package:moto_driver/modules/usage_terms/presentation/blocs/usage_terms_bloc.dart';
 import 'package:moto_driver/modules/usage_terms/presentation/blocs/usage_terms_event.dart';
 import 'package:moto_driver/modules/usage_terms/presentation/blocs/usage_terms_state.dart';
@@ -32,8 +32,10 @@ class _TermsPageState extends State<TermsPage> {
           // abre no fim do fluxo de sessão (anti-soterramento).
           final pending = NotificationService.peekPendingOrder();
           if (pending != null) {
-            Modular.to.pushReplacementNamed('/order-refresh',
-                arguments: {'orderId': pending});
+            Modular.to.pushReplacementNamed(
+              '/order-refresh',
+              arguments: {'orderId': pending},
+            );
           } else {
             Modular.to.navigate('/home');
           }
@@ -43,16 +45,16 @@ class _TermsPageState extends State<TermsPage> {
         return switch (state) {
           UsageTermsInitial() ||
           UsageTermsChecking() ||
-          UsageTermsLoading() =>
-            _buildLoading(),
+          UsageTermsLoading() => _buildLoading(),
           UsageTermsLoaded(:final terms) ||
-          UsageTermsSubmitting(:final terms) =>
-            _buildTerms(
-              terms: terms,
-              isSubmitting: state is UsageTermsSubmitting,
-            ),
-          UsageTermsError(:final message, :final isRetryable) =>
-            _buildError(message: message, isRetryable: isRetryable),
+          UsageTermsSubmitting(:final terms) => _buildTerms(
+            terms: terms,
+            isSubmitting: state is UsageTermsSubmitting,
+          ),
+          UsageTermsError(:final message, :final isRetryable) => _buildError(
+            message: message,
+            isRetryable: isRetryable,
+          ),
           UsageTermsAccepted() => const SizedBox.shrink(),
           _ => const SizedBox.shrink(),
         };
@@ -61,10 +63,9 @@ class _TermsPageState extends State<TermsPage> {
   }
 
   Widget _buildLoading() {
-    return const Scaffold(
-      backgroundColor: AppColors.white,
+    return Scaffold(
       body: Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+        child: CircularProgressIndicator(color: context.moto.accent),
       ),
     );
   }
@@ -74,7 +75,6 @@ class _TermsPageState extends State<TermsPage> {
     required bool isSubmitting,
   }) {
     return Scaffold(
-      backgroundColor: AppColors.white,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(
@@ -82,11 +82,11 @@ class _TermsPageState extends State<TermsPage> {
           style: GoogleFonts.robotoFlex(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: AppColors.white,
+            color: context.moto.textOnAccent,
           ),
         ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
+        backgroundColor: context.moto.accent,
+        foregroundColor: context.moto.textOnAccent,
       ),
       body: PopScope(
         canPop: false,
@@ -103,7 +103,7 @@ class _TermsPageState extends State<TermsPage> {
                       style: GoogleFonts.robotoFlex(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+                        color: context.moto.accent,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -118,7 +118,7 @@ class _TermsPageState extends State<TermsPage> {
                               style: GoogleFonts.robotoFlex(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.black87,
+                                color: context.moto.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -127,7 +127,7 @@ class _TermsPageState extends State<TermsPage> {
                               style: GoogleFonts.robotoFlex(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w400,
-                                color: Colors.black54,
+                                color: context.moto.textSecondary,
                                 height: 1.5,
                               ),
                             ),
@@ -163,16 +163,16 @@ class _TermsPageState extends State<TermsPage> {
                                   ),
                                 ),
                               );
-                              context
-                                  .read<UsageTermsBloc>()
-                                  .add(const DeclineTerms());
+                              context.read<UsageTermsBloc>().add(
+                                const DeclineTerms(),
+                              );
                             },
                       child: Text(
                         'Recusar',
                         style: GoogleFonts.robotoFlex(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.secondary,
+                          color: context.moto.textTertiary,
                         ),
                       ),
                     ),
@@ -191,7 +191,6 @@ class _TermsPageState extends State<TermsPage> {
     required bool isRetryable,
   }) {
     return Scaffold(
-      backgroundColor: AppColors.white,
       body: PopScope(
         canPop: false,
         child: Center(
@@ -200,10 +199,10 @@ class _TermsPageState extends State<TermsPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
+                Icon(
                   Icons.error_outline,
                   size: 64,
-                  color: AppColors.secondary,
+                  color: context.moto.textTertiary,
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -211,7 +210,7 @@ class _TermsPageState extends State<TermsPage> {
                   style: GoogleFonts.robotoFlex(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    color: Colors.black54,
+                    color: context.moto.textSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ),
