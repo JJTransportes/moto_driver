@@ -1185,6 +1185,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final permission = await service.requestPermissions();
     if (!mounted) return;
 
+    // O rastreamento em segundo plano (foreground service) só existe no Android;
+    // no iOS o serviço devolve `unsupported`. Sem este retorno o aviso de
+    // "Permissão de localização necessária" abria a cada ativação, mesmo com a
+    // localização já permitida o tempo todo.
+    if (permission == BackgroundLocationPermissionStatus.unsupported) return;
+
     if (permission == BackgroundLocationPermissionStatus.granted) {
       await service.start();
       return;
