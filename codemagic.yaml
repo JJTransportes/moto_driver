@@ -5,10 +5,8 @@ workflows:
     max_build_duration: 30
 
     triggering:
-      events: []
-      # push trigger temporarily disabled while this pipeline is being reconstructed
-      # in a working branch — re-add "- push" under events when ready to resume
-      # automatic builds/publishing on android_release.
+      events:
+      - push
       branch_patterns:
       - pattern: "android_release"
         include: true
@@ -16,7 +14,7 @@ workflows:
       cancel_previous_builds: true
 
     environment:
-      flutter: 3.44.0
+      flutter: 3.44.8
       groups:
       - release
       android_signing:
