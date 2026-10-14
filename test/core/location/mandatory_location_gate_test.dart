@@ -6,6 +6,40 @@ import 'package:moto_driver/core/location/background_location_service.dart';
 import 'package:moto_driver/core/location/mandatory_location_gate.dart';
 
 void main() {
+  testWidgets('exibe aviso antes de solicitar a permissão do Android', (
+    tester,
+  ) async {
+    final requests = <bool>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MandatoryLocationGate(
+          isAndroid: true,
+          permissionCheck: (request) async {
+            requests.add(request);
+            return BackgroundLocationPermissionStatus.locationDenied;
+          },
+          child: const SizedBox.shrink(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(requests, [false]);
+    expect(find.text('Uso da localização'), findsOneWidget);
+    expect(find.textContaining('monitoramento da frota'), findsOneWidget);
+    expect(
+      find.textContaining('quando o aplicativo está fechado'),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(find.text('Continuar'));
+    await tester.tap(find.text('Continuar'));
+    await tester.pump();
+
+    expect(requests, [false, true]);
+  });
+
   testWidgets('mantém o Navigator montado durante rechecagem no resume', (
     tester,
   ) async {
