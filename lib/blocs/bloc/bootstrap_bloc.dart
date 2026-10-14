@@ -8,7 +8,6 @@ import 'package:moto_driver/core/config/device_type.dart';
 import 'package:moto_driver/core/errors/exceptions.dart';
 import 'package:moto_driver/core/errors/user_error_message.dart';
 import 'package:moto_driver/core/local_db/local_database_service.dart';
-import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/notifications/inotification_service.dart';
 import 'package:moto_driver/modules/auth/domain/repositories/i_auth_repository.dart';
 
@@ -38,7 +37,6 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     emit(LoadingConfigurationsState());
 
     await _initLocalPersistence(emit);
-    await _requestLocationPermission(emit);
     await _initializeNotificationService(emit);
     await _requestNotificationsPermission(emit);
 
@@ -101,11 +99,6 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     } on Exception catch (e) {
       emit(LocalPersistenceFailureState(message: userErrorMessage(e)));
     }
-  }
-
-  Future<void> _requestLocationPermission(Emitter<BootstrapStates> emit) async {
-    emit(LocalPersistenceConfigurationState());
-    await LocationService.requestPermissionIfNeeded();
   }
 
   Future<void> _initializeNotificationService(

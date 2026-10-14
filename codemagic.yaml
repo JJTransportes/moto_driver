@@ -5,10 +5,8 @@ workflows:
     max_build_duration: 30
 
     triggering:
-      events: []
-      # push trigger temporarily disabled while this pipeline is being reconstructed
-      # in a working branch — re-add "- push" under events when ready to resume
-      # automatic builds/publishing on android_release.
+      events:
+      - push
       branch_patterns:
       - pattern: "android_release"
         include: true
@@ -16,7 +14,7 @@ workflows:
       cancel_previous_builds: true
 
     environment:
-      flutter: 3.44.0
+      flutter: 3.44.8
       groups:
       - release
       android_signing:
@@ -152,7 +150,7 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 30
     integrations:
-      app_store_connect: Moto Driver
+      app_store_connect: Codemagic Moto
     triggering:
       # Manual until Apple completes the organization migration and signing setup.
       events: []
@@ -162,20 +160,28 @@ workflows:
         source: true
       cancel_previous_builds: true
     environment:
-      flutter: 3.44.0
+      flutter: 3.44.8
+      xcode: 26.1
       groups:
       - moto_staging
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: br.com.rockservicos.motoDriverApp
     cache:
       cache_paths:
       - $HOME/.pub-cache
     scripts:
-    - name: Set up code signing settings on Xcode project
-      script: xcode-project use-profiles
+    - name: Set up automatic iOS code signing
+      script: |
+        keychain initialize
+        app-store-connect fetch-signing-files "br.com.rockservicos.motoDriverApp" --type IOS_APP_STORE --create
+        app-store-connect fetch-signing-files "br.com.rockservicos.motoDriverApp.OneSignalNotificationServiceExtension" --type IOS_APP_STORE --create
+        keychain add-certificates
     - name: Get Flutter packages
       script: flutter pub get
+    - name: Configure runtime definitions
+      script: |
+        cat > .env << EOF
+        API_BASE_URL=$API_BASE_URL
+        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
+        EOF
     - name: Run tests
       script: flutter test
     - name: Set application secrets
@@ -185,12 +191,8 @@ workflows:
         EOF
     - name: Install pods
       script: find . -name "Podfile" -execdir pod install \;
-    - name: Configure runtime definitions
-      script: |
-        cat > .env << EOF
-        API_BASE_URL=$API_BASE_URL
-        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
-        EOF
+    - name: Apply iOS code signing profiles
+      script: xcode-project use-profiles
     - name: Determine next TestFlight build number
       script: |
         LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
@@ -201,7 +203,7 @@ workflows:
         flutter build ipa --release --build-number=$NEW_BUILD_NUMBER
         --export-options-plist=/Users/builder/export_options.plist
         --dart-define=SENTRY_DSN="$SENTRY_DSN"
-        --dart-define=APP_ENV="${APP_ENV:-production}"
+        --dart-define=APP_ENV=staging
     artifacts:
     - build/ios/ipa/*.ipa
     - /tmp/xcodebuild_logs/*.log
@@ -220,7 +222,7 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 30
     integrations:
-      app_store_connect: Moto Driver
+      app_store_connect: Codemagic Moto
     triggering:
       events: []
       branch_patterns:
@@ -229,20 +231,28 @@ workflows:
         source: true
       cancel_previous_builds: true
     environment:
-      flutter: 3.44.0
+      flutter: 3.44.8
+      xcode: 26.1
       groups:
       - release
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: br.com.rockservicos.motoDriverApp
     cache:
       cache_paths:
       - $HOME/.pub-cache
     scripts:
-    - name: Set up code signing settings on Xcode project
-      script: xcode-project use-profiles
+    - name: Set up automatic iOS code signing
+      script: |
+        keychain initialize
+        app-store-connect fetch-signing-files "br.com.rockservicos.motoDriverApp" --type IOS_APP_STORE --create
+        app-store-connect fetch-signing-files "br.com.rockservicos.motoDriverApp.OneSignalNotificationServiceExtension" --type IOS_APP_STORE --create
+        keychain add-certificates
     - name: Get Flutter packages
       script: flutter pub get
+    - name: Configure runtime definitions
+      script: |
+        cat > .env << EOF
+        API_BASE_URL=$API_BASE_URL
+        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
+        EOF
     - name: Run tests
       script: flutter test
     - name: Set application secrets
@@ -252,12 +262,8 @@ workflows:
         EOF
     - name: Install pods
       script: find . -name "Podfile" -execdir pod install \;
-    - name: Configure runtime definitions
-      script: |
-        cat > .env << EOF
-        API_BASE_URL=$API_BASE_URL
-        ONE_SIGNAL_ID=$ONE_SIGNAL_ID
-        EOF
+    - name: Apply iOS code signing profiles
+      script: xcode-project use-profiles
     - name: Determine next TestFlight build number
       script: |
         LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
@@ -268,7 +274,7 @@ workflows:
         flutter build ipa --release --build-number=$NEW_BUILD_NUMBER
         --export-options-plist=/Users/builder/export_options.plist
         --dart-define=SENTRY_DSN="$SENTRY_DSN"
-        --dart-define=APP_ENV="${APP_ENV:-production}"
+        --dart-define=APP_ENV=production
     artifacts:
     - build/ios/ipa/*.ipa
     - /tmp/xcodebuild_logs/*.log
