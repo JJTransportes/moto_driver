@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.br.com.rockservicos.motoDriver.onesignal</string>
+		<string>group.br.com.rockservicos.motoDriverApp.onesignal</string>
 	</array>
 </dict>
 </plist>

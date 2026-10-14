@@ -30,7 +30,8 @@ class _SplashScreenState extends State<SplashScreen> {
           width: 257,
           height: 103,
           fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const SizedBox(width: 257, height: 103, child: Placeholder()),
+          errorBuilder: (_, __, ___) =>
+              const SizedBox(width: 257, height: 103, child: Placeholder()),
         ),
       ),
     );

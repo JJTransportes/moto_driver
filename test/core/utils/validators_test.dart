@@ -31,16 +31,25 @@ void main() {
     });
 
     test('each requirement is evaluated independently', () {
-      final requirements = validators.evaluatePasswordPolicy('abcdefgh', policy);
+      final requirements = validators.evaluatePasswordPolicy(
+        'abcdefgh',
+        policy,
+      );
       final byLabel = {for (final r in requirements) r.label: r.satisfied};
       expect(byLabel['Pelo menos 1 letra minúscula'], isTrue);
       expect(byLabel['Pelo menos 1 letra maiúscula'], isFalse);
       expect(byLabel['Pelo menos 1 número'], isFalse);
-      expect(byLabel['Pelo menos 1 caractere especial (ex: ! @ # \$ % &)'], isFalse);
+      expect(
+        byLabel['Pelo menos 1 caractere especial (ex: ! @ # \$ % &)'],
+        isFalse,
+      );
     });
 
     test('a fully valid password satisfies every requirement', () {
-      final requirements = validators.evaluatePasswordPolicy('Abcdef1!', policy);
+      final requirements = validators.evaluatePasswordPolicy(
+        'Abcdef1!',
+        policy,
+      );
       expect(requirements.every((r) => r.satisfied), isTrue);
     });
 
@@ -53,7 +62,10 @@ void main() {
         requireDigit: true,
         requireSpecialChar: false,
       );
-      final requirements = validators.evaluatePasswordPolicy('abcdefg1', relaxedPolicy);
+      final requirements = validators.evaluatePasswordPolicy(
+        'abcdefg1',
+        relaxedPolicy,
+      );
       expect(requirements, hasLength(3)); // length + lowercase + digit
     });
   });
@@ -94,5 +106,18 @@ void main() {
         expect(validators.validateEmailFormat(email), isNotNull);
       });
     }
+  });
+
+  group('validatePhone', () {
+    test('aceita celular e telefone fixo brasileiros válidos', () {
+      expect(validators.validatePhone('(11) 99876-5432'), isNull);
+      expect(validators.validatePhone('(61) 3456-7890'), isNull);
+    });
+
+    test('rejeita DDD, prefixo e sequências inválidos', () {
+      expect(validators.validatePhone('(10) 99876-5432'), isNotNull);
+      expect(validators.validatePhone('(11) 19876-5432'), isNotNull);
+      expect(validators.validatePhone('(11) 1111-1111'), isNotNull);
+    });
   });
 }

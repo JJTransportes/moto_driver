@@ -48,8 +48,7 @@ class _ProfileImageDisplayState extends State<ProfileImageDisplay> {
         _authHeaders != null) {
       return CircleAvatar(
         radius: widget.radius,
-        backgroundImage:
-            NetworkImage(widget.photoUrl!, headers: _authHeaders),
+        backgroundImage: NetworkImage(widget.photoUrl!, headers: _authHeaders),
         onBackgroundImageError: (_, __) => _buildFallback(context),
       );
     }

@@ -53,9 +53,10 @@ String? validateAlphanumericFormat(
 /// curta) a 12 caracteres (casos raros com 11 dígitos + verificador, ou
 /// legados com dígito verificador alfanumérico). Mesma faixa usada no
 /// backend, já limpo de pontuação: ^[0-9A-Za-z]{7,12}$
-String? validateRg(String rg) => validateAlphanumericFormat(rg, 'RG', 12, minLength: 7);
+String? validateRg(String rg) =>
+    validateAlphanumericFormat(rg, 'RG', 12, minLength: 7);
 
-/// Telefone é opcional. Quando preenchido, precisa ter DDD + número (fixo
+/// Telefone obrigatório, com DDD + número (fixo
 /// de 8 dígitos ou celular de 9) — 10 ou 11 dígitos ao todo. O backend não
 /// valida formato de telefone; esta é só uma checagem de conveniência do
 /// cliente para pegar número obviamente incompleto antes de enviar.
@@ -63,6 +64,87 @@ String? validatePhone(String phone) {
   final digits = unmaskDigits(phone);
   if (digits.length < 10 || digits.length > 11) {
     return 'Telefone inválido.';
+  }
+  const validAreaCodes = {
+    '11',
+    '12',
+    '13',
+    '14',
+    '15',
+    '16',
+    '17',
+    '18',
+    '19',
+    '21',
+    '22',
+    '24',
+    '27',
+    '28',
+    '31',
+    '32',
+    '33',
+    '34',
+    '35',
+    '37',
+    '38',
+    '41',
+    '42',
+    '43',
+    '44',
+    '45',
+    '46',
+    '47',
+    '48',
+    '49',
+    '51',
+    '53',
+    '54',
+    '55',
+    '61',
+    '62',
+    '63',
+    '64',
+    '65',
+    '66',
+    '67',
+    '68',
+    '69',
+    '71',
+    '73',
+    '74',
+    '75',
+    '77',
+    '79',
+    '81',
+    '82',
+    '83',
+    '84',
+    '85',
+    '86',
+    '87',
+    '88',
+    '89',
+    '91',
+    '92',
+    '93',
+    '94',
+    '95',
+    '96',
+    '97',
+    '98',
+    '99',
+  };
+  if (!validAreaCodes.contains(digits.substring(0, 2))) {
+    return 'DDD inválido.';
+  }
+  final subscriber = digits.substring(2);
+  if (subscriber.split('').toSet().length == 1) return 'Telefone inválido.';
+  if (digits.length == 11) {
+    final second = int.parse(subscriber[1]);
+    if (!subscriber.startsWith('9') || second < 2) return 'Celular inválido.';
+  } else {
+    final first = int.parse(subscriber[0]);
+    if (first < 2 || first > 5) return 'Telefone fixo inválido.';
   }
   return null;
 }
@@ -118,11 +200,17 @@ final RegExp _specialCharPattern = RegExp(r'[^A-Za-z0-9\s]');
 /// habilitados — mesmas 5 regras e labels do checklist "estilo gov.br" do
 /// painel web. Se um requisito vier desabilitado na policy (ex.: backend
 /// desliga `requireSpecialChar`), ele simplesmente não aparece na lista.
-List<PasswordRequirement> evaluatePasswordPolicy(String password, PasswordPolicy policy) {
+List<PasswordRequirement> evaluatePasswordPolicy(
+  String password,
+  PasswordPolicy policy,
+) {
   return [
     PasswordRequirement(
-      label: 'Mínimo ${policy.minLength} e máximo ${policy.maxLength} caracteres',
-      satisfied: password.length >= policy.minLength && password.length <= policy.maxLength,
+      label:
+          'Mínimo ${policy.minLength} e máximo ${policy.maxLength} caracteres',
+      satisfied:
+          password.length >= policy.minLength &&
+          password.length <= policy.maxLength,
     ),
     if (policy.requireUppercase)
       PasswordRequirement(

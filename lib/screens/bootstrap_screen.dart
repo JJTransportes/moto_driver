@@ -10,7 +10,8 @@ class BootstrapScreen extends StatefulWidget {
   State<BootstrapScreen> createState() => _BootstrapScreenState();
 }
 
-class _BootstrapScreenState extends State<BootstrapScreen> with SingleTickerProviderStateMixin {
+class _BootstrapScreenState extends State<BootstrapScreen>
+    with SingleTickerProviderStateMixin {
   late final BootstrapBloc _bloc;
   late final AnimationController _gearController;
 

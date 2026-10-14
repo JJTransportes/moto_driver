@@ -57,7 +57,13 @@ class MotoPalette extends ThemeExtension<MotoPalette> {
 
   /// Fundo porcelana com aurora (telas sem mapa) — use via MotoCanvas.
   final Gradient canvas;
-  final Color textPrimary, textSecondary, textTertiary, textDisabled, textLink, textOnAccent, textOnSignal;
+  final Color textPrimary,
+      textSecondary,
+      textTertiary,
+      textDisabled,
+      textLink,
+      textOnAccent,
+      textOnSignal;
   final Color accent, accentBright, accentSoft;
 
   /// Cápsula primária: luz de cima, corpo cobalto, base safira.
@@ -66,7 +72,14 @@ class MotoPalette extends ThemeExtension<MotoPalette> {
   /// Limão do logo — RESERVADO a "vivo": online, ao vivo, sucesso.
   final Color signal, signalText, signalSoft;
   final Gradient signalLiquid;
-  final Color success, successSoft, warning, warningSoft, danger, dangerSoft, info, infoSoft;
+  final Color success,
+      successSoft,
+      warning,
+      warningSoft,
+      danger,
+      dangerSoft,
+      info,
+      infoSoft;
   final Color glass1, glass2, glass3;
 
   /// Borda de luz do vidro (gradiente: forte no topo-esquerda, azul na base).
@@ -97,7 +110,12 @@ class MotoPalette extends ThemeExtension<MotoPalette> {
     canvas: LinearGradient(
       begin: Alignment.topRight,
       end: Alignment.bottomLeft,
-      colors: [Color(0xFFDDE7FF), Color(0xFFF6F8FD), Color(0xFFF1F4FB), Color(0xFFEEF4E4)],
+      colors: [
+        Color(0xFFDDE7FF),
+        Color(0xFFF6F8FD),
+        Color(0xFFF1F4FB),
+        Color(0xFFEEF4E4),
+      ],
       stops: [0, .35, .75, 1],
     ),
     textPrimary: MotoRaw.tinta900,
@@ -129,7 +147,12 @@ class MotoPalette extends ThemeExtension<MotoPalette> {
     rim: LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: [Color(0xFFFFFFFF), Color(0x8CFFFFFF), Color(0x1FFFFFFF), Color(0x599DBBFF)],
+      colors: [
+        Color(0xFFFFFFFF),
+        Color(0x8CFFFFFF),
+        Color(0x1FFFFFFF),
+        Color(0x599DBBFF),
+      ],
       stops: [0, .22, .5, 1],
     ),
     highlight: Color(0xF2FFFFFF),
@@ -199,10 +222,12 @@ class MotoPalette extends ThemeExtension<MotoPalette> {
   MotoPalette copyWith() => this; // paleta fixa
 
   @override
-  MotoPalette lerp(MotoPalette? other, double t) => (other == null || t < .5) ? this : other;
+  MotoPalette lerp(MotoPalette? other, double t) =>
+      (other == null || t < .5) ? this : other;
 }
 
 extension MotoContext on BuildContext {
   /// Atalho: `context.moto.accent`
-  MotoPalette get moto => Theme.of(this).extension<MotoPalette>() ?? MotoPalette.claro;
+  MotoPalette get moto =>
+      Theme.of(this).extension<MotoPalette>() ?? MotoPalette.claro;
 }
