@@ -32,8 +32,10 @@ class _TermsPageState extends State<TermsPage> {
           // abre no fim do fluxo de sessão (anti-soterramento).
           final pending = NotificationService.peekPendingOrder();
           if (pending != null) {
-            Modular.to.pushReplacementNamed('/order-refresh',
-                arguments: {'orderId': pending});
+            Modular.to.pushReplacementNamed(
+              '/order-refresh',
+              arguments: {'orderId': pending},
+            );
           } else {
             Modular.to.navigate('/home');
           }
@@ -43,16 +45,16 @@ class _TermsPageState extends State<TermsPage> {
         return switch (state) {
           UsageTermsInitial() ||
           UsageTermsChecking() ||
-          UsageTermsLoading() =>
-            _buildLoading(),
+          UsageTermsLoading() => _buildLoading(),
           UsageTermsLoaded(:final terms) ||
-          UsageTermsSubmitting(:final terms) =>
-            _buildTerms(
-              terms: terms,
-              isSubmitting: state is UsageTermsSubmitting,
-            ),
-          UsageTermsError(:final message, :final isRetryable) =>
-            _buildError(message: message, isRetryable: isRetryable),
+          UsageTermsSubmitting(:final terms) => _buildTerms(
+            terms: terms,
+            isSubmitting: state is UsageTermsSubmitting,
+          ),
+          UsageTermsError(:final message, :final isRetryable) => _buildError(
+            message: message,
+            isRetryable: isRetryable,
+          ),
           UsageTermsAccepted() => const SizedBox.shrink(),
           _ => const SizedBox.shrink(),
         };
@@ -161,9 +163,9 @@ class _TermsPageState extends State<TermsPage> {
                                   ),
                                 ),
                               );
-                              context
-                                  .read<UsageTermsBloc>()
-                                  .add(const DeclineTerms());
+                              context.read<UsageTermsBloc>().add(
+                                const DeclineTerms(),
+                              );
                             },
                       child: Text(
                         'Recusar',

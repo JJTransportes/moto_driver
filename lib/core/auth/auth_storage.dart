@@ -10,7 +10,7 @@ class AuthStorage {
   static const _userIdKey = 'moto_driver_user_id';
 
   AuthStorage({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   /// As escritas são sequenciais de propósito.
   /// No web o flutter_secure_storage cria a chave AES preguiçosamente na
@@ -45,8 +45,11 @@ class AuthStorage {
       // uninstall/reinstall or signing-key change).
       // Clear corrupted entries and return null so the app
       // gracefully falls back to the login screen.
-      if (e.code == 'Exception encountered' && e.message?.contains('read') == true) {
-        debugPrint('AuthStorage: corrupted secure storage — clearing and re-authenticating');
+      if (e.code == 'Exception encountered' &&
+          e.message?.contains('read') == true) {
+        debugPrint(
+          'AuthStorage: corrupted secure storage — clearing and re-authenticating',
+        );
         await _storage.deleteAll();
         return null;
       }

@@ -6,6 +6,7 @@
 //   MotoSwipeToConfirm   "Deslize para finalizar" (motorista)
 //   MotoSkeleton         carregando listas
 // =====================================================================
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -36,7 +37,14 @@ class MotoOrb extends StatelessWidget {
           stops: [0, .45, 1],
         ),
         border: Border.all(color: c.borderSubtle),
-        boxShadow: [BoxShadow(color: c.shadow, blurRadius: 36, offset: const Offset(0, 18), spreadRadius: -14)],
+        boxShadow: [
+          BoxShadow(
+            color: c.shadow,
+            blurRadius: 36,
+            offset: const Offset(0, 18),
+            spreadRadius: -14,
+          ),
+        ],
       ),
       child: Icon(icon, color: c.accent, size: size * .41),
     );
@@ -45,7 +53,11 @@ class MotoOrb extends StatelessWidget {
 
 // ------------------------------------------------------------------ SONAR
 class MotoSonar extends StatefulWidget {
-  const MotoSonar({super.key, this.size = 188, this.icon = Icons.directions_car_rounded});
+  const MotoSonar({
+    super.key,
+    this.size = 188,
+    this.icon = Icons.directions_car_rounded,
+  });
   final double size;
   final IconData icon;
 
@@ -53,9 +65,12 @@ class MotoSonar extends StatefulWidget {
   State<MotoSonar> createState() => _MotoSonarState();
 }
 
-class _MotoSonarState extends State<MotoSonar> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))
-    ..repeat();
+class _MotoSonarState extends State<MotoSonar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2800),
+  )..repeat();
 
   @override
   void dispose() {
@@ -75,7 +90,10 @@ class _MotoSonarState extends State<MotoSonar> with SingleTickerProviderStateMix
           builder: (context, _) => Stack(
             alignment: Alignment.center,
             children: [
-              CustomPaint(size: Size.square(widget.size), painter: _SonarPainter(_c.value, c)),
+              CustomPaint(
+                size: Size.square(widget.size),
+                painter: _SonarPainter(_c.value, c),
+              ),
               Transform.scale(
                 scale: 1 + .05 * math.sin(_c.value * math.pi * 2),
                 child: MotoOrb(icon: widget.icon, size: widget.size * .41),
@@ -100,8 +118,16 @@ class _SonarPainter extends CustomPainter {
     final ring = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
-    canvas.drawCircle(center, r - .5, ring..color = c.accentBright.withValues(alpha: .2));
-    canvas.drawCircle(center, r * .6, ring..color = c.accentBright.withValues(alpha: .12));
+    canvas.drawCircle(
+      center,
+      r - .5,
+      ring..color = c.accentBright.withValues(alpha: .2),
+    );
+    canvas.drawCircle(
+      center,
+      r * .6,
+      ring..color = c.accentBright.withValues(alpha: .12),
+    );
     // radar: setor que gira (cobalto → limão na ponta)
     final sweep = Paint()
       ..shader = SweepGradient(
@@ -143,9 +169,12 @@ class MotoSuccessCheck extends StatefulWidget {
   State<MotoSuccessCheck> createState() => _MotoSuccessCheckState();
 }
 
-class _MotoSuccessCheckState extends State<MotoSuccessCheck> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1150))
-    ..forward();
+class _MotoSuccessCheckState extends State<MotoSuccessCheck>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1150),
+  )..forward();
   late final Animation<double> _pop = CurvedAnimation(
     parent: _c,
     curve: const Interval(0, .55, curve: MotoMotion.spring),
@@ -186,7 +215,12 @@ class _MotoSuccessCheckState extends State<MotoSuccessCheck> with SingleTickerPr
             children: [
               CustomPaint(
                 size: Size.square(s * 1.9),
-                painter: _BurstPainter(_burst.value, c.signal, c.accentBright, s),
+                painter: _BurstPainter(
+                  _burst.value,
+                  c.signal,
+                  c.accentBright,
+                  s,
+                ),
               ),
               Transform.scale(
                 scale: .5 + .5 * _pop.value,
@@ -208,7 +242,9 @@ class _MotoSuccessCheckState extends State<MotoSuccessCheck> with SingleTickerPr
                         ),
                       ],
                     ),
-                    child: CustomPaint(painter: _CheckPainter(_draw.value, c.textOnSignal)),
+                    child: CustomPaint(
+                      painter: _CheckPainter(_draw.value, c.textOnSignal),
+                    ),
                   ),
                 ),
               ),
@@ -275,8 +311,17 @@ class _CheckPainter extends CustomPainter {
 // --------------------------------------------------------- COUNTDOWN RING
 /// Anel que drena (limão → cobalto). Chama [onTimeout] no zero.
 class MotoCountdownRing extends StatefulWidget {
-  const MotoCountdownRing({super.key, this.seconds = 15, this.onTimeout, this.size = 68});
+  const MotoCountdownRing({
+    super.key,
+    this.seconds = 15,
+    this.expiresAt,
+    this.now,
+    this.onTimeout,
+    this.size = 68,
+  });
   final int seconds;
+  final DateTime? expiresAt;
+  final DateTime Function()? now;
   final VoidCallback? onTimeout;
   final double size;
 
@@ -284,20 +329,78 @@ class MotoCountdownRing extends StatefulWidget {
   State<MotoCountdownRing> createState() => _MotoCountdownRingState();
 }
 
-class _MotoCountdownRingState extends State<MotoCountdownRing> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(
-          vsync: this,
-          duration: Duration(seconds: widget.seconds),
-        )
-        ..addStatusListener((s) {
-          if (s == AnimationStatus.completed) widget.onTimeout?.call();
-        })
-        ..forward();
+class _MotoCountdownRingState extends State<MotoCountdownRing> {
+  Timer? _timer;
+  late DateTime _deadline;
+  double _progress = 1;
+  int _secondsLeft = 0;
+  bool _timeoutDelivered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _configureDeadline();
+  }
+
+  @override
+  void didUpdateWidget(covariant MotoCountdownRing oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.seconds != widget.seconds ||
+        oldWidget.expiresAt != widget.expiresAt) {
+      _configureDeadline();
+    }
+  }
+
+  void _configureDeadline() {
+    _timer?.cancel();
+    _timeoutDelivered = false;
+    _deadline =
+        widget.expiresAt?.toUtc() ??
+        _now().add(Duration(seconds: widget.seconds));
+    _updateFromClock(notify: false);
+    _timer = Timer.periodic(
+      const Duration(milliseconds: 50),
+      (_) => _updateFromClock(),
+    );
+  }
+
+  void _updateFromClock({bool notify = true}) {
+    final remaining = _deadline.difference(_now());
+    final remainingMicroseconds = remaining.inMicroseconds.clamp(
+      0,
+      widget.seconds * Duration.microsecondsPerSecond,
+    );
+    final nextProgress =
+        remainingMicroseconds /
+        (widget.seconds * Duration.microsecondsPerSecond);
+    final nextSeconds = (remainingMicroseconds / Duration.microsecondsPerSecond)
+        .ceil();
+
+    void apply() {
+      _progress = nextProgress;
+      _secondsLeft = nextSeconds;
+    }
+
+    if (notify && mounted) {
+      setState(apply);
+    } else {
+      apply();
+    }
+
+    if (remainingMicroseconds == 0 && !_timeoutDelivered) {
+      _timeoutDelivered = true;
+      _timer?.cancel();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onTimeout?.call();
+      });
+    }
+  }
+
+  DateTime _now() => (widget.now?.call() ?? DateTime.now()).toUtc();
 
   @override
   void dispose() {
-    _c.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -306,46 +409,47 @@ class _MotoCountdownRingState extends State<MotoCountdownRing> with SingleTicker
     final c = context.moto;
     return SizedBox.square(
       dimension: widget.size,
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (context, _) {
-          final left = (widget.seconds * (1 - _c.value)).ceil();
-          return Semantics(
-            label: '$left segundos para aceitar',
-            child: CustomPaint(
-              painter: _RingPainter(
-                1 - _c.value,
-                c.signal,
-                c.accentBright,
-                c.isDark ? const Color(0x1FFFFFFF) : MotoRaw.porcelana300,
+      child: Semantics(
+        label: '$_secondsLeft segundos para aceitar',
+        child: CustomPaint(
+          painter: _RingPainter(
+            _progress,
+            c.signal,
+            c.accentBright,
+            c.isDark ? const Color(0x1FFFFFFF) : MotoRaw.porcelana300,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(9),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: c.isDark ? const Color(0x14FFFFFF) : Colors.white,
+                boxShadow: c.isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: c.shadow,
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                          spreadRadius: -2,
+                        ),
+                      ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(9),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: c.isDark ? const Color(0x14FFFFFF) : Colors.white,
-                    boxShadow: c.isDark
-                        ? null
-                        : [BoxShadow(color: c.shadow, blurRadius: 6, offset: const Offset(0, 2), spreadRadius: -2)],
-                  ),
-                  child: Center(
-                    child: Text(
-                      '$left',
-                      style: TextStyle(
-                        fontFamily: MotoFont.display,
-                        fontSize: widget.size * .29,
-                        fontWeight: FontWeight.w600,
-                        color: c.textPrimary,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
+              child: Center(
+                child: Text(
+                  '$_secondsLeft',
+                  style: TextStyle(
+                    fontFamily: MotoFont.display,
+                    fontSize: widget.size * .29,
+                    fontWeight: FontWeight.w600,
+                    color: c.textPrimary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -364,7 +468,10 @@ class _RingPainter extends CustomPainter {
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;
     canvas.drawArc(r, 0, math.pi * 2, false, p..color = track);
-    p.shader = SweepGradient(colors: [a, b, a], transform: const GradientRotation(-math.pi / 2)).createShader(r);
+    p.shader = SweepGradient(
+      colors: [a, b, a],
+      transform: const GradientRotation(-math.pi / 2),
+    ).createShader(r);
     canvas.drawArc(r, -math.pi / 2, math.pi * 2 * progress, false, p);
   }
 
@@ -375,7 +482,11 @@ class _RingPainter extends CustomPainter {
 // ------------------------------------------------------ SWIPE TO CONFIRM
 /// Motorista: iniciar/finalizar viagem sem toque acidental.
 class MotoSwipeToConfirm extends StatefulWidget {
-  const MotoSwipeToConfirm({super.key, required this.label, required this.onConfirmed});
+  const MotoSwipeToConfirm({
+    super.key,
+    required this.label,
+    required this.onConfirmed,
+  });
   final String label;
   final VoidCallback onConfirmed;
 
@@ -383,12 +494,15 @@ class MotoSwipeToConfirm extends StatefulWidget {
   State<MotoSwipeToConfirm> createState() => _MotoSwipeToConfirmState();
 }
 
-class _MotoSwipeToConfirmState extends State<MotoSwipeToConfirm> with SingleTickerProviderStateMixin {
+class _MotoSwipeToConfirmState extends State<MotoSwipeToConfirm>
+    with SingleTickerProviderStateMixin {
   static const _h = 66.0, _knob = 56.0;
   double _x = 0;
   bool _dragging = false;
-  late final AnimationController _shine = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))
-    ..repeat();
+  late final AnimationController _shine = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  )..repeat();
 
   @override
   void dispose() {
@@ -424,7 +538,12 @@ class _MotoSwipeToConfirmState extends State<MotoSwipeToConfirm> with SingleTick
                   width: _x + _knob + 10,
                   decoration: BoxDecoration(
                     borderRadius: MotoRadius.brPill,
-                    gradient: LinearGradient(colors: [c.signal.withValues(alpha: 0), c.signal.withValues(alpha: .3)]),
+                    gradient: LinearGradient(
+                      colors: [
+                        c.signal.withValues(alpha: 0),
+                        c.signal.withValues(alpha: .3),
+                      ],
+                    ),
                   ),
                 ),
                 Padding(
@@ -437,7 +556,11 @@ class _MotoSwipeToConfirmState extends State<MotoSwipeToConfirm> with SingleTick
                         builder: (context, child) => ShaderMask(
                           blendMode: BlendMode.srcIn,
                           shaderCallback: (r) => LinearGradient(
-                            colors: [c.textTertiary, c.textPrimary, c.textTertiary],
+                            colors: [
+                              c.textTertiary,
+                              c.textPrimary,
+                              c.textTertiary,
+                            ],
                             begin: Alignment(-3 + 6 * _shine.value, 0),
                             end: Alignment(-1 + 6 * _shine.value, 0),
                           ).createShader(r),
@@ -445,7 +568,11 @@ class _MotoSwipeToConfirmState extends State<MotoSwipeToConfirm> with SingleTick
                         ),
                         child: Text(
                           widget.label,
-                          style: const TextStyle(fontFamily: MotoFont.ui, fontSize: 16, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontFamily: MotoFont.ui,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -456,8 +583,10 @@ class _MotoSwipeToConfirmState extends State<MotoSwipeToConfirm> with SingleTick
                   curve: MotoMotion.spring,
                   left: 5 + _x,
                   child: GestureDetector(
-                    onHorizontalDragStart: (_) => setState(() => _dragging = true),
-                    onHorizontalDragUpdate: (d) => setState(() => _x = (_x + d.delta.dx).clamp(0, max)),
+                    onHorizontalDragStart: (_) =>
+                        setState(() => _dragging = true),
+                    onHorizontalDragUpdate: (d) =>
+                        setState(() => _x = (_x + d.delta.dx).clamp(0, max)),
                     onHorizontalDragEnd: (_) {
                       final done = _x > max * .85;
                       setState(() {
@@ -485,7 +614,11 @@ class _MotoSwipeToConfirmState extends State<MotoSwipeToConfirm> with SingleTick
                           ),
                         ],
                       ),
-                      child: Icon(Icons.chevron_right_rounded, color: c.textOnSignal, size: 30),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        color: c.textOnSignal,
+                        size: 30,
+                      ),
                     ),
                   ),
                 ),
@@ -500,7 +633,12 @@ class _MotoSwipeToConfirmState extends State<MotoSwipeToConfirm> with SingleTick
 
 // ---------------------------------------------------------------- SKELETON
 class MotoSkeleton extends StatefulWidget {
-  const MotoSkeleton({super.key, this.width, this.height = 14, this.radius = MotoRadius.xs});
+  const MotoSkeleton({
+    super.key,
+    this.width,
+    this.height = 14,
+    this.radius = MotoRadius.xs,
+  });
   final double? width;
   final double height;
   final double radius;
@@ -509,9 +647,12 @@ class MotoSkeleton extends StatefulWidget {
   State<MotoSkeleton> createState() => _MotoSkeletonState();
 }
 
-class _MotoSkeletonState extends State<MotoSkeleton> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))
-    ..repeat();
+class _MotoSkeletonState extends State<MotoSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..repeat();
 
   @override
   void dispose() {
@@ -530,7 +671,11 @@ class _MotoSkeletonState extends State<MotoSkeleton> with SingleTickerProviderSt
         gradient: LinearGradient(
           begin: Alignment(-2 + 4 * _c.value, 0),
           end: Alignment(-1 + 4 * _c.value, 0),
-          colors: const [MotoRaw.porcelana200, Colors.white, MotoRaw.porcelana200],
+          colors: const [
+            MotoRaw.porcelana200,
+            Colors.white,
+            MotoRaw.porcelana200,
+          ],
         ),
       ),
     ),

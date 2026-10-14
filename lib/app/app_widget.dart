@@ -6,6 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
+import 'package:moto_driver/core/auth/sign_out_service.dart';
+import 'package:moto_driver/core/location/mandatory_location_gate.dart';
+import 'package:moto_driver/core/network/mandatory_connectivity_gate.dart';
+import 'package:moto_driver/core/network/signalr_service.dart';
+import 'package:moto_driver/core/profile/mandatory_phone_gate.dart';
 import 'package:moto_driver/core/update/mandatory_update_gate.dart';
 import 'package:moto_driver/design_system/design_system.dart';
 
@@ -23,6 +28,8 @@ class _AppWidgetState extends State<AppWidget> with WidgetsBindingObserver {
   // terminar), o callback rodava do mesmo jeito, arriscando usar um
   // `Modular.get` de escopo já descartado.
   Timer? _deviceStatusTimer;
+  StreamSubscription<Map<String, dynamic>>? _sessionRevokedSubscription;
+  bool _handlingSessionRevocation = false;
 
   @override
   void initState() {
@@ -33,6 +40,8 @@ class _AppWidgetState extends State<AppWidget> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     _updateDeviceStatus(true);
+    _sessionRevokedSubscription = Modular.get<SignalRService>().onSessionRevoked
+        .listen((_) => _handleSessionRevoked());
   }
 
   @override
@@ -52,11 +61,23 @@ class _AppWidgetState extends State<AppWidget> with WidgetsBindingObserver {
   @override
   void dispose() {
     _deviceStatusTimer?.cancel();
+    _sessionRevokedSubscription?.cancel();
     Modular.to.removeListener(_logRoutes);
 
     WidgetsBinding.instance.removeObserver(this);
 
     super.dispose();
+  }
+
+  Future<void> _handleSessionRevoked() async {
+    if (_handlingSessionRevocation) return;
+    _handlingSessionRevocation = true;
+    try {
+      await Modular.get<SignalRService>().disconnectAll();
+      await Modular.get<SignOutService>().signOut(notifyBackend: false);
+    } finally {
+      _handlingSessionRevocation = false;
+    }
   }
 
   _logRoutes() => log('NAVIGATING TO ${Modular.to.path}');
@@ -90,7 +111,13 @@ class _AppWidgetState extends State<AppWidget> with WidgetsBindingObserver {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      builder: (context, child) => MandatoryUpdateGate(child: child!),
+      builder: (context, child) => MandatoryUpdateGate(
+        child: MandatoryConnectivityGate(
+          child: MandatoryLocationGate(
+            child: MandatoryPhoneGate(child: child!),
+          ),
+        ),
+      ),
     );
   }
 }

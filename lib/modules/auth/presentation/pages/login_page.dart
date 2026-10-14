@@ -26,7 +26,8 @@ class _LoginPageState extends State<LoginPage> {
   // botão reenviando as mesmas credenciais rejeitadas.
   final _serverErrorGuard = ServerErrorGuard();
 
-  String get _credentialsSnapshot => '${_emailController.text}|${_passwordController.text}';
+  String get _credentialsSnapshot =>
+      '${_emailController.text}|${_passwordController.text}';
 
   @override
   void initState() {
@@ -104,13 +105,17 @@ class _LoginPageState extends State<LoginPage> {
         // Fallback pro caso do estado já chegar como falha antes do listener
         // rodar (ex.: BlocConsumer com state pré-populado) — o listener é
         // quem cuida do bloqueio anti-spam via _serverErrorGuard.
-        final passwordError = _passwordError ?? (state is LoginFailure ? state.message : null);
+        final passwordError =
+            _passwordError ?? (state is LoginFailure ? state.message : null);
 
         return Scaffold(
           body: MotoCanvas(
             child: SafeArea(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 28,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -127,11 +132,16 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: MotoSpace.s2),
-                    Text('Bom te ver de novo.', style: Theme.of(context).textTheme.displaySmall),
+                    Text(
+                      'Bom te ver de novo.',
+                      style: Theme.of(context).textTheme.displaySmall,
+                    ),
                     const SizedBox(height: MotoSpace.s2),
                     Text(
                       'Entre para receber suas corridas.',
-                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(color: context.moto.textSecondary),
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        color: context.moto.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 40),
                     Column(
@@ -156,8 +166,15 @@ class _LoginPageState extends State<LoginPage> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: () => Navigator.of(context).pushNamed('/recovery'),
-                            child: Text('Esqueci minha senha', style: GoogleFonts.inter(fontSize: 12, color: context.moto.accent)),
+                            onPressed: () =>
+                                Navigator.of(context).pushNamed('/recovery'),
+                            child: Text(
+                              'Esqueci minha senha',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: context.moto.accent,
+                              ),
+                            ),
                           ),
                         ),
                         MotoButton(
@@ -168,7 +185,9 @@ class _LoginPageState extends State<LoginPage> {
                         MotoButton(
                           label: 'Criar conta',
                           variant: MotoButtonVariant.glass,
-                          onPressed: () => Navigator.of(context).pushNamed('/driver-register/'),
+                          onPressed: () => Navigator.of(
+                            context,
+                          ).pushNamed('/driver-register/'),
                         ),
                       ],
                     ),

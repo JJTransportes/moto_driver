@@ -27,7 +27,9 @@ class VerifyCodeError extends VerifyResetCodeState {
 
   @override
   bool operator ==(Object other) =>
-      other is VerifyCodeError && other.message == message && other.exhausted == exhausted;
+      other is VerifyCodeError &&
+      other.message == message &&
+      other.exhausted == exhausted;
 
   @override
   int get hashCode => Object.hash(message, exhausted);

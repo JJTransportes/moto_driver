@@ -15,7 +15,7 @@ class UsageTermsBloc extends Bloc<UsageTermsEvent, UsageTermsState> {
       'Erro no servidor. Tente novamente em instantes.';
 
   UsageTermsBloc(this._datasource, this._storage, this._signOutService)
-      : super(const UsageTermsInitial()) {
+    : super(const UsageTermsInitial()) {
     on<CheckStatus>(_onCheckStatus);
     on<LoadTerms>(_onLoadTerms);
     on<AcceptTerms>(_onAcceptTerms);
@@ -37,15 +37,19 @@ class UsageTermsBloc extends Bloc<UsageTermsEvent, UsageTermsState> {
     } on UnauthorizedException {
       await _signOutService.signOut();
     } on ServerException {
-      emit(const UsageTermsError(
-        message: _serverErrorMessage,
-        isRetryable: true,
-      ));
+      emit(
+        const UsageTermsError(
+          message: _serverErrorMessage,
+          isRetryable: true,
+        ),
+      );
     } catch (_) {
-      emit(const UsageTermsError(
-        message: 'Erro ao verificar termos. Verifique sua conexão.',
-        isRetryable: true,
-      ));
+      emit(
+        const UsageTermsError(
+          message: 'Erro ao verificar termos. Verifique sua conexão.',
+          isRetryable: true,
+        ),
+      );
     }
   }
 
@@ -60,15 +64,19 @@ class UsageTermsBloc extends Bloc<UsageTermsEvent, UsageTermsState> {
     } on UnauthorizedException {
       await _signOutService.signOut();
     } on ServerException {
-      emit(const UsageTermsError(
-        message: _serverErrorMessage,
-        isRetryable: true,
-      ));
+      emit(
+        const UsageTermsError(
+          message: _serverErrorMessage,
+          isRetryable: true,
+        ),
+      );
     } catch (_) {
-      emit(const UsageTermsError(
-        message: 'Erro ao carregar termos. Tente novamente.',
-        isRetryable: true,
-      ));
+      emit(
+        const UsageTermsError(
+          message: 'Erro ao carregar termos. Tente novamente.',
+          isRetryable: true,
+        ),
+      );
     }
   }
 
@@ -94,15 +102,19 @@ class UsageTermsBloc extends Bloc<UsageTermsEvent, UsageTermsState> {
     } on UnauthorizedException {
       await _signOutService.signOut();
     } on ServerException {
-      emit(const UsageTermsError(
-        message: _serverErrorMessage,
-        isRetryable: true,
-      ));
+      emit(
+        const UsageTermsError(
+          message: _serverErrorMessage,
+          isRetryable: true,
+        ),
+      );
     } catch (_) {
-      emit(const UsageTermsError(
-        message: 'Erro ao aceitar termos. Tente novamente.',
-        isRetryable: true,
-      ));
+      emit(
+        const UsageTermsError(
+          message: 'Erro ao aceitar termos. Tente novamente.',
+          isRetryable: true,
+        ),
+      );
     }
   }
 

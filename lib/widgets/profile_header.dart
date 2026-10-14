@@ -9,6 +9,8 @@ class ProfileHeader extends StatelessWidget {
   final String userId;
   final VoidCallback? onSignOut;
   final VoidCallback? onSettingsTap;
+  final VoidCallback? onRefresh;
+  final bool isRefreshing;
 
   const ProfileHeader({
     super.key,
@@ -17,6 +19,8 @@ class ProfileHeader extends StatelessWidget {
     required this.userId,
     this.onSignOut,
     this.onSettingsTap,
+    this.onRefresh,
+    this.isRefreshing = false,
   });
 
   static const _weekdays = [
@@ -81,6 +85,16 @@ class ProfileHeader extends StatelessWidget {
               ),
             ],
           ),
+        ),
+        IconButton(
+          tooltip: isRefreshing ? 'Atualizando...' : 'Atualizar',
+          onPressed: isRefreshing ? null : onRefresh,
+          icon: isRefreshing
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded),
         ),
         PopupMenuButton<String>(
           onSelected: (value) {
