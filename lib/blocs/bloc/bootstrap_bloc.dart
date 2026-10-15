@@ -19,8 +19,10 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     this._notificationService,
     this._authStorage,
     this._authRepository,
-    this._signOutService,
-  ) : super(BootstrapInitial()) {
+    this._signOutService, {
+    Duration notificationPermissionTimeout = const Duration(seconds: 10),
+  }) : _notificationPermissionTimeout = notificationPermissionTimeout,
+       super(BootstrapInitial()) {
     on<ConfigureApplicationEvent>(_configureApplicationEventHandler);
     on<CheckAuthEvent>(_checkAuthEventHandler);
   }
@@ -29,6 +31,7 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
   final AuthStorage _authStorage;
   final IAuthRepository _authRepository;
   final SignOutService _signOutService;
+  final Duration _notificationPermissionTimeout;
 
   FutureOr<void> _configureApplicationEventHandler(
     ConfigureApplicationEvent _,
@@ -126,6 +129,16 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     Emitter<BootstrapStates> emit,
   ) async {
     emit(NotificationsPermissionRequestState());
-    await _notificationService.requestNotificationPermission();
+    try {
+      // No iOS o retorno do pedido pode se perder quando o diálogo aparece
+      // durante a abertura do app; sem teto, a tela de bootstrap ficaria
+      // parada para sempre mesmo com a permissão respondida.
+      await _notificationService.requestNotificationPermission().timeout(
+        _notificationPermissionTimeout,
+        onTimeout: () => false,
+      );
+    } on Exception {
+      // Permissão de notificação é best-effort: não pode travar a abertura.
+    }
   }
 }
