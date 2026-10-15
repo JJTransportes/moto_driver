@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter_modular/flutter_modular.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/config/app_config.dart';
@@ -194,6 +195,15 @@ class BackgroundLocationService {
 
   BackgroundLocationService(this._authStorage);
 
+  // iOS: não existe foreground service. Com o modo de segundo plano `location`
+  // e a permissão "Sempre", o fluxo de posições mantém o app vivo fora da tela.
+  StreamSubscription<Position>? _iosSubscription;
+  Timer? _iosHeartbeat;
+  Position? _iosLastPosition;
+  DateTime? _iosLastSentAt;
+  bool _iosSending = false;
+  static const _iosSendInterval = Duration(seconds: 5);
+
   static void initialize() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
@@ -219,7 +229,7 @@ class BackgroundLocationService {
   }
 
   Future<BackgroundLocationPermissionStatus> requestPermissions() async {
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid && !Platform.isIOS) {
       return BackgroundLocationPermissionStatus.unsupported;
     }
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -237,13 +247,16 @@ class BackgroundLocationService {
       return BackgroundLocationPermissionStatus.locationDeniedForever;
     }
 
-    final notificationPermission =
-        await FlutterForegroundTask.checkNotificationPermission();
-    if (notificationPermission != NotificationPermission.granted) {
-      final requested =
-          await FlutterForegroundTask.requestNotificationPermission();
-      if (requested != NotificationPermission.granted) {
-        return BackgroundLocationPermissionStatus.notificationsDenied;
+    // A permissão de notificação do serviço em primeiro plano é só do Android.
+    if (Platform.isAndroid) {
+      final notificationPermission =
+          await FlutterForegroundTask.checkNotificationPermission();
+      if (notificationPermission != NotificationPermission.granted) {
+        final requested =
+            await FlutterForegroundTask.requestNotificationPermission();
+        if (requested != NotificationPermission.granted) {
+          return BackgroundLocationPermissionStatus.notificationsDenied;
+        }
       }
     }
 
@@ -256,7 +269,66 @@ class BackgroundLocationService {
     return BackgroundLocationPermissionStatus.granted;
   }
 
+  Future<bool> _startIosTracking() async {
+    if (_iosSubscription != null) return true;
+    final driverId = await _authStorage.getUserId();
+    if (driverId == null) return false;
+
+    _iosSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: AppleSettings(
+            accuracy: LocationAccuracy.high,
+            activityType: ActivityType.automotiveNavigation,
+            pauseLocationUpdatesAutomatically: false,
+            showBackgroundLocationIndicator: true,
+            allowBackgroundLocationUpdates: true,
+          ),
+        ).listen((position) {
+          _iosLastPosition = position;
+          unawaited(_sendIosPosition(driverId));
+        }, onError: (Object _) {});
+    // Parado no trânsito o iOS não emite posições; o batimento mantém o
+    // motorista visível no mapa (a janela de "ao vivo" do dashboard é de 30 s).
+    _iosHeartbeat = Timer.periodic(
+      _iosSendInterval,
+      (_) => unawaited(_sendIosPosition(driverId)),
+    );
+    return true;
+  }
+
+  Future<void> _sendIosPosition(String driverId) async {
+    final position = _iosLastPosition;
+    if (position == null || _iosSending) return;
+    final lastSentAt = _iosLastSentAt;
+    if (lastSentAt != null &&
+        DateTime.now().difference(lastSentAt) < _iosSendInterval) {
+      return;
+    }
+    _iosSending = true;
+    try {
+      await Modular.get<Dio>().post(
+        '/api/positions/drivers/$driverId',
+        data: {'latitude': position.latitude, 'longitude': position.longitude},
+      );
+      _iosLastSentAt = DateTime.now();
+    } catch (_) {
+      // Falha de rede: tenta de novo no próximo batimento.
+    } finally {
+      _iosSending = false;
+    }
+  }
+
+  Future<void> _stopIosTracking() async {
+    await _iosSubscription?.cancel();
+    _iosSubscription = null;
+    _iosHeartbeat?.cancel();
+    _iosHeartbeat = null;
+    _iosLastPosition = null;
+    _iosLastSentAt = null;
+  }
+
   Future<bool> start() async {
+    if (Platform.isIOS) return _startIosTracking();
     if (!Platform.isAndroid) return false;
     final token = await _authStorage.getToken();
     final driverId = await _authStorage.getUserId();
@@ -314,6 +386,10 @@ class BackgroundLocationService {
   }
 
   Future<void> stop() async {
+    if (Platform.isIOS) {
+      await _stopIosTracking();
+      return;
+    }
     if (!Platform.isAndroid) return;
     if (await FlutterForegroundTask.isRunningService) {
       await FlutterForegroundTask.stopService();

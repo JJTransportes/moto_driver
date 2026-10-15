@@ -9,6 +9,7 @@ import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:moto_driver/core/location/background_location_service.dart';
+import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/local_db/repositories/travel_local_repository.dart';
 import 'package:moto_driver/core/network/signalr_service.dart';
 import 'package:moto_driver/core/notifications/notification_service.dart';
@@ -236,7 +237,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         description:
                             'O acesso contínuo mantém sua posição atualizada, inclusive quando o aplicativo estiver em segundo plano.',
                         actionLabel: 'Verificar configuração',
-                        onAction: Geolocator.openAppSettings,
+                        onAction:
+                            LocationService.requestPermissionOrOpenSettings,
                       ),
                       const SizedBox(height: MotoSpace.s3),
                       _buildReminderItem(
