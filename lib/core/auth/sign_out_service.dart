@@ -39,7 +39,21 @@ class SignOutService {
   /// corrompem a chave AES no web) e individualmente tolerantes a falha: este é
   /// o caminho de recuperação de sessão inválida, então a navegação para
   /// `/login` tem que acontecer mesmo que alguma limpeza falhe.
-  Future<void> signOut({bool notifyBackend = true}) async {
+  ///
+  /// Reentrante: uma chamada durante outra em andamento reaproveita a mesma
+  /// execução. Os 401 das chamadas de rede feitas aqui dentro disparam o
+  /// tratamento de sessão inválida, que chama [signOut] de novo.
+  Future<void> signOut({bool notifyBackend = true}) {
+    final running = _running;
+    if (running != null) return running;
+    final future = _performSignOut(notifyBackend: notifyBackend);
+    _running = future;
+    return future.whenComplete(() => _running = null);
+  }
+
+  Future<void>? _running;
+
+  Future<void> _performSignOut({required bool notifyBackend}) async {
     await _runSafely(
       'serviço de localização em segundo plano',
       _backgroundLocation.stop,

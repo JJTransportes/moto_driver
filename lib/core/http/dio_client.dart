@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -126,7 +128,9 @@ class RefreshAuthInterceptor extends QueuedInterceptor {
     try {
       final refreshToken = await _storage.getRefreshToken();
       if (refreshToken == null) {
-        await _signOut();
+        // Sem await: o signOut faz chamadas pelo mesmo Dio, cujos 401 entram na fila
+        // deste interceptor; esperar aqui travaria a fila (deadlock).
+        unawaited(_signOut());
         handler.next(err);
         return;
       }
@@ -145,7 +149,9 @@ class RefreshAuthInterceptor extends QueuedInterceptor {
       if (success == null) {
         final error = result.exceptionOrNull();
         if (_isInvalidSession(error)) {
-          await _signOut();
+          // Sem await: o signOut faz chamadas pelo mesmo Dio, cujos 401 entram na fila
+          // deste interceptor; esperar aqui travaria a fila (deadlock).
+          unawaited(_signOut());
         } else {
           debugPrint(
             'RefreshAuthInterceptor: renovação indisponível; sessão preservada — $error',
