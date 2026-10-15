@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:bloc/bloc.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
 import 'package:moto_driver/core/config/app_config.dart';
@@ -8,6 +10,7 @@ import 'package:moto_driver/core/config/device_type.dart';
 import 'package:moto_driver/core/errors/exceptions.dart';
 import 'package:moto_driver/core/errors/user_error_message.dart';
 import 'package:moto_driver/core/local_db/local_database_service.dart';
+import 'package:moto_driver/core/location/location_service.dart';
 import 'package:moto_driver/core/notifications/inotification_service.dart';
 import 'package:moto_driver/modules/auth/domain/repositories/i_auth_repository.dart';
 
@@ -21,7 +24,13 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     this._authRepository,
     this._signOutService, {
     Duration notificationPermissionTimeout = const Duration(seconds: 10),
+    Future<void> Function()? requestLocationPermission,
+    bool? isIOS,
   }) : _notificationPermissionTimeout = notificationPermissionTimeout,
+       _requestLocationPermission =
+           requestLocationPermission ??
+           LocationService.requestPermissionIfNeeded,
+       _isIOS = isIOS ?? (!kIsWeb && Platform.isIOS),
        super(BootstrapInitial()) {
     on<ConfigureApplicationEvent>(_configureApplicationEventHandler);
     on<CheckAuthEvent>(_checkAuthEventHandler);
@@ -32,6 +41,8 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
   final IAuthRepository _authRepository;
   final SignOutService _signOutService;
   final Duration _notificationPermissionTimeout;
+  final Future<void> Function() _requestLocationPermission;
+  final bool _isIOS;
 
   FutureOr<void> _configureApplicationEventHandler(
     ConfigureApplicationEvent _,
@@ -40,6 +51,7 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
     emit(LoadingConfigurationsState());
 
     await _initLocalPersistence(emit);
+    await _requestLocationPermissionOnIOS();
     await _initializeNotificationService(emit);
     await _requestNotificationsPermission(emit);
 
@@ -122,6 +134,22 @@ class BootstrapBloc extends Bloc<BootstrapEvents, BootstrapStates> {
           ),
         ),
       );
+    }
+  }
+
+  /// No iOS ninguém mais pede a permissão de localização: o aviso do Android
+  /// (`MandatoryLocationGate`) e o serviço em segundo plano são só do Android, e
+  /// o envio da posição na Home apenas consulta a permissão (sai em silêncio se
+  /// negada). Sem este pedido o motorista nunca aparece no mapa do dashboard.
+  Future<void> _requestLocationPermissionOnIOS() async {
+    if (!_isIOS) return;
+    try {
+      await _requestLocationPermission().timeout(
+        _notificationPermissionTimeout,
+        onTimeout: () {},
+      );
+    } on Exception {
+      // Best-effort: não pode travar a abertura do app.
     }
   }
 
