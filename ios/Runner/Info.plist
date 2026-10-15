@@ -57,7 +57,6 @@
 	<string>$(IOS_MAPS_API_KEY)</string>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>location</string>
 		<string>remote-notification</string>
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
