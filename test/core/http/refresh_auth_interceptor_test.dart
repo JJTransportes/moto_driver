@@ -230,5 +230,40 @@ void main() {
         verifyNever(() => authRepository.refreshToken(any(), any()));
       },
     );
+
+    test(
+      'sessão inválida: signOut que faz chamadas 401 pelo mesmo Dio não trava a fila',
+      () async {
+        Modular.init(_FakeModule(authRepository, signOutService));
+
+        when(
+          () => storage.getRefreshToken(),
+        ).thenAnswer((_) async => 'stale_refresh');
+        when(() => authRepository.refreshToken(any(), any())).thenAnswer(
+          (_) async => Failure(const UnauthorizedException('Sessão inválida.')),
+        );
+
+        final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
+          ..httpClientAdapter = _AlwaysUnauthorizedAdapter();
+        dio.interceptors.add(RefreshAuthInterceptor(storage, dio));
+
+        // Reproduz o SignOutService real: ele chama o backend (deactivate /
+        // sign-out) pelo mesmo Dio, e essas chamadas também voltam 401.
+        var signOutCalls = 0;
+        when(() => signOutService.signOut()).thenAnswer((_) async {
+          if (signOutCalls++ > 0) return;
+          try {
+            await dio.post('/api/drivers/availability/update');
+          } on DioException {
+            // best-effort, como no serviço real
+          }
+        });
+
+        await expectLater(
+          dio.get('/protected').timeout(const Duration(seconds: 3)),
+          throwsA(isA<DioException>()),
+        );
+      },
+    );
   });
 }
