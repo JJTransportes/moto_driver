@@ -4,7 +4,8 @@ import 'package:moto_driver/modules/auth/domain/usecases/i_verify_reset_code_use
 import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_event.dart';
 import 'package:moto_driver/modules/auth/presentation/blocs/verify_reset_code_state.dart';
 
-class VerifyResetCodeBloc extends Bloc<VerifyResetCodeEvent, VerifyResetCodeState> {
+class VerifyResetCodeBloc
+    extends Bloc<VerifyResetCodeEvent, VerifyResetCodeState> {
   final IVerifyResetCodeUsecase _verifyResetCodeUsecase;
   final String email;
 
@@ -15,7 +16,8 @@ class VerifyResetCodeBloc extends Bloc<VerifyResetCodeEvent, VerifyResetCodeStat
   static const _maxAttempts = 5;
   int _wrongAttempts = 0;
 
-  VerifyResetCodeBloc(this._verifyResetCodeUsecase, {required this.email}) : super(const VerifyCodeInitial()) {
+  VerifyResetCodeBloc(this._verifyResetCodeUsecase, {required this.email})
+    : super(const VerifyCodeInitial()) {
     on<VerifyCodeSubmitted>(_onVerifyCodeSubmitted);
   }
 
@@ -25,7 +27,10 @@ class VerifyResetCodeBloc extends Bloc<VerifyResetCodeEvent, VerifyResetCodeStat
   ) async {
     emit(const VerifyCodeSubmitting());
 
-    final result = await _verifyResetCodeUsecase.call(email: email, code: event.code);
+    final result = await _verifyResetCodeUsecase.call(
+      email: email,
+      code: event.code,
+    );
 
     result.fold(
       (resetToken) => emit(VerifyCodeSuccess(resetToken)),
@@ -40,9 +45,11 @@ class VerifyResetCodeBloc extends Bloc<VerifyResetCodeEvent, VerifyResetCodeStat
           case ConflictException():
             emit(VerifyCodeError(error.message));
           default:
-            emit(const VerifyCodeError(
-              'Erro ao verificar o código. Verifique sua conexão e tente novamente.',
-            ));
+            emit(
+              const VerifyCodeError(
+                'Erro ao verificar o código. Verifique sua conexão e tente novamente.',
+              ),
+            );
         }
       },
     );

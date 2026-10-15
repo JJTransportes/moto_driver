@@ -48,12 +48,20 @@ class MotoRoute extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: c.bgBase,
-                    border: Border.all(color: c.isDark ? MotoRaw.cobalto300 : c.accentBright, width: 3.5),
-                    boxShadow: [BoxShadow(color: c.accentSoft, spreadRadius: 4)],
+                    border: Border.all(
+                      color: c.isDark ? MotoRaw.cobalto300 : c.accentBright,
+                      width: 3.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: c.accentSoft, spreadRadius: 4),
+                    ],
                   ),
                 ),
                 Expanded(
-                  child: CustomPaint(size: const Size(2, double.infinity), painter: _Dashed(c.borderStrong)),
+                  child: CustomPaint(
+                    size: const Size(2, double.infinity),
+                    painter: _Dashed(c.borderStrong),
+                  ),
                 ),
                 Transform.rotate(
                   angle: .785,
@@ -63,7 +71,9 @@ class MotoRoute extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: c.signalLiquid,
                       borderRadius: BorderRadius.circular(3.5),
-                      boxShadow: [BoxShadow(color: c.signalSoft, spreadRadius: 3)],
+                      boxShadow: [
+                        BoxShadow(color: c.signalSoft, spreadRadius: 3),
+                      ],
                     ),
                   ),
                 ),
@@ -129,14 +139,20 @@ class MotoMetrics extends StatelessWidget {
               if (i > 0) VerticalDivider(width: 1, color: c.borderSubtle),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: MotoSpace.s4, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: MotoSpace.s4,
+                    vertical: 14,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text.rich(
                         TextSpan(
                           children: [
-                            TextSpan(text: items[i].$1, style: MotoNum.of(context, 22)),
+                            TextSpan(
+                              text: items[i].$1,
+                              style: MotoNum.of(context, 22),
+                            ),
                             if (items[i].$2.isNotEmpty)
                               TextSpan(
                                 text: ' ${items[i].$2}',
@@ -151,7 +167,10 @@ class MotoMetrics extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 5),
-                      Text(items[i].$3, style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        items[i].$3,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),
@@ -165,7 +184,13 @@ class MotoMetrics extends StatelessWidget {
 }
 
 class MotoAvatar extends StatelessWidget {
-  const MotoAvatar({super.key, required this.initials, this.size = 48, this.online = false, this.image});
+  const MotoAvatar({
+    super.key,
+    required this.initials,
+    this.size = 48,
+    this.online = false,
+    this.image,
+  });
   final String initials;
   final double size;
   final bool online;
@@ -187,7 +212,11 @@ class MotoAvatar extends StatelessWidget {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [MotoRaw.cobalto400, MotoRaw.cobalto500, MotoRaw.safira900],
+                colors: [
+                  MotoRaw.cobalto400,
+                  MotoRaw.cobalto500,
+                  MotoRaw.safira900,
+                ],
                 stops: [0, .35, 1],
               ),
               image: switch (image) {
@@ -195,9 +224,18 @@ class MotoAvatar extends StatelessWidget {
                 null => null,
               },
               boxShadow: [
-                BoxShadow(color: c.isDark ? const Color(0x24FFFFFF) : Colors.white, spreadRadius: ring),
-                if (!c.isDark) BoxShadow(color: c.borderDefault, spreadRadius: ring + 1),
-                BoxShadow(color: c.shadow, blurRadius: 18, offset: const Offset(0, 8), spreadRadius: -6),
+                BoxShadow(
+                  color: c.isDark ? const Color(0x24FFFFFF) : Colors.white,
+                  spreadRadius: ring,
+                ),
+                if (!c.isDark)
+                  BoxShadow(color: c.borderDefault, spreadRadius: ring + 1),
+                BoxShadow(
+                  color: c.shadow,
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                  spreadRadius: -6,
+                ),
               ],
             ),
             alignment: Alignment.center,
@@ -224,7 +262,10 @@ class MotoAvatar extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: c.signalLiquid,
                   shape: BoxShape.circle,
-                  border: Border.all(color: c.isDark ? MotoRaw.safira800 : Colors.white, width: size >= 96 ? 4 : 2.5),
+                  border: Border.all(
+                    color: c.isDark ? MotoRaw.safira800 : Colors.white,
+                    width: size >= 96 ? 4 : 2.5,
+                  ),
                 ),
               ),
             ),
@@ -250,7 +291,14 @@ class MotoPlate extends StatelessWidget {
       ),
       borderRadius: BorderRadius.circular(10),
       border: Border.all(color: const Color(0x1F132C86)),
-      boxShadow: const [BoxShadow(color: Color(0x40132C86), blurRadius: 6, offset: Offset(0, 2), spreadRadius: -2)],
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x40132C86),
+          blurRadius: 6,
+          offset: Offset(0, 2),
+          spreadRadius: -2,
+        ),
+      ],
     ),
     child: Column(
       mainAxisSize: MainAxisSize.min,
@@ -266,7 +314,14 @@ class MotoPlate extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 3),
-        Text(plate, style: MotoNum.of(context, 15, color: MotoRaw.tinta900).copyWith(letterSpacing: .9)),
+        Text(
+          plate,
+          style: MotoNum.of(
+            context,
+            15,
+            color: MotoRaw.tinta900,
+          ).copyWith(letterSpacing: .9),
+        ),
       ],
     ),
   );
@@ -274,7 +329,13 @@ class MotoPlate extends StatelessWidget {
 
 /// Ícone em "pastilha" de porcelana (listas, cabeçalhos de card).
 class MotoTile extends StatelessWidget {
-  const MotoTile({super.key, required this.icon, this.tone = MotoTone.info, this.accent = false, this.size = 46});
+  const MotoTile({
+    super.key,
+    required this.icon,
+    this.tone = MotoTone.info,
+    this.accent = false,
+    this.size = 46,
+  });
   final IconData icon;
   final MotoTone tone;
 
@@ -290,9 +351,21 @@ class MotoTile extends StatelessWidget {
         : c.isDark
         ? (MotoRaw.cobalto300, const Color(0x1FFFFFFF), const Color(0x0FFFFFFF))
         : switch (tone) {
-            MotoTone.success => (c.success, const Color(0xFFFCFFF3), const Color(0xFFE9F4CC)),
-            MotoTone.danger => (c.danger, const Color(0xFFFFF8F9), const Color(0xFFFCE3E7)),
-            MotoTone.warning => (c.warning, const Color(0xFFFFFBF3), const Color(0xFFFCEFD6)),
+            MotoTone.success => (
+              c.success,
+              const Color(0xFFFCFFF3),
+              const Color(0xFFE9F4CC),
+            ),
+            MotoTone.danger => (
+              c.danger,
+              const Color(0xFFFFF8F9),
+              const Color(0xFFFCE3E7),
+            ),
+            MotoTone.warning => (
+              c.warning,
+              const Color(0xFFFFFBF3),
+              const Color(0xFFFCEFD6),
+            ),
             _ => (c.accent, Colors.white, const Color(0xFFE7EEFC)),
           };
     return Container(
@@ -300,10 +373,19 @@ class MotoTile extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(size * .3),
-        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [top, bottom]),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [top, bottom],
+        ),
         border: Border.all(color: fg.withValues(alpha: .16)),
         boxShadow: [
-          BoxShadow(color: c.shadow.withValues(alpha: .5), blurRadius: 8, offset: const Offset(0, 3), spreadRadius: -4),
+          BoxShadow(
+            color: c.shadow.withValues(alpha: .5),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+            spreadRadius: -4,
+          ),
         ],
       ),
       child: Icon(icon, color: fg, size: size * .48),
@@ -313,7 +395,13 @@ class MotoTile extends StatelessWidget {
 
 /// Busca "Pra onde vamos?" — cápsula branca com orbe cobalto.
 class MotoSearchBar extends StatelessWidget {
-  const MotoSearchBar({super.key, required this.title, this.hint, this.trailing, required this.onTap});
+  const MotoSearchBar({
+    super.key,
+    required this.title,
+    this.hint,
+    this.trailing,
+    required this.onTap,
+  });
   final String title;
   final String? hint;
   final Widget? trailing;
@@ -341,8 +429,15 @@ class MotoSearchBar extends StatelessWidget {
                 Container(
                   width: 50,
                   height: 50,
-                  decoration: BoxDecoration(shape: BoxShape.circle, gradient: c.accentLiquid),
-                  child: const Icon(Icons.search_rounded, color: Colors.white, size: 22),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: c.accentLiquid,
+                  ),
+                  child: const Icon(
+                    Icons.search_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -350,10 +445,18 @@ class MotoSearchBar extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: Theme.of(context).textTheme.titleMedium!.copyWith(fontSize: 17)),
+                      Text(
+                        title,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium!.copyWith(fontSize: 17),
+                      ),
                       if (hint != null) ...[
                         const SizedBox(height: 3),
-                        Text(hint!, style: Theme.of(context).textTheme.bodySmall),
+                        Text(
+                          hint!,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ],
                     ],
                   ),

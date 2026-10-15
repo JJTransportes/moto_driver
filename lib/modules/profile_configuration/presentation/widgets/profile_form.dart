@@ -52,14 +52,23 @@ class ProfileFormState extends State<ProfileForm> {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
     _emailController = TextEditingController(
-      text: widget.isEditing ? widget.initialEmail : _maskEmail(widget.initialEmail),
+      text: widget.isEditing
+          ? widget.initialEmail
+          : _maskEmail(widget.initialEmail),
     );
     _confirmEmailController = TextEditingController(text: widget.initialEmail);
     _phoneController = TextEditingController(
-      text: widget.isEditing ? _formatPhone(widget.initialPhone) : _maskPhone(widget.initialPhone),
+      text: widget.isEditing
+          ? _formatPhone(widget.initialPhone)
+          : _maskPhone(widget.initialPhone),
     );
 
-    for (final controller in [_nameController, _emailController, _confirmEmailController, _phoneController]) {
+    for (final controller in [
+      _nameController,
+      _emailController,
+      _confirmEmailController,
+      _phoneController,
+    ]) {
       controller.addListener(_onFieldsChanged);
     }
   }
@@ -130,23 +139,27 @@ class ProfileFormState extends State<ProfileForm> {
 
   String _formatPhone(String raw) {
     if (raw.isEmpty) return raw;
-    return PhoneInputFormatter().formatEditUpdate(
-      TextEditingValue.empty,
-      TextEditingValue(text: raw),
-    ).text;
+    return PhoneInputFormatter()
+        .formatEditUpdate(
+          TextEditingValue.empty,
+          TextEditingValue(text: raw),
+        )
+        .text;
   }
 
   String? get _liveConfirmEmailError {
     if (_confirmEmailController.text.isEmpty) return null;
-    if (_confirmEmailController.text.trim().toLowerCase() != _emailController.text.trim().toLowerCase()) {
+    if (_confirmEmailController.text.trim().toLowerCase() !=
+        _emailController.text.trim().toLowerCase()) {
       return 'Os e-mails não coincidem';
     }
     return null;
   }
 
-  /// Telefone é opcional: sem erro se vazio, valida formato só se preenchido.
-  String? get _phoneErrorIfAny =>
-      _phoneController.text.trim().isEmpty ? null : validators.validatePhone(_phoneController.text);
+  /// Telefone obrigatório em toda atualização de perfil.
+  String? get _phoneErrorIfAny => _phoneController.text.trim().isEmpty
+      ? 'Telefone é obrigatório'
+      : validators.validatePhone(_phoneController.text);
 
   /// Valida ao tentar salvar; retorna true se tudo estiver ok.
   bool validate() {
@@ -154,15 +167,19 @@ class ProfileFormState extends State<ProfileForm> {
       _nameError = _nameController.text.trim().isEmpty
           ? 'Nome é obrigatório'
           : validators.validateMaxLength(_nameController.text, 100, 'Nome') ??
-              validators.validateSafeText(_nameController.text, 'Nome');
-      _emailError = validators.validateEmailFormat(_emailController.text.trim()) ??
+                validators.validateSafeText(_nameController.text, 'Nome');
+      _emailError =
+          validators.validateEmailFormat(_emailController.text.trim()) ??
           validators.validateMaxLength(_emailController.text, 100, 'E-mail');
       _confirmEmailError = _confirmEmailController.text.trim().isEmpty
           ? 'Campo obrigatório'
           : _liveConfirmEmailError;
       _phoneError = _phoneErrorIfAny;
     });
-    return _nameError == null && _emailError == null && _confirmEmailError == null && _phoneError == null;
+    return _nameError == null &&
+        _emailError == null &&
+        _confirmEmailError == null &&
+        _phoneError == null;
   }
 
   /// Estado ao vivo (sem tocar nas mensagens de erro exibidas) usado para
@@ -170,15 +187,20 @@ class ProfileFormState extends State<ProfileForm> {
   bool get isValid {
     if (!widget.isEditing) return false;
     return _nameController.text.trim().isNotEmpty &&
-        validators.validateMaxLength(_nameController.text, 100, 'Nome') == null &&
+        validators.validateMaxLength(_nameController.text, 100, 'Nome') ==
+            null &&
         validators.validateSafeText(_nameController.text, 'Nome') == null &&
         validators.validateEmailFormat(_emailController.text.trim()) == null &&
-        validators.validateMaxLength(_emailController.text, 100, 'E-mail') == null &&
-        _confirmEmailController.text.trim().toLowerCase() == _emailController.text.trim().toLowerCase() &&
+        validators.validateMaxLength(_emailController.text, 100, 'E-mail') ==
+            null &&
+        _confirmEmailController.text.trim().toLowerCase() ==
+            _emailController.text.trim().toLowerCase() &&
         _phoneErrorIfAny == null;
   }
 
-  bool get emailChanged => _emailController.text.trim().toLowerCase() != widget.initialEmail.trim().toLowerCase();
+  bool get emailChanged =>
+      _emailController.text.trim().toLowerCase() !=
+      widget.initialEmail.trim().toLowerCase();
 
   String get name => _nameController.text.trim();
   String get email => _emailController.text.trim();
@@ -195,7 +217,13 @@ class ProfileFormState extends State<ProfileForm> {
           controller: _nameController,
           enabled: editing,
           maxLength: 100,
-          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+          buildCounter:
+              (
+                context, {
+                required currentLength,
+                required isFocused,
+                maxLength,
+              }) => null,
           decoration: InputDecoration(
             labelText: 'Nome',
             prefixIcon: const Icon(Icons.person),
@@ -211,7 +239,13 @@ class ProfileFormState extends State<ProfileForm> {
           enabled: editing,
           keyboardType: TextInputType.emailAddress,
           maxLength: 100,
-          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+          buildCounter:
+              (
+                context, {
+                required currentLength,
+                required isFocused,
+                maxLength,
+              }) => null,
           decoration: InputDecoration(
             labelText: 'E-mail',
             prefixIcon: const Icon(Icons.email),
@@ -227,7 +261,13 @@ class ProfileFormState extends State<ProfileForm> {
             controller: _confirmEmailController,
             keyboardType: TextInputType.emailAddress,
             maxLength: 100,
-            buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+            buildCounter:
+                (
+                  context, {
+                  required currentLength,
+                  required isFocused,
+                  maxLength,
+                }) => null,
             decoration: InputDecoration(
               labelText: 'Confirmar e-mail',
               prefixIcon: const Icon(Icons.email_outlined),
@@ -243,9 +283,15 @@ class ProfileFormState extends State<ProfileForm> {
           keyboardType: TextInputType.phone,
           inputFormatters: [PhoneInputFormatter()],
           maxLength: 15,
-          buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+          buildCounter:
+              (
+                context, {
+                required currentLength,
+                required isFocused,
+                maxLength,
+              }) => null,
           decoration: InputDecoration(
-            labelText: 'Telefone (opcional)',
+            labelText: 'Telefone *',
             prefixIcon: const Icon(Icons.phone),
             border: const OutlineInputBorder(),
             hintText: '(12) 91234-5678',

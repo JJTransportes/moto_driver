@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moto_driver/core/auth/auth_storage.dart';
 import 'package:moto_driver/core/auth/sign_out_service.dart';
+import 'package:moto_driver/core/errors/exceptions.dart';
 import 'package:moto_driver/core/http/dio_client.dart';
 import 'package:moto_driver/modules/auth/data/models/refresh_token_response_model.dart';
 import 'package:moto_driver/modules/auth/domain/repositories/i_auth_repository.dart';
@@ -97,7 +98,9 @@ void main() {
       () async {
         Modular.init(_FakeModule(authRepository, signOutService));
 
-        when(() => storage.getRefreshToken()).thenAnswer((_) async => 'old_refresh');
+        when(
+          () => storage.getRefreshToken(),
+        ).thenAnswer((_) async => 'old_refresh');
         when(() => storage.saveToken(any(), any())).thenAnswer((_) async {});
         when(() => storage.saveRefreshToken(any())).thenAnswer((_) async {});
         when(() => authRepository.refreshToken(any(), any())).thenAnswer(
@@ -120,8 +123,13 @@ void main() {
         final response = await dio.get('/protected');
 
         expect(response.statusCode, 200);
-        expect(adapter.requests.where((r) => r.path.contains('/protected')).length, 2);
-        verify(() => authRepository.refreshToken('old_refresh', any())).called(1);
+        expect(
+          adapter.requests.where((r) => r.path.contains('/protected')).length,
+          2,
+        );
+        verify(
+          () => authRepository.refreshToken('old_refresh', any()),
+        ).called(1);
         verify(() => storage.saveToken('new_token', 'user_1')).called(1);
         verify(() => storage.saveRefreshToken('new_refresh')).called(1);
         verifyNever(() => signOutService.signOut());
@@ -148,13 +156,44 @@ void main() {
     );
 
     test(
-      '401 quando o refresh também falha: chama SignOutService.signOut()',
+      'falha temporária no refresh preserva a sessão',
       () async {
         Modular.init(_FakeModule(authRepository, signOutService));
 
-        when(() => storage.getRefreshToken()).thenAnswer((_) async => 'old_refresh');
-        when(() => authRepository.refreshToken(any(), any()))
-            .thenAnswer((_) async => Failure(Exception('refresh expirado')));
+        when(
+          () => storage.getRefreshToken(),
+        ).thenAnswer((_) async => 'old_refresh');
+        when(
+          () => authRepository.refreshToken(any(), any()),
+        ).thenAnswer((_) async => const Failure(NetworkException()));
+
+        final adapter = _AlwaysUnauthorizedAdapter();
+        final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
+          ..httpClientAdapter = adapter;
+        dio.interceptors.add(RefreshAuthInterceptor(storage, dio));
+
+        await expectLater(
+          dio.get('/protected'),
+          throwsA(isA<DioException>()),
+        );
+
+        verifyNever(() => signOutService.signOut());
+      },
+    );
+
+    test(
+      'refresh token confirmado como inválido encerra a sessão',
+      () async {
+        Modular.init(_FakeModule(authRepository, signOutService));
+
+        when(
+          () => storage.getRefreshToken(),
+        ).thenAnswer((_) async => 'old_refresh');
+        when(() => authRepository.refreshToken(any(), any())).thenAnswer(
+          (_) async => const Failure(
+            ValidationException('Token de atualização expirado.'),
+          ),
+        );
 
         final adapter = _AlwaysUnauthorizedAdapter();
         final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))

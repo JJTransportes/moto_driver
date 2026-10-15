@@ -1,6 +1,7 @@
 name: Enforce PR source branch on pipeline branches
 
-# android_staging and android_release are pipeline-only branches: they exist
+# android_staging, android_release, ios_staging and ios_release are pipeline-only
+# branches: they exist
 # to trigger Codemagic, not to hold independent development. The only
 # allowed way in is a merge from dev — never a random feature/hotfix branch
 # directly, which could skip review on dev or drift the pipeline branches
@@ -11,6 +12,8 @@ on:
     branches:
       - android_staging
       - android_release
+      - ios_staging
+      - ios_release
 
 jobs:
   check-source-branch:
@@ -18,11 +21,7 @@ jobs:
     steps:
       - name: Fail if source branch is not dev
         run: |
-          # Exceção única para reconciliar a divergência histórica da branch
-          # de produção. Deve ser removida após o merge do PR correspondente.
-          if [ "${{ github.head_ref }}" != "dev" ] && \
-             ! { [ "${{ github.base_ref }}" = "android_release" ] && \
-                 [ "${{ github.head_ref }}" = "release-reconcile-driver" ]; }; then
+          if [ "${{ github.head_ref }}" != "dev" ]; then
             echo "PRs into ${{ github.base_ref }} must come from 'dev'. Got: ${{ github.head_ref }}"
             exit 1
           fi

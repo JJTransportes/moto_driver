@@ -9,6 +9,8 @@ class ProfileHeader extends StatelessWidget {
   final String userId;
   final VoidCallback? onSignOut;
   final VoidCallback? onSettingsTap;
+  final VoidCallback? onRefresh;
+  final bool isRefreshing;
 
   const ProfileHeader({
     super.key,
@@ -17,11 +19,32 @@ class ProfileHeader extends StatelessWidget {
     required this.userId,
     this.onSignOut,
     this.onSettingsTap,
+    this.onRefresh,
+    this.isRefreshing = false,
   });
 
-  static const _weekdays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+  static const _weekdays = [
+    'Segunda',
+    'Terça',
+    'Quarta',
+    'Quinta',
+    'Sexta',
+    'Sábado',
+    'Domingo',
+  ];
   static const _months = [
-    'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez',
+    'jan',
+    'fev',
+    'mar',
+    'abr',
+    'mai',
+    'jun',
+    'jul',
+    'ago',
+    'set',
+    'out',
+    'nov',
+    'dez',
   ];
 
   String _todayLabel() {
@@ -39,29 +62,50 @@ class ProfileHeader extends StatelessWidget {
           radius: 20,
         ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_todayLabel(), style: Theme.of(context).textTheme.bodySmall),
-            Text(
-              'Olá, ${fullName.split(' ').first}',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: context.moto.textPrimary,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _todayLabel(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
-            ),
-          ],
+              Text(
+                'Olá, ${fullName.split(' ').first}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: context.moto.textPrimary,
+                ),
+              ),
+            ],
+          ),
         ),
-        const Spacer(),
+        IconButton(
+          tooltip: isRefreshing ? 'Atualizando...' : 'Atualizar',
+          onPressed: isRefreshing ? null : onRefresh,
+          icon: isRefreshing
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded),
+        ),
         PopupMenuButton<String>(
           onSelected: (value) {
             if (value == 'settings') {
               if (onSettingsTap != null) {
                 onSettingsTap!();
               } else {
-                Modular.to.pushNamed('/profile-configuration', arguments: {'userId': userId});
+                Modular.to.pushNamed(
+                  '/profile-configuration',
+                  arguments: {'userId': userId},
+                );
               }
             }
             if (value == 'signout') onSignOut?.call();

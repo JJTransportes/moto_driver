@@ -7,7 +7,7 @@ class DeleteAccountBloc extends Bloc<DeleteAccountEvent, DeleteAccountState> {
   final IDeleteAccountUseCase _deleteAccountUseCase;
 
   DeleteAccountBloc(this._deleteAccountUseCase)
-      : super(const DeleteAccountInitial()) {
+    : super(const DeleteAccountInitial()) {
     on<DeleteAccountRequested>(_onDeleteAccountRequested);
   }
 
