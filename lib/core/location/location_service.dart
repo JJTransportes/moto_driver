@@ -17,6 +17,19 @@ class LocationResult {
 }
 
 class LocationService {
+  /// Ação do card "Verificar configuração" da Home: se a permissão ainda não
+  /// foi decidida, abre o diálogo do sistema (no iOS a página do app nos
+  /// Ajustes só existe depois do primeiro pedido); se já foi negada, ou o
+  /// diálogo não pode mais ser exibido, leva aos Ajustes.
+  static Future<bool> requestPermissionOrOpenSettings() async {
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      final result = await Geolocator.requestPermission();
+      if (result != LocationPermission.deniedForever) return true;
+    }
+    return Geolocator.openAppSettings();
+  }
+
   static Future<void> requestPermissionIfNeeded() async {
     final permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
