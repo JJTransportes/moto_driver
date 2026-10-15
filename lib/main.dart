@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:moto_driver/app/app_module.dart';
 import 'package:moto_driver/app/app_widget.dart';
+import 'package:moto_driver/core/auth/first_run_session_cleaner.dart';
 import 'package:moto_driver/core/config/app_config.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:moto_driver/core/location/background_location_service.dart';
@@ -13,6 +14,7 @@ Future<void> main() async {
 
   await dotenv.load();
   await AppConfig.loadEnv();
+  await FirstRunSessionCleaner().run();
   FlutterForegroundTask.initCommunicationPort();
   BackgroundLocationService.initialize();
 
